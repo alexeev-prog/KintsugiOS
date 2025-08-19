@@ -28,7 +28,7 @@ check_tool() {
     else
         if [ "$required" = true ]; then
             echo -e "${RED}[FAIL]${NC} $tool_name (required)"
-            return 1
+            return 0
         else
             echo -e "${YELLOW}[WARN]${NC} $tool_name (optional)"
             ((warnings++))

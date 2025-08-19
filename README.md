@@ -1,18 +1,18 @@
 # KintsugiOS
-Minimalistic and rich x86 operation system in (F)ASM and C
+Минималистичная x86 операционная система на (F)ASM и С.
 
 ## Requirements
-This project use [i386 ELF GCC cross compiler](http://newos.org/toolchains/i386-elf-15.1.0-Linux-x86_64.tar.xz) and FASM 1.73, NASM 2.16 and GDB, MTools, Xorriso.
+Этот проект использует [кросс компилятор i386 ELF GCC](http://newos.org/toolchains/i386-elf-15.1.0-Linux-x86_64.tar.xz), FASM 1.73, NASM 2.16 и GDB, MTools, Xorriso.
 
-Please, download cross compiler toolchain and copy him to `toolchain/` directory. And you can change `shell.nix`:
+Пожалуйста, скачайте тулчейн компилятора и переместите его в директорию `toolchain/`. Также вы можете изменить `shell.nix`:
 
 ```nix
 let
-  customToolchainPath = "toolchain/i386-elf-15.1.0-Linux-x86_64/bin"; # put here your path to toolchain bin directory
+  customToolchainPath = "toolchain/i386-elf-15.1.0-Linux-x86_64/bin"; # ваш путь до бинарников компилятора
 in
 ```
 
-Before development, run `check-env.sh`:
+Перел разработкой, проверьте вывод `check-env.sh`:
 
 ```bash
  $ ./check-env.sh

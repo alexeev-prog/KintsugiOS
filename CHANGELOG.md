@@ -1,3 +1,9 @@
+commit 7ec1cd47eb2f01c7a20fca3f64580198e7f5dd94
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 19 23:32:12 2025 +0700
+
+    add simple bootloader-asm file
+
 commit ff410b688a41d32afd01b4be17ccb121873b6975
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Tue Aug 19 22:44:44 2025 +0700
