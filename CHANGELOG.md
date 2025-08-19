@@ -1,3 +1,9 @@
+commit ff410b688a41d32afd01b4be17ccb121873b6975
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 19 22:44:44 2025 +0700
+
+    update readme and add check-env script
+
 commit 53fe04c6309774e68033f8b0544946598bb156bb
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Tue Aug 19 22:14:47 2025 +0700
