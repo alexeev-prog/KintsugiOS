@@ -1,3 +1,9 @@
+commit 6d5e76d0a34fc90d588b2ad6120e734e5f7c7acf
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Wed Aug 20 05:48:55 2025 +0700
+
+    add stage1 and stage2 bootloader, add simple kernel
+
 commit 7ec1cd47eb2f01c7a20fca3f64580198e7f5dd94
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Tue Aug 19 23:32:12 2025 +0700
