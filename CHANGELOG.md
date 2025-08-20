@@ -1,3 +1,9 @@
+commit 581a9d8a8232f49a505b9c8cbc291869ee345162
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 21 01:30:11 2025 +0700
+
+    small fixes in kernel/kernel.c
+
 commit 13cd64fb1040aeeeb871837928f30877dd01d6e4
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Aug 21 01:03:44 2025 +0700

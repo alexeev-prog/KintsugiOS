@@ -39,6 +39,7 @@ void user_input(char *input) {
 		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",					.command=&shutdown_qemu},
 		{.text="INFO",				.hint="Get info",						.command=&info_command_shell}
 	};
+	// TODO: добавить поддержку аргументов
 
 	int executed = 0;
 

@@ -59,6 +59,18 @@ make # сборка
 make run # сборка и запуск в qemu
 ```
 
+## Фичи
+
+ + bootloader:
+   + gdt
+   + diskload
+   + switch to 32
+ + kernel:
+   + drivers
+   + libc
+   + CPU
+   + basic shell
+
 ## Литература, источники
 
 По языку ассемблера:
