@@ -9,9 +9,9 @@
 
 KERNEL_OFFSET equ 0x1000	; Смещение в памяти, из которого мы загрузим ядро
 
-	mov [BOOT_DRIVE], dl	; BIOS stores our boot drive in DL , so it ’s
-							; best to remember this for later. (Remember that
-							; the BIOS sets us the boot drive in 'dl' on boot)
+	mov [BOOT_DRIVE], dl	; BIOS хранит наш загрузочный диск в формате DL, поэтому
+							; лучше запомнить это на будущее. (Помните об этом
+							; BIOS задает нам загрузочный диск в формате "dl" при загрузке)
 	mov bp, 0x9000			; Устанавливаем стек
 	mov sp, bp
 
@@ -52,9 +52,9 @@ BEGIN_PM:
 
 
 BOOT_DRIVE:			db 0
-MSG_REAL_MODE:		db "Load Kintsugi OS into Real Mode", 0 							; [Старт] 16 битный реальный режим
-MSG_PROT_MODE:		db "Load Kintsugi OS into Prot Mode", 0        						; [Успех] 32 битный защищенный режим
-MSG_LOAD_KERNEL:	db "Load Kintsugi OS Kernel with Video Memory", 0 					; [Загрузка] ядра с видео памятью
+MSG_REAL_MODE:		db "Start KintsugiOS into Real Mode", 0 							; [Старт] 16 битный реальный режим
+MSG_PROT_MODE:		db "Success KintsugiOS into Prot Mode", 0        					; [Успех] 32 битный защищенный режим
+MSG_LOAD_KERNEL:	db "Load KintsugiOS Kernel with Video Memory", 0 					; [Загрузка] ядра с видео памятью
 
 times 510-($-$$) db 0
 dw 0xaa55

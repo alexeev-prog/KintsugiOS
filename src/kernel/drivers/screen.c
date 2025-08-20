@@ -1,5 +1,5 @@
 /*------------------------------------------------------------------------------
-*  ObsiFish OS Drivers source code
+*  Kintsugi OS Drivers source code
 *  File: drivers/screen.c
 *  Title: Функции работы с экраном
 *  Last Change Date: 30 October 2023, 12:28 (UTC)
@@ -9,10 +9,10 @@
 *	Description: null
 * ----------------------------------------------------------------------------*/
 
-
 #include "screen.h"
 #include "../cpu/ports.h"
 #include "../libc/mem.h"
+#include "../libc/string.h"
 
 /* Декларирования частных функций */
 int get_cursor_offset();
@@ -40,46 +40,45 @@ void kprint_at(char *message, int col, int row, int color) {
         row = get_offset_row(offset);
         col = get_offset_col(offset);
     }
-
     /* "Прокрутка" сообщения и его вывод */
     int i = 0;
     while (message[i] != 0) {
-    	if (color == 0) {
+    	if (color == WHITE_ON_BLACK_CLR_CODE) {
 	        offset = print_char(message[i++], col, row, WHITE_ON_BLACK);
-		} else if (color == 1) {
+		} else if (color == BLUE_ON_BLACK_CLR_CODE) {
 	        offset = print_char(message[i++], col, row, BLUE_ON_BLACK);
-		} else if (color == 2) {
+		} else if (color == GREEN_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, GREEN_ON_BLACK);
-		} else if (color == 3) {
+		} else if (color == CYAN_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, CYAN_ON_BLACK);
-		} else if (color == 4) {
+		} else if (color == RED_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, RED_ON_BLACK);
-		} else if (color == 5) {
+		} else if (color == MAGENTA_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, MAGENTA_ON_BLACK);
-		} else if (color == 6) {
+		} else if (color == BROWN_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, BROWN_ON_BLACK);
-		} else if (color == 7) {
+		} else if (color == LGREY_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, LGREY_ON_BLACK);
-		} else if (color == 8) {
+		} else if (color == DGREY_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, DGREY_ON_BLACK);
-		} else if (color == 9) {
+		} else if (color == LBLUE_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, LBLUE_ON_BLACK);
-		} else if (color == 10) {
+		} else if (color == LGREEN_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, LGREEN_ON_BLACK);
-		} else if (color == 11) {
+		} else if (color == LCYAN_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, LCYAN_ON_BLACK);
-		} else if (color == 12) {
+		} else if (color == LRED_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, LRED_ON_BLACK);
-		} else if (color == 13) {
+		} else if (color == LMAGENTA_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, LMAGENTA_ON_BLACK);
-		} else if (color == 14) {
+		} else if (color == YELLOW_ON_BLACK_CLR_CODE) {
 			offset = print_char(message[i++], col, row, YELLOW_ON_BLACK);
-		} else if (color == 15) {
-			offset = print_char(message[i++], col, row, WHITE_ON_BLUE);			
-		} else if (color == 16) {
+		} else if (color == WHITE_ON_BLUE_CLR_CODE) {
+			offset = print_char(message[i++], col, row, WHITE_ON_BLUE);
+		} else if (color == WHITE_ON_RED_CLR_CODE) {
 			offset = print_char(message[i++], col, row, WHITE_ON_RED);
-		} else if (color == 17) {
-			offset = print_char(message[i++], col, row, RED_ON_WHITE);			
+		} else if (color == RED_ON_WHITE_CLR_CODE) {
+			offset = print_char(message[i++], col, row, RED_ON_WHITE);
 		}
 
         /* Вычисление row/col для следующей итерации */
@@ -93,9 +92,20 @@ void kprint(char *message) {
     kprint_at(message, -1, -1, 0);
 }
 
+void kprintln(char *message) {
+    // Вывод текста. Цвет по умолчанию - белый на черном (код 0)
+    kprint_at(message, -1, -1, 0);
+    kprint("\n");
+}
+
+void kprintln_colored(char *message, int color) {
+	/* Цветной вывод текста. Принимает также, в отличии от kprint, код цвета.*/
+	kprint_at(message, -1, -1, color);
+    kprint("\n");
+}
+
 void kprint_colored(char *message, int color) {
-	/* Цветной вывод текста. Принимает также, в отличии от kprint, код цвета.
-	*/
+	/* Цветной вывод текста. Принимает также, в отличии от kprint, код цвета.*/
 	kprint_at(message, -1, -1, color);
 }
 
@@ -152,7 +162,7 @@ int print_char(char c, int col, int row, char attr) {
     /* Проверяем, больше ли оффсет экрана, и скроллим */
     if (offset >= MAX_ROWS * MAX_COLS * 2) {
         int i;
-        for (i = 1; i < MAX_ROWS; i++) 
+        for (i = 1; i < MAX_ROWS; i++)
             memory_copy((u8*)(get_offset(0, i) + VIDEO_ADDRESS),
                         (u8*)(get_offset(0, i-1) + VIDEO_ADDRESS),
                         MAX_COLS * 2);
@@ -223,54 +233,54 @@ int get_offset_col(int offset) { return (offset - (get_offset_row(offset)*2*MAX_
 // #include "screen.h"
 // #include "lowlevel_io.h"
 // #include "../common.h"
-// 
+//
 // void	kprint(u8 *str)
 // {
 // 	/* Функция печати строки */
-// 	
+//
 // 	// u8 *str: указатель на строку (на первый символ строки). Строка должна
 // 	// быть null-terminated.
-// 
+//
 // 	while (*str)
 // 	{
 // 		putchar(*str, WHITE_ON_BLACK);
 // 		str++;
 // 	}
 // }
-// 
+//
 // void	putchar(u8 character, u8 attribute_byte)
 // {
 // 	/* Более высокоуровневая функция печати символа */
-// 
+//
 // 	// u8 character: байт, соответствующий символу
 // 	// u8 attribute_byte: байт, соответствующий цвету текста/фона символа
-// 
+//
 // 	u16 offset;
-// 
+//
 // 	offset = get_cursor();
 // 	if (character == '\n')
 // 	{
 // 		// Переводим строку.
-// 		if ((offset / 2 / MAX_COLS) == (MAX_ROWS - 1)) 
+// 		if ((offset / 2 / MAX_COLS) == (MAX_ROWS - 1))
 // 			scroll_line();
 // 		else
 // 			set_cursor((offset - offset % MAX_COLS) + MAX_COLS*2);
 // 	}
-// 	else 
+// 	else
 // 	{
 // 		if (offset == (MAX_COLS * MAX_ROWS * 2)) scroll_line();
 // 		write(character, attribute_byte, offset);
 // 		set_cursor(offset+2);
 // 	}
 // }
-// 
+//
 // void	scroll_line()
 // {
 // 	/* Функция скроллинга */
-// 
+//
 // 	u8 i = 1;		// Начинаем со второй строки.
 // 	u16 last_line;	// Начало последней строки.
-// 
+//
 // 	while (i < MAX_ROWS)
 // 	{
 // 		memcpy(
@@ -280,7 +290,7 @@ int get_offset_col(int offset) { return (offset - (get_offset_row(offset)*2*MAX_
 // 		);
 // 		i++;
 // 	}
-// 
+//
 // 	last_line = (MAX_COLS*MAX_ROWS*2) - MAX_COLS*2;
 // 	i = 0;
 // 	while (i < MAX_COLS)
@@ -290,11 +300,11 @@ int get_offset_col(int offset) { return (offset - (get_offset_row(offset)*2*MAX_
 // 	}
 // 	set_cursor(last_line);
 // }
-// 
+//
 // void	clear_screen()
 // {
 // 	/* Функция очистки экрана */
-// 
+//
 // 	u16	offset = 0;
 // 	while (offset < (MAX_ROWS * MAX_COLS * 2))
 // 	{
@@ -303,24 +313,24 @@ int get_offset_col(int offset) { return (offset - (get_offset_row(offset)*2*MAX_
 // 	}
 // 	set_cursor(0);
 // }
-// 
+//
 // void	write(u8 character, u8 attribute_byte, u16 offset)
 // {
 // 	/* Функция печати символа на экран с помощью VGA по адресу 0xb8000 */
-// 
+//
 // 	// u8 character: байт, соответствующий символу
 // 	// u8 attribute_byte: байт, соответствующий цвету текста/фона символа
 // 	// u16 offset: смещение (позиция), по которому нужно распечатать символ
-// 	
+//
 // 	u8 *vga = (u8 *) VIDEO_ADDRESS;
 // 	vga[offset] = character;
 // 	vga[offset + 1] = attribute_byte;
 // }
-// 
+//
 // u16		get_cursor()
 // {
 // 	/* Функция, возвращающая позицию курсора (char offset). */
-// 
+//
 // 	port_byte_out(REG_SCREEN_CTRL, 14);				// Запрашиваем верхний байт
 // 	u8 high_byte = port_byte_in(REG_SCREEN_DATA);	// Принимаем его
 // 	port_byte_out(REG_SCREEN_CTRL, 15);				// Запрашиваем нижний байт
@@ -330,11 +340,11 @@ int get_offset_col(int offset) { return (offset - (get_offset_row(offset)*2*MAX_
 // 	// на каждый символ у нас 2 байта
 // 	return (((high_byte << 8) + low_byte) * 2);
 // }
-// 
+//
 // void	set_cursor(u16 pos)
 // {
 // 	/* Функция, устаналивающая курсор по смещнию (позиции) pos */
-// 
+//
 // 	pos /= 2;	// конвертируем в cell offset (в позицию по клеткам, а не
 // 				// символам)
 // 	// Устанавливаем позицию курсора

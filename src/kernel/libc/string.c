@@ -66,7 +66,7 @@ void backspace(char s[]) {
     s[len-1] = '\0';
 }
 
-/* K&R 
+/* K&R
  * Возвращает <0 если s1<s2, 0 если s1==s2, >0 если s1>s2 */
 int strcmp(char s1[], char s2[]) {
     int i;

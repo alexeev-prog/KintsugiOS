@@ -1,3 +1,9 @@
+commit 639b0325e187d5a3a9dcd2504b7697229f8c4e9d
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Wed Aug 20 23:26:21 2025 +0700
+
+    create bootloader and basic kernel
+
 commit 399389771a54ab5cf73c3f74f65b67429719cd85
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Wed Aug 20 06:03:31 2025 +0700

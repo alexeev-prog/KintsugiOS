@@ -15,7 +15,6 @@
 #include "../cpu/ports.h"
 #include "../cpu/timer.h"
 
-
 void kmain() {
 	// Запускаемая функция ядра //
 	clear_screen();
@@ -33,39 +32,40 @@ void kmain() {
 }
 
 void user_input(char *input) {
-	// Пользовательский ввод
-    if (strcmp(input, "END") == 0) {
-    	// Остановка CPU
-        kprint("Stopping the CPU. Bye! (recommended shutdown PC)\n");
-        rsod_clear_screen();
-        kprint_colored("Kintsugi  OS 0.1.0                                                              ", 17);
-        kprint_colored("RED SCREEN OF DEATH | FATAL ERROR                                               \n", 17);
+	struct { char *text, *hint; void (*command)(); } commands[] = {
+		//   Command            		Hint for command                      	Pointer to command
+		{.text="END",		   		.hint="STOP CPU", 						.command=&halt_cpu},
+		{.text="CLEAR", 	   		.hint="Clear screen",					.command=&clear_screen},
+		{.text="PAGEKMALLOC", 	   	.hint="Kernel Page Malloc",				.command=&malloc_command_shell},
+		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",					.command=&shutdown_qemu},
+		{.text="INFO",				.hint="Get info",							.command=&info_command_shell}
+	};
 
-        kprint_colored("ObsiFish OS Kernel Fatal Error\n\n", 16);
-        kprint_colored(" >>> Sended END: halting the CPU\n", 16);
-        kprint_colored("HLT interrupt assmebly: error code 0x0000000000 (HLTCPU)\n", 16);
-        kprint_colored("Recomended: shutdown PC\n\n", 16);
-        kprint_colored("[WARNING] This message is normal. Just shutdown or reboot", 16);
-        asm volatile("hlt");
-    } else if (strcmp(input, "SHUTDOWN") == 0) {
-    	outports(0x604, 0x2000);
-    } else if (strcmp(input, "HELP") == 0) {
-    	/* Вывод строки о помощи
-    	strcmp помогает узнать, что ввел пользователь*/
-    	help_command_shell();
-    } else if (strcmp(input, "CLEAR") == 0) {
-    	// Очистка экрана
-    	clear_screen();
-    } else if (strcmp(input, "INFO") == 0) {
-    	// Информация о системе
-    	info_command_shell();
-    }  else if (strcmp(input, "PAGE") == 0) {
-    	malloc_command_shell();
-    } else {
-    	// Вывод красным текстом, что комманда неизвестная
-    	kprint_colored("[ERROR] INVALID COMMAND: ", 4);
+	int executed = 0;
+
+	const int commands_length = sizeof(commands) / sizeof(commands[0]);
+
+	for (int i = 0; i < commands_length; ++i) {
+		if (strcmp(input, commands[i].text) == 0) {
+			commands[i].command();
+			executed = 1;
+		}
+	}
+
+	if (strcmp(input, "HELP") == 0) {
+		kprintln("Keramika Shell Help");
+		for (int i = 0; i < commands_length; ++i) {
+			kprint(commands[i].text);
+			kprint(" - ");
+			kprintln(commands[i].hint);
+		}
+		executed = 1;
+	}
+
+	if (executed == 0) {
+		kprint_colored("[ERROR] INVALID COMMAND: ", 4);
     	kprint(input);
-    }
+	}
 
     // Вывод строки шелла
     kprint("\n!#> ");

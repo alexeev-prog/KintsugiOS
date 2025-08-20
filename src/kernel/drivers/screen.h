@@ -63,6 +63,26 @@
 
 #define RED_ON_WHITE 0xf4
 
+// Цветовые коды
+#define WHITE_ON_BLACK_CLR_CODE 0
+#define BLUE_ON_BLACK_CLR_CODE 1
+#define GREEN_ON_BLACK_CLR_CODE 2
+#define CYAN_ON_BLACK_CLR_CODE 3
+#define RED_ON_BLACK_CLR_CODE 4
+#define MAGENTA_ON_BLACK_CLR_CODE 5
+#define BROWN_ON_BLACK_CLR_CODE 6
+#define LGREY_ON_BLACK_CLR_CODE 7
+#define DGREY_ON_BLACK_CLR_CODE 8
+#define LBLUE_ON_BLACK_CLR_CODE 9
+#define LGREEN_ON_BLACK_CLR_CODE 10
+#define LCYAN_ON_BLACK_CLR_CODE 11
+#define LRED_ON_BLACK_CLR_CODE 12
+#define LMAGENTA_ON_BLACK_CLR_CODE 13
+#define YELLOW_ON_BLACK_CLR_CODE 14
+#define WHITE_ON_BLUE_CLR_CODE 15
+#define WHITE_ON_RED_CLR_CODE 16
+#define RED_ON_WHITE_CLR_CODE 17
+
 /* Порты ввода/вывода экрана */
 #define REG_SCREEN_CTRL 0x3d4
 #define REG_SCREEN_DATA 0x3d5
@@ -72,6 +92,8 @@ void clear_screen();
 void rsod_clear_screen();
 void kprint_at(char *message, int col, int row, int color);
 void kprint(char *message);
+void kprintln(char *message);
+void kprintln_colored(char *message, int color);
 void kprint_colored(char *message, int color);
 void kprint_backspace();
 
