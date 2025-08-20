@@ -1,3 +1,9 @@
+commit 13cd64fb1040aeeeb871837928f30877dd01d6e4
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 21 01:03:44 2025 +0700
+
+    fix drivers and improve kernel command execution
+
 commit 639b0325e187d5a3a9dcd2504b7697229f8c4e9d
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Wed Aug 20 23:26:21 2025 +0700

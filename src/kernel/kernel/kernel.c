@@ -12,8 +12,6 @@
 #include "kernel.h"
 #include "utils.h"
 #include "../libc/string.h"
-#include "../cpu/ports.h"
-#include "../cpu/timer.h"
 
 void kmain() {
 	// Запускаемая функция ядра //
@@ -32,13 +30,14 @@ void kmain() {
 }
 
 void user_input(char *input) {
+	// Массив структур команд, состоящий из самой команды, подсказки и указателя до void-функции
 	struct { char *text, *hint; void (*command)(); } commands[] = {
-		//   Command            		Hint for command                      	Pointer to command
-		{.text="END",		   		.hint="STOP CPU", 						.command=&halt_cpu},
+		//   Команда            		Подсказка для команды                   Указатель до функции
+		{.text="END",		   		.hint="HALT CPU", 						.command=&halt_cpu},
 		{.text="CLEAR", 	   		.hint="Clear screen",					.command=&clear_screen},
 		{.text="PAGEKMALLOC", 	   	.hint="Kernel Page Malloc",				.command=&malloc_command_shell},
 		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",					.command=&shutdown_qemu},
-		{.text="INFO",				.hint="Get info",							.command=&info_command_shell}
+		{.text="INFO",				.hint="Get info",						.command=&info_command_shell}
 	};
 
 	int executed = 0;

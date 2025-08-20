@@ -1,6 +1,13 @@
 # KintsugiOS
 Минималистичная x86 операционная система на (N)ASM и С.
 
+<div align="center">
+![GitHub top language](https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS)
+![GitHub](https://img.shields.io/github/license/alexeev-prog/KintsugiOS)
+![GitHub Repo stars](https://img.shields.io/github/stars/alexeev-prog/KintsugiOS)
+![GitHub issues](https://img.shields.io/github/issues/alexeev-prog/KintsugiOS)
+</div>
+
 ## Requirements
 Этот проект использует [кросс компилятор i386 ELF GCC](http://newos.org/toolchains/i386-elf-15.1.0-Linux-x86_64.tar.xz), FASM 1.73, NASM 2.16 и GDB, MTools, Xorriso.
 
