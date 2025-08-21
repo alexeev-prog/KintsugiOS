@@ -22,6 +22,8 @@ void kmain() {
 	irq_install();
 	kprint("IRQ Installed\n");
 
+	heap_init();
+
 	// Приглашение
 	kprint("Success loaded! Welcome to Kintsugi OS\n");
 	kprint("Copyright (C) alexeev-prog\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
@@ -41,7 +43,9 @@ void user_input(char *input) {
 		{.text="KMALLOC", 		   	.hint="Kernel Page Malloc",				.command=&malloc_command_shell},
 		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",					.command=&shutdown_qemu},
 		{.text="INFO",				.hint="Get info",						.command=&info_command_shell},
-		{.text="FREEMEMADDR",		.hint="Get free mem addr",				.command=&print_freememaddr}
+		{.text="FREEMEMADDR",		.hint="Get free mem addr",				.command=&print_freememaddr},
+		{.text="TESTMEM", 			.hint="Test memory",					.command=&test_mem_command},
+		{.text="KMEMDUMP", 			.hint="Dump memory",					.command=&mem_dump}
 	};
 	// TODO: добавить поддержку аргументов
 

@@ -49,7 +49,45 @@ void malloc_command_shell() {
 	char phys_str[16] = "";
 	hex_to_ascii(phys_addr, phys_str);
 
+	kprint("Page address: ");
 	kprint(page_str);
-	kprint("\n");
+	kprint("\nPhysical address: ");
 	kprint(phys_str);
+	kprint("\n");
+}
+
+void mem_dump() {
+	kmemdump();
+}
+
+void test_mem_command() {
+    void* ptr1 = kmalloc_new(64);
+    void* ptr2 = kmalloc_new(128);
+    void* ptr3 = kmalloc_new(256);
+
+	char buf1[32] = "";
+	char buf2[32] = "";
+	char buf3[32] = "";
+
+    kprint("Allocated blocks:\n");
+
+    kprint("Ptr1: 0x");
+    hex_to_ascii((int)ptr1, buf1);
+    kprint(buf1);
+    kprint("\n");
+
+    kprint("Ptr2: 0x");
+    hex_to_ascii((int)ptr2, buf2);
+    kprint(buf2);
+    kprint("\n");
+
+    kprint("Ptr3: 0x");
+    hex_to_ascii((int)ptr3, buf3);
+    kprint(buf3);
+    kprint("\n");
+
+    kfree(ptr2);
+
+    kprint("Freed ptr2\n\n");
+    kmemdump();
 }

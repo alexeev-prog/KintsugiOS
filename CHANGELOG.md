@@ -1,3 +1,9 @@
+commit c9add64fbe631ca01441108990307fc46a530f04
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 21 23:53:17 2025 +0700
+
+    fix memory error: change 16->32 sectors to boot drive
+
 commit 00f23c40cbff513c1b9537d048b4cbcb655d269f
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Aug 21 23:16:52 2025 +0700

@@ -22,14 +22,126 @@ void memory_set(u8 *dest, u8 val, u32 len) {
     for ( ; len != 0; len--) *temp++ = val;
 }
 
-// TODO: Улучшить kmalloc, добавить kfree
-/* Это должно быть вычислено во время соединения, но жестко запрограммировано
- * на данный момент значение в порядке. Ядро начинается
- с 0x1000, как определено в Makefile */
 u32 free_mem_addr_guard1 = 0xDEADBEEF;
-u32 free_mem_addr = 0x10000;
+static u32 free_mem_addr = HEAP_START;
 u32 free_mem_addr_guard2 = 0xCAFEBABE;
+static mem_block_t* free_blocks = NULL;
 
+void heap_init() {
+    // Инициализируем первый свободный блок на всей области кучи
+    free_blocks = (mem_block_t*)HEAP_START;
+    free_blocks->size = HEAP_SIZE - sizeof(mem_block_t);
+    free_blocks->next = NULL;
+    free_blocks->is_free = 1;
+
+    kprint("Heap initialized at 0x");
+    char buf[16];
+    hex_to_ascii(HEAP_START, buf);
+    kprint(buf);
+    kprint("\n");
+}
+
+void* kmalloc_new(u32 size) {
+    // Выравниваем размер до границы BLOCK_SIZE
+    if (size % BLOCK_SIZE != 0) {
+        size += BLOCK_SIZE - (size % BLOCK_SIZE);
+    }
+
+    mem_block_t* current = free_blocks;
+    mem_block_t* prev = NULL;
+
+    while (current) {
+        if (current->is_free && current->size >= size) {
+            // Нашли подходящий свободный блок
+            if (current->size > size + sizeof(mem_block_t) + BLOCK_SIZE) {
+                // Можем разделить блок
+                mem_block_t* new_block = (mem_block_t*)((u32)current + sizeof(mem_block_t) + size);
+                new_block->size = current->size - size - sizeof(mem_block_t);
+                new_block->is_free = 1;
+                new_block->next = current->next;
+
+                current->size = size;
+                current->next = new_block;
+            }
+
+            current->is_free = 0;
+            return (void*)((u32)current + sizeof(mem_block_t));
+        }
+        prev = current;
+        current = current->next;
+    }
+
+    return NULL; // Не нашли свободного блока
+}
+
+void kfree(void* ptr) {
+    if (!ptr) return;
+
+    // Получаем указатель на заголовок блока
+    mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
+
+    if (block->is_free) {
+        kprint("Double free detected!\n");
+        return;
+    }
+
+    block->is_free = 1;
+
+    // Попробуем объединить с соседними свободными блоками
+    mem_block_t* current = free_blocks;
+    while (current) {
+        if (current->is_free && current->next && current->next->is_free) {
+            // Объединяем текущий блок со следующим
+            current->size += sizeof(mem_block_t) + current->next->size;
+            current->next = current->next->next;
+        }
+        current = current->next;
+    }
+}
+
+void kmemdump() {
+    mem_block_t* current = free_blocks;
+    u32 total_used = 0;
+    u32 total_free = 0;
+    u32 block_count = 0;
+
+    kprint("Memory dump:\n");
+
+    while (current) {
+        kprint("Block ");
+        char buf[16];
+        int_to_ascii(block_count++, buf);
+        kprint(buf);
+        kprint(": Addr=0x");
+        hex_to_ascii((u32)current, buf);
+        kprint(buf);
+        kprint(", Size=");
+        int_to_ascii(current->size, buf);
+        kprint(buf);
+        kprint(", ");
+        kprint(current->is_free ? "FREE" : "USED");
+        kprint("\n");
+
+        if (current->is_free) {
+            total_free += current->size;
+        } else {
+            total_used += current->size;
+        }
+
+        current = current->next;
+    }
+
+    kprint("Total: USED=");
+    char buf[16];
+    int_to_ascii(total_used, buf);
+    kprint(buf);
+    kprint(", FREE=");
+    int_to_ascii(total_free, buf);
+    kprint(buf);
+    kprint("\n");
+}
+
+// LEGACY Arena
 /* Реализация - это просто указатель на некоторую свободную память, которая продолжает расти */
 u32 kmalloc(u32 size, int align, u32 *phys_addr) {
 
