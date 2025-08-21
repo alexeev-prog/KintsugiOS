@@ -39,6 +39,13 @@ void hex_to_ascii(int n, char str[]) {
     else append(str, tmp + '0');
 }
 
+void strcpy(char *dest, char *src) {
+    while (*src) {
+        *dest++ = *src++;
+    }
+    *dest = '\0';
+}
+
 /* K&R */
 void reverse(char s[]) {
     int c, i, j;

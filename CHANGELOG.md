@@ -1,3 +1,9 @@
+commit 26761cb02644a04ecd0efca37af1b761e43a7782
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Fri Aug 22 00:13:47 2025 +0700
+
+    add memory allocator: kmalloc_new, kfree, kmemdump
+
 commit c9add64fbe631ca01441108990307fc46a530f04
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Aug 21 23:53:17 2025 +0700

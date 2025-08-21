@@ -7,7 +7,7 @@
 
 
 #include "keyboard.h"
-#include "../cpu/ports.h"
+#include "lowlevel_io.h"
 #include "../cpu/isr.h"
 #include "screen.h"
 #include "../libc/string.h"
@@ -50,11 +50,10 @@ static void keyboard_callback(registers_t regs) {
         char str[2] = {letter, '\0'};
         if(strlen(key_buffer) < sizeof(key_buffer) - 1) {
             append(key_buffer, letter);
+            kprint(str);
         } else {
-            // Буфер полон, можно как-то обработать (например, проигнорировать ввод)
             kprint("Keyboard buffer is overflow.");
         }
-        kprint(str);
     }
     UNUSED(regs);
 }

@@ -27,6 +27,7 @@ static u32 free_mem_addr = HEAP_START;
 u32 free_mem_addr_guard2 = 0xCAFEBABE;
 static mem_block_t* free_blocks = NULL;
 
+// Инициализация памяти heap
 void heap_init() {
     // Инициализируем первый свободный блок на всей области кучи
     free_blocks = (mem_block_t*)HEAP_START;
@@ -35,7 +36,7 @@ void heap_init() {
     free_blocks->is_free = 1;
 
     kprint("Heap initialized at 0x");
-    char buf[16];
+    char buf[32] = "";
     hex_to_ascii(HEAP_START, buf);
     kprint(buf);
     kprint("\n");
@@ -52,12 +53,12 @@ void* kmalloc_new(u32 size) {
 
     while (current) {
         if (current->is_free && current->size >= size) {
-            // Нашли подходящий свободный блок
+            // Нашли подходящий свободный блок: размер текущего больше чем размер выделяемой памяти плюс размер структуры блока памяти и плюс размер самого блока
             if (current->size > size + sizeof(mem_block_t) + BLOCK_SIZE) {
                 // Можем разделить блок
-                mem_block_t* new_block = (mem_block_t*)((u32)current + sizeof(mem_block_t) + size);
-                new_block->size = current->size - size - sizeof(mem_block_t);
-                new_block->is_free = 1;
+                mem_block_t* new_block = (mem_block_t*)((u32)current + sizeof(mem_block_t) + size); // поинтер на новый блок
+                new_block->size = current->size - size - sizeof(mem_block_t); // размер текущего - выделяемый - размер структуры
+                new_block->is_free = 1; // свободен
                 new_block->next = current->next;
 
                 current->size = size;
@@ -71,6 +72,7 @@ void* kmalloc_new(u32 size) {
         current = current->next;
     }
 
+    kprint("No free blocks found\n");
     return NULL; // Не нашли свободного блока
 }
 
@@ -80,7 +82,7 @@ void kfree(void* ptr) {
     // Получаем указатель на заголовок блока
     mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
 
-    if (block->is_free) {
+    if (block->is_free) { // блок уже освобожден
         kprint("Double free detected!\n");
         return;
     }
@@ -99,7 +101,7 @@ void kfree(void* ptr) {
     }
 }
 
-void kmemdump() {
+void kmemdump() { // дамп памяти
     mem_block_t* current = free_blocks;
     u32 total_used = 0;
     u32 total_free = 0;
@@ -109,7 +111,7 @@ void kmemdump() {
 
     while (current) {
         kprint("Block ");
-        char buf[16];
+        char buf[32];
         int_to_ascii(block_count++, buf);
         kprint(buf);
         kprint(": Addr=0x");
@@ -132,12 +134,12 @@ void kmemdump() {
     }
 
     kprint("Total: USED=");
-    char buf[16];
-    int_to_ascii(total_used, buf);
-    kprint(buf);
+    char buf2[32];
+    int_to_ascii(total_used, buf2);
+    kprint(buf2);
     kprint(", FREE=");
-    int_to_ascii(total_free, buf);
-    kprint(buf);
+    int_to_ascii(total_free, buf2);
+    kprint(buf2);
     kprint("\n");
 }
 
@@ -149,7 +151,9 @@ u32 kmalloc(u32 size, int align, u32 *phys_addr) {
         kprint("PANIC: Memory corruption detected around free_mem_addr!\n");
         // Зависаем или перезагружаемся
         // asm volatile("hlt");
+        return -1;
     }
+
     /* Страницы выровнены по 4K, или 0x1000 */
     if (align == 1 && (free_mem_addr & 0xFFFFF000)) {
         free_mem_addr &= 0xFFFFF000;
@@ -158,7 +162,7 @@ u32 kmalloc(u32 size, int align, u32 *phys_addr) {
     /* Сохранить также физический адрес */
     if (phys_addr) *phys_addr = free_mem_addr;
 
-    kprint("kmalloc: allocating ");
+    kprint("kmalloc legacy: allocating ");
     char size_str[16] = "";
     hex_to_ascii(size, size_str);
     kprint(size_str);
@@ -176,5 +180,5 @@ void print_freememaddr() {
 	hex_to_ascii(free_mem_addr, free_mem_addr_str);
 
 	kprint(free_mem_addr_str);
-    // kprint("\n");
+    kprint("\n");
 }

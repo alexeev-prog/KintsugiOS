@@ -11,6 +11,7 @@
 #include "../drivers/screen.h"
 #include "kernel.h"
 #include "utils.h"
+#include "../libc/stdio.h"
 #include "../libc/string.h"
 
 void kmain() {
@@ -29,7 +30,7 @@ void kmain() {
 	kprint("Copyright (C) alexeev-prog\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
 
 	// Уведомление о старте оболочки командной строки
-	kprint("\nKeramikaShell v0.1.0 "
+	kprint("\nKeramika Busybox v0.1.0 "
 	        "Type END to halt the CPU\n"
 	        "Type HELP to view commands\n\n!#> ");
 }
@@ -64,16 +65,13 @@ void user_input(char *input) {
 	if (strcmp(input, "HELP") == 0) {
 		kprintln("Keramika Shell Help");
 		for (int i = 0; i < commands_length; ++i) {
-			kprint(commands[i].text);
-			kprint(" - ");
-			kprintln(commands[i].hint);
+			kprintf("%s - %s\n", commands[i].text, commands[i].hint);
 		}
 		executed = 1;
 	}
 
 	if (executed == 0 && strcmp(input, "") != 0) {
-		kprint_colored("[ERROR] INVALID COMMAND: ", 4);
-    	kprint(input);
+		kprintf_colored("Invalid command: %s", RED_ON_BLACK_CLR_CODE, input);
 	}
 
     // Вывод строки шелла
