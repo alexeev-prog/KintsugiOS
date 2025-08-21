@@ -37,7 +37,7 @@ load_kernel:
 							; Устанавливаем параметры для функции disk_load:
 	mov bx, KERNEL_OFFSET	; Загрузим данные в место памяти
 							; смещению KERNEL_OFFSET
-	mov dh, 16				; Загрузим много секторов. *
+	mov dh, 32				; Загрузим много секторов. *
 	mov dl, [BOOT_DRIVE]	; Загрузим данные из BOOT_DRIVE (Возвращаем BOOT_DRIVE)
 	call disk_load			; Вызываем функцию disk_load
 	ret

@@ -1,3 +1,9 @@
+commit 00f23c40cbff513c1b9537d048b4cbcb655d269f
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 21 23:16:52 2025 +0700
+
+    trying fix mem bug
+
 commit 5da7274a6e2b4c1056c831ec721ebf82d6ab5bdb
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Aug 21 22:43:36 2025 +0700

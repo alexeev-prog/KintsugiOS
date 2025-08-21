@@ -26,9 +26,18 @@ void memory_set(u8 *dest, u8 val, u32 len) {
 /* Это должно быть вычислено во время соединения, но жестко запрограммировано
  * на данный момент значение в порядке. Ядро начинается
  с 0x1000, как определено в Makefile */
+u32 free_mem_addr_guard1 = 0xDEADBEEF;
 u32 free_mem_addr = 0x10000;
+u32 free_mem_addr_guard2 = 0xCAFEBABE;
+
 /* Реализация - это просто указатель на некоторую свободную память, которая продолжает расти */
 u32 kmalloc(u32 size, int align, u32 *phys_addr) {
+
+    if(free_mem_addr_guard1 != 0xDEADBEEF || free_mem_addr_guard2 != 0xCAFEBABE) {
+        kprint("PANIC: Memory corruption detected around free_mem_addr!\n");
+        // Зависаем или перезагружаемся
+        // asm volatile("hlt");
+    }
     /* Страницы выровнены по 4K, или 0x1000 */
     if (align == 1 && (free_mem_addr & 0xFFFFF000)) {
         free_mem_addr &= 0xFFFFF000;
@@ -46,7 +55,7 @@ u32 kmalloc(u32 size, int align, u32 *phys_addr) {
     kprint("\n");
 
     u32 ret = free_mem_addr;
-    free_mem_addr += size; /* Не забудьте увеличить указатель */
+    free_mem_addr += size;
     return ret;
 }
 

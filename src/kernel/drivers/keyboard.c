@@ -48,7 +48,12 @@ static void keyboard_callback(registers_t regs) {
         char letter = sc_ascii[(int)scancode];
         /* Запоминает только полученный char[] */
         char str[2] = {letter, '\0'};
-        append(key_buffer, letter);
+        if(strlen(key_buffer) < sizeof(key_buffer) - 1) {
+            append(key_buffer, letter);
+        } else {
+            // Буфер полон, можно как-то обработать (например, проигнорировать ввод)
+            kprint("Keyboard buffer is overflow.");
+        }
         kprint(str);
     }
     UNUSED(regs);
