@@ -79,7 +79,9 @@ void kprint_at(char *message, int col, int row, int color) {
 			offset = print_char(message[i++], col, row, WHITE_ON_RED);
 		} else if (color == RED_ON_WHITE_CLR_CODE) {
 			offset = print_char(message[i++], col, row, RED_ON_WHITE);
-		}
+		} else if (color == BLUE_ON_WHITE_CLR_CODE) {
+            offset = print_char(message[i++], col, row, BLUE_ON_WHITE);
+        }
 
         /* Вычисление row/col для следующей итерации */
         row = get_offset_row(offset);
@@ -178,15 +180,14 @@ int print_char(char c, int col, int row, char attr) {
     return offset;
 }
 
-void rsod_clear_screen() {
-	// Red screen of death
+void halted_cpu_screen_clear() {
     int screen_size = MAX_COLS * MAX_ROWS;
     int i;
     u8 *screen = (u8*) VIDEO_ADDRESS;
 
     for (i = 0; i < screen_size; i++) {
         screen[i*2] = ' ';
-        screen[i*2+1] = WHITE_ON_RED;
+        screen[i*2+1] = WHITE_ON_BLUE;
     }
     set_cursor_offset(get_offset(0, 0));
 }

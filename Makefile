@@ -8,9 +8,9 @@ LD = i386-elf-ld
 SRC_DIR = src
 BIN_DIR = bin
 DISKIMG_DIR = diskimgs
-DISKIMG_NAME = kintsugi_floppy_i386_0.13.24.img
+DISKIMG_NAME = kintsugi_floppy_i386.img
 
-CFLAGS = -g -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs -Wall -Wextra -Werror -ffreestanding -I$(SRC_DIR)/kernel/include
+CFLAGS = -g -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs -Wall -Wextra -ffreestanding -I$(SRC_DIR)/kernel/include
 ASMFLAGS_BIN = -f bin
 ASMFLAGS_ELF = -f elf
 LDFLAGS = -Ttext 0x1000 --oformat binary

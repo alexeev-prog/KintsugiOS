@@ -2,10 +2,10 @@
 Минималистичная x86 операционная система на (N)ASM и С.
 
 <div align="center">
-![GitHub top language](https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS)
-![GitHub](https://img.shields.io/github/license/alexeev-prog/KintsugiOS)
-![GitHub Repo stars](https://img.shields.io/github/stars/alexeev-prog/KintsugiOS)
-![GitHub issues](https://img.shields.io/github/issues/alexeev-prog/KintsugiOS)
+<img src=https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS>
+<img src=https://img.shields.io/github/license/alexeev-prog/KintsugiOS>
+<img src=https://img.shields.io/github/stars/alexeev-prog/KintsugiOS>
+<img src="https://img.shields.io/github/issues/alexeev-prog/KintsugiOS">
 </div>
 
 ## Requirements

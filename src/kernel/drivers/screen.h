@@ -43,6 +43,7 @@
 #define WHITE_ON_BLACK 0x0f						// HEX-код белого на черном
 #define WHITE_ON_BLUE 0x1f
 #define WHITE_ON_RED 0x4f
+#define BLUE_ON_WHITE 0x1f
 #define WHITE_ON_DGREY 0x8
 
 // HEX-коды разных цветов на черном
@@ -82,6 +83,7 @@
 #define WHITE_ON_BLUE_CLR_CODE 15
 #define WHITE_ON_RED_CLR_CODE 16
 #define RED_ON_WHITE_CLR_CODE 17
+#define BLUE_ON_WHITE_CLR_CODE 18
 
 /* Порты ввода/вывода экрана */
 #define REG_SCREEN_CTRL 0x3d4
@@ -89,7 +91,7 @@
 
 /* Публичное API ядра */
 void clear_screen();
-void rsod_clear_screen();
+void halted_cpu_screen_clear();
 void kprint_at(char *message, int col, int row, int color);
 void kprint(char *message);
 void kprintln(char *message);

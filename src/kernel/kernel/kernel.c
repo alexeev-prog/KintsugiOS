@@ -6,7 +6,7 @@
 * ----------------------------------------------------------------------------*/
 
 
-// #include "../common.h"
+#include "../libc/mem.h"
 #include "../cpu/isr.h"
 #include "../drivers/screen.h"
 #include "kernel.h"
@@ -35,9 +35,10 @@ void user_input(char *input) {
 		//   Команда            		Подсказка для команды                   Указатель до функции
 		{.text="END",		   		.hint="HALT CPU", 						.command=&halt_cpu},
 		{.text="CLEAR", 	   		.hint="Clear screen",					.command=&clear_screen},
-		{.text="PAGEKMALLOC", 	   	.hint="Kernel Page Malloc",				.command=&malloc_command_shell},
+		{.text="KMALLOC", 		   	.hint="Kernel Page Malloc",				.command=&malloc_command_shell},
 		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",					.command=&shutdown_qemu},
-		{.text="INFO",				.hint="Get info",						.command=&info_command_shell}
+		{.text="INFO",				.hint="Get info",						.command=&info_command_shell},
+		{.text="FREEMEMADDR",		.hint="Get free mem addr",				.command=&print_freememaddr}
 	};
 	// TODO: добавить поддержку аргументов
 
@@ -62,7 +63,7 @@ void user_input(char *input) {
 		executed = 1;
 	}
 
-	if (executed == 0) {
+	if (executed == 0 && strcmp(input, "") != 0) {
 		kprint_colored("[ERROR] INVALID COMMAND: ", 4);
     	kprint(input);
 	}

@@ -1,15 +1,15 @@
 /*------------------------------------------------------------------------------
-*  ObsiFish OS C Libraries source code
+*  Kintsugi OS C Libraries source code
 *  File: libc/mem.c
 *  Title: Функции работы с памятью
-*  Last Change Date: 30 October 2023, 12:28 (UTC)
-*  Author: alexeev-prog
-*  License: GNU GPL v3
-* ------------------------------------------------------------------------------
 *	Description: null
 * ----------------------------------------------------------------------------*/
 
+
 #include "mem.h"
+#include "basic.h"
+#include "../drivers/screen.h"
+#include "../libc/string.h"
 
 void memory_copy(u8 *source, u8 *dest, int nbytes) {
     int i;
@@ -43,3 +43,10 @@ u32 kmalloc(u32 size, int align, u32 *phys_addr) {
     return ret;
 }
 
+void print_freememaddr() {
+    char free_mem_addr_str[16] = "";
+	hex_to_ascii(free_mem_addr, free_mem_addr_str);
+
+	kprint(free_mem_addr_str);
+    kprint("\n");
+}
