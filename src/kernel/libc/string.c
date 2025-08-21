@@ -21,6 +21,7 @@ void int_to_ascii(int n, char str[]) {
 void hex_to_ascii(int n, char str[]) {
     append(str, '0');
     append(str, 'x');
+
     char zeros = 0;
 
     s32 tmp;

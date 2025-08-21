@@ -101,6 +101,9 @@ run_bin: $(BIN_DIR)/kintsugios.bin
 run: diskimg
 	qemu-system-i386 -fda $(DISKIMG_DIR)/$(DISKIMG_NAME) -boot a
 
+debug: diskimg
+	qemu-system-i386 -fda $(DISKIMG_DIR)/$(DISKIMG_NAME) -boot a -s -S
+
 clean:
 	rm -f $(BIN_DIR)/*.o $(BIN_DIR)/*.bin
 

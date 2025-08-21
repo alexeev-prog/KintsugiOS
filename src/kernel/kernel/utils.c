@@ -43,13 +43,13 @@ void info_command_shell() {
 
 void malloc_command_shell() {
 	u32 phys_addr;
-	u32 page = kmalloc(10, 1, &phys_addr);
-	char page_str[32] = "";
+	u32 page = kmalloc(16, 1, &phys_addr);
+	char page_str[16] = "";
 	hex_to_ascii(page, page_str);
-	char phys_str[32] = "";
+	char phys_str[16] = "";
 	hex_to_ascii(phys_addr, phys_str);
-	kprint("Page: ");
+
 	kprint(page_str);
-	kprint(", phys address: ");
+	kprint("\n");
 	kprint(phys_str);
 }

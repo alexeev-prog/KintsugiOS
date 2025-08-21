@@ -16,11 +16,14 @@
 void kmain() {
 	// Запускаемая функция ядра //
 	clear_screen();
+
 	isr_install();
+	kprint("ISR Installed\n");
 	irq_install();
+	kprint("IRQ Installed\n");
 
 	// Приглашение
-	kprint("Welcome to Kintsugi OS\n");
+	kprint("Success loaded! Welcome to Kintsugi OS\n");
 	kprint("Copyright (C) alexeev-prog\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
 
 	// Уведомление о старте оболочки командной строки
@@ -50,6 +53,7 @@ void user_input(char *input) {
 		if (strcmp(input, commands[i].text) == 0) {
 			commands[i].command();
 			executed = 1;
+			break;
 		}
 	}
 

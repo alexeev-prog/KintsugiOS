@@ -37,6 +37,14 @@ u32 kmalloc(u32 size, int align, u32 *phys_addr) {
     /* Сохранить также физический адрес */
     if (phys_addr) *phys_addr = free_mem_addr;
 
+    kprint("kmalloc: allocating ");
+    char size_str[16] = "";
+    hex_to_ascii(size, size_str);
+    kprint(size_str);
+    kprint(" bytes at ");
+    print_freememaddr();
+    kprint("\n");
+
     u32 ret = free_mem_addr;
     free_mem_addr += size; /* Не забудьте увеличить указатель */
     return ret;
@@ -47,5 +55,5 @@ void print_freememaddr() {
 	hex_to_ascii(free_mem_addr, free_mem_addr_str);
 
 	kprint(free_mem_addr_str);
-    kprint("\n");
+    // kprint("\n");
 }
