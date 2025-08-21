@@ -1,3 +1,9 @@
+commit d07e687ed59ca81e680976049bc51ab65cabb9c4
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 21 22:36:17 2025 +0700
+
+    fix screen drivers, improve libc and types, improve kernel
+
 commit cbd683918c1b4caba593d63d521a6cf0b9639c06
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Aug 21 04:22:44 2025 +0700

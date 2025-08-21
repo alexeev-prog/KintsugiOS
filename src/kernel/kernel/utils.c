@@ -21,7 +21,7 @@ void halt_cpu() {
 	kprint_colored("Kintsugi  OS 0.1.0\n", BLUE_ON_WHITE_CLR_CODE);
 	kprint_colored("HLT STOPPING CPU\n\n", BLUE_ON_WHITE_CLR_CODE);
 
-	kprint_colored("Kintsugi OS Kernel Red Screen\n\n", WHITE_ON_BLUE_CLR_CODE);
+	kprint_colored("Kintsugi OS Kernel Blue Screen\n\n", WHITE_ON_BLUE_CLR_CODE);
 	kprint_colored(" >>> Sended END: halting the CPU\n", WHITE_ON_BLUE_CLR_CODE);
 	kprint_colored("HLT interrupt assmebly: error code 0x0000000000 (HLTCPU)\n", WHITE_ON_BLUE_CLR_CODE);
 	kprint_colored("Recomended: shutdown PC\n\n", WHITE_ON_BLUE_CLR_CODE);

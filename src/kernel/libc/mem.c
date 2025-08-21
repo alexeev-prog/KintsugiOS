@@ -7,7 +7,6 @@
 
 
 #include "mem.h"
-#include "basic.h"
 #include "../drivers/screen.h"
 #include "../libc/string.h"
 
