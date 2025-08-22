@@ -12,6 +12,7 @@
 #include "screen.h"
 #include "../cpu/ports.h"
 #include "../libc/mem.h"
+#include "lowlevel_io.h"
 #include "../libc/string.h"
 
 /* Декларирования частных функций */
@@ -31,6 +32,30 @@ int get_offset_col(int offset);
  * Если col, row отрицательные, то используем текущий оффсет
  */
 void kprint_at(char *message, int col, int row, int color) {
+    struct { int clrcode; int color; } colors[] = {
+		{.clrcode=WHITE_ON_BLACK_CLR_CODE,		   		.color=WHITE_ON_BLACK},
+        {.clrcode=BLUE_ON_BLACK_CLR_CODE,		   		.color=BLUE_ON_BLACK},
+        {.clrcode=GREEN_ON_BLACK_CLR_CODE,		   		.color=GREEN_ON_BLACK},
+        {.clrcode=CYAN_ON_BLACK_CLR_CODE,		   		.color=CYAN_ON_BLACK},
+        {.clrcode=RED_ON_BLACK_CLR_CODE,		   		.color=RED_ON_BLACK},
+        {.clrcode=MAGENTA_ON_BLACK_CLR_CODE,		   	.color=MAGENTA_ON_BLACK},
+        {.clrcode=BROWN_ON_BLACK_CLR_CODE,		   		.color=BROWN_ON_BLACK},
+        {.clrcode=LGREY_ON_BLACK_CLR_CODE,		   		.color=LGREY_ON_BLACK},
+        {.clrcode=DGREY_ON_BLACK_CLR_CODE,		   		.color=DGREY_ON_BLACK},
+        {.clrcode=LBLUE_ON_BLACK_CLR_CODE,		   		.color=LBLUE_ON_BLACK},
+        {.clrcode=LGREEN_ON_BLACK_CLR_CODE,		   	.color=LGREEN_ON_BLACK},
+        {.clrcode=LCYAN_ON_BLACK_CLR_CODE,		   		.color=LCYAN_ON_BLACK},
+        {.clrcode=LRED_ON_BLACK_CLR_CODE,		   		.color=LRED_ON_BLACK},
+        {.clrcode=LMAGENTA_ON_BLACK_CLR_CODE,		   	.color=LMAGENTA_ON_BLACK},
+        {.clrcode=YELLOW_ON_BLACK_CLR_CODE,		   	.color=YELLOW_ON_BLACK},
+        {.clrcode=WHITE_ON_BLUE_CLR_CODE,		   		.color=WHITE_ON_BLUE},
+        {.clrcode=WHITE_ON_RED_CLR_CODE,		   		.color=WHITE_ON_RED},
+        {.clrcode=RED_ON_WHITE_CLR_CODE,		   		.color=RED_ON_WHITE},
+        {.clrcode=BLUE_ON_WHITE_CLR_CODE,		   		.color=BLUE_ON_WHITE},
+	};
+
+    const int colors_length = sizeof(colors) / sizeof(colors[0]);
+
     /* Установка курсора и оффсета если если col, row отрицательные */
     int offset;
     if (col >= 0 && row >= 0)
@@ -43,44 +68,12 @@ void kprint_at(char *message, int col, int row, int color) {
     /* "Прокрутка" сообщения и его вывод */
     int i = 0;
     while (message[i] != 0) {
-    	if (color == WHITE_ON_BLACK_CLR_CODE) {
-	        offset = print_char(message[i++], col, row, WHITE_ON_BLACK);
-		} else if (color == BLUE_ON_BLACK_CLR_CODE) {
-	        offset = print_char(message[i++], col, row, BLUE_ON_BLACK);
-		} else if (color == GREEN_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, GREEN_ON_BLACK);
-		} else if (color == CYAN_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, CYAN_ON_BLACK);
-		} else if (color == RED_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, RED_ON_BLACK);
-		} else if (color == MAGENTA_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, MAGENTA_ON_BLACK);
-		} else if (color == BROWN_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, BROWN_ON_BLACK);
-		} else if (color == LGREY_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, LGREY_ON_BLACK);
-		} else if (color == DGREY_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, DGREY_ON_BLACK);
-		} else if (color == LBLUE_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, LBLUE_ON_BLACK);
-		} else if (color == LGREEN_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, LGREEN_ON_BLACK);
-		} else if (color == LCYAN_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, LCYAN_ON_BLACK);
-		} else if (color == LRED_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, LRED_ON_BLACK);
-		} else if (color == LMAGENTA_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, LMAGENTA_ON_BLACK);
-		} else if (color == YELLOW_ON_BLACK_CLR_CODE) {
-			offset = print_char(message[i++], col, row, YELLOW_ON_BLACK);
-		} else if (color == WHITE_ON_BLUE_CLR_CODE) {
-			offset = print_char(message[i++], col, row, WHITE_ON_BLUE);
-		} else if (color == WHITE_ON_RED_CLR_CODE) {
-			offset = print_char(message[i++], col, row, WHITE_ON_RED);
-		} else if (color == RED_ON_WHITE_CLR_CODE) {
-			offset = print_char(message[i++], col, row, RED_ON_WHITE);
-		} else if (color == BLUE_ON_WHITE_CLR_CODE) {
-            offset = print_char(message[i++], col, row, BLUE_ON_WHITE);
+
+        for (int j = 0; j < colors_length; ++j) {
+            if (color == colors[j].clrcode) {
+                offset = print_char(message[i++], col, row, colors[j].color);
+                break;
+            }
         }
 
         /* Вычисление row/col для следующей итерации */

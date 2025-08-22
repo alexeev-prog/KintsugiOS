@@ -16,16 +16,12 @@ void shutdown_qemu() {
 }
 
 void halt_cpu() {
-	kprint("Stopping the CPU. Bye! (recommended shutdown PC)\n");
     halted_cpu_screen_clear();
-	kprint_colored("Kintsugi  OS 0.1.0\n", BLUE_ON_WHITE_CLR_CODE);
-	kprint_colored("HLT STOPPING CPU\n\n", BLUE_ON_WHITE_CLR_CODE);
+	kprint_colored("Kintsugi  OS 0.1.0\n\n", BLUE_ON_WHITE_CLR_CODE);
+	kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE_CLR_CODE);
+	kprint_colored("CPU is halted.\n\n", BLUE_ON_WHITE_CLR_CODE);
+	kprint_colored("asm volatile(\"hlt\")", BLUE_ON_WHITE_CLR_CODE);
 
-	kprint_colored("Kintsugi OS Kernel Blue Screen\n\n", WHITE_ON_BLUE_CLR_CODE);
-	kprint_colored(" >>> Sended END: halting the CPU\n", WHITE_ON_BLUE_CLR_CODE);
-	kprint_colored("HLT interrupt assmebly: error code 0x0000000000 (HLTCPU)\n", WHITE_ON_BLUE_CLR_CODE);
-	kprint_colored("Recomended: shutdown PC\n\n", WHITE_ON_BLUE_CLR_CODE);
-	kprint_colored("[WARNING] This message is normal. Just shutdown or reboot", WHITE_ON_BLUE_CLR_CODE);
 	asm volatile("hlt");
 }
 
@@ -71,17 +67,17 @@ void test_mem_command() {
 
     kprint("Allocated blocks:\n");
 
-    kprint("Ptr1: 0x");
+    kprint("Ptr1: ");
     hex_to_ascii((int)ptr1, buf1);
     kprint(buf1);
     kprint("\n");
 
-    kprint("Ptr2: 0x");
+    kprint("Ptr2: ");
     hex_to_ascii((int)ptr2, buf2);
     kprint(buf2);
     kprint("\n");
 
-    kprint("Ptr3: 0x");
+    kprint("Ptr3: ");
     hex_to_ascii((int)ptr3, buf3);
     kprint(buf3);
     kprint("\n");

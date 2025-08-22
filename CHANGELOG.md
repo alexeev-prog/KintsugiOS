@@ -1,3 +1,9 @@
+commit 84d17ac56b97d198ca97cf389da05a5b12edecce
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Fri Aug 22 05:25:51 2025 +0700
+
+    improve makefile; fix bugs, add stdio.h and kprintf functions
+
 commit 26761cb02644a04ecd0efca37af1b761e43a7782
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Fri Aug 22 00:13:47 2025 +0700

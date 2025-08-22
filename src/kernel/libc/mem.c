@@ -35,7 +35,7 @@ void heap_init() {
     free_blocks->next = NULL;
     free_blocks->is_free = 1;
 
-    kprint("Heap initialized at 0x");
+    kprint("Heap initialized at ");
     char buf[32] = "";
     hex_to_ascii(HEAP_START, buf);
     kprint(buf);
@@ -114,7 +114,7 @@ void kmemdump() { // дамп памяти
         char buf[32];
         int_to_ascii(block_count++, buf);
         kprint(buf);
-        kprint(": Addr=0x");
+        kprint(": Addr=");
         hex_to_ascii((u32)current, buf);
         kprint(buf);
         kprint(", Size=");
