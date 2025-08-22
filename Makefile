@@ -23,44 +23,62 @@ C_OBJS = $(C_SOURCES:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
 
 OBJS = $(KERNEL_ENTRY) $(INTERRUPT_OBJ) $(C_OBJS)
 
+RED=\033[0;31m
+GREEN=\033[0;32m
+YELLOW=\033[0;33m
+BLUE=\033[0;34m
+CYAN=\033[0;36m
+RESET=\033[0m
+
 all: $(BIN_DIR)/kintsugios.bin
 
 $(BIN_DIR)/kintsugios.bin: $(BIN_DIR)/bootsector.bin $(BIN_DIR)/kernel.bin
-	cat $^ > $@
+	@printf "$(BLUE)[CAT]  Cat    %s %-42s -> %s$(RESET)\n" "bootsector" "kernel" "$(BIN_DIR)/kintsugios.bin"
+	@cat $^ > $@
 
 $(BIN_DIR)/bootsector.bin: $(SRC_DIR)/bootloader/bootsector.asm
-	mkdir -p $(BIN_DIR)
-	$(ASM) $(ASMFLAGS_BIN) $< -o $@
+	@printf "$(CYAN)[ASM]  Compiling %-50s -> %s$(RESET)\n" "bootsector.asm" "bootsector.bin"
+	@mkdir -p $(BIN_DIR)
+	@$(ASM) $(ASMFLAGS_BIN) $< -o $@
 
 $(BIN_DIR)/kernel.bin: $(OBJS)
-	$(LD) $(LDFLAGS) $^ -o $@
+	@printf "$(BLUE)[LD]   Linking   %-50s -> %s$(RESET)\n" "$^" "$@"
+	@$(LD) $(LDFLAGS) $^ -o $@
 
 $(BIN_DIR)/%.o: $(SRC_DIR)/%.asm
-	mkdir -p $(dir $@)
-	$(ASM) $(ASMFLAGS_ELF) $< -o $@
+	@printf "$(CYAN)[ASM]  Compiling %-50s -> %s$(RESET)\n" "$<" "$@"
+	@mkdir -p $(dir $@)
+	@$(ASM) $(ASMFLAGS_ELF) $< -o $@
 
 $(BIN_DIR)/%.o: $(SRC_DIR)/%.c
-	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	@printf "$(CYAN)[CC]   Compiling %-50s -> %s$(RESET)\n" "$<" "$@"
+	@mkdir -p $(dir $@)
+	@$(CC) $(CFLAGS) -c $< -o $@
 
 diskimg: $(BIN_DIR)/kintsugios.bin
-	mkdir -p $(DISKIMG_DIR)
-	dd if=/dev/zero of=$(DISKIMG_DIR)/$(DISKIMG_NAME) bs=1024 count=1440
-	dd if=$(BIN_DIR)/kintsugios.bin of=$(DISKIMG_DIR)/$(DISKIMG_NAME) conv=notrunc
+	@printf "$(BLUE)[DD]   Make IMG  %-50s -> %s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin" "$(DISKIMG_DIR)/$(DISKIMG_NAME)"
+	@mkdir -p $(DISKIMG_DIR)
+	@dd if=/dev/zero of=$(DISKIMG_DIR)/$(DISKIMG_NAME) bs=1024 count=1440
+	@dd if=$(BIN_DIR)/kintsugios.bin of=$(DISKIMG_DIR)/$(DISKIMG_NAME) conv=notrunc
 
 run_bin: $(BIN_DIR)/kintsugios.bin
-	qemu-system-i386 -fda $(BIN_DIR)/kintsugios.bin
+	@printf "$(GREEN)[QEMU] Run bin   %-50s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin"
+	@qemu-system-i386 -fda $(BIN_DIR)/kintsugios.bin
 
 run: diskimg
-	qemu-system-i386 -fda $(DISKIMG_DIR)/$(DISKIMG_NAME) -boot a
+	@printf "$(GREEN)[QEMU] Run img   %-50s$(RESET)\n" "$(DISKIMG_DIR)/$(DISKIMG_NAME)"
+	@qemu-system-i386 -fda $(DISKIMG_DIR)/$(DISKIMG_NAME) -boot a
 
 debug: diskimg
-	qemu-system-i386 -fda $(DISKIMG_DIR)/$(DISKIMG_NAME) -boot a -s -S
+	@printf "$(GREEN)[QEMU] Debug img %-50s$(RESET)\n" "$(DISKIMG_DIR)/$(DISKIMG_NAME)"
+	@qemu-system-i386 -fda $(DISKIMG_DIR)/$(DISKIMG_NAME) -boot a -s -S
 
 clean:
-	rm -rf $(BIN_DIR)/*
+	@printf "$(RED)[RM]   Clean bin %-50s$(RESET)\n" "$(BIN_DIR)"
+	@rm -rf $(BIN_DIR)/*
 
 clean_all:
-	rm -rf $(BIN_DIR)/* $(DISKIMG_DIR)/*
+	@printf "$(RED)[RM]   Clean all %-50s$(RESET)\n" "$(BIN_DIR)"
+	@rm -rf $(BIN_DIR)/* $(DISKIMG_DIR)/*
 
 .PHONY: all diskimg run run_bin clean clean_all
