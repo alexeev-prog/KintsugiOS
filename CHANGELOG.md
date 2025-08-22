@@ -1,3 +1,9 @@
+commit fc36ce4c4630d7468c9cc562f977fbc3bcf51146
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Aug 23 04:14:24 2025 +0700
+
+    fix shell prompt bug, fix kernel
+
 commit 34f4acc8359288ab92953aaaaa2d1dc4ccf9de50
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Aug 23 03:21:09 2025 +0700
