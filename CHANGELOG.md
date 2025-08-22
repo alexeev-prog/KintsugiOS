@@ -1,3 +1,9 @@
+commit 0176c2367607690e3198f7dccac0a1d26521e82d
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Fri Aug 22 22:03:20 2025 +0700
+
+    add arguments in shell, improve alloc usage, improve libc
+
 commit 54f9099f8dbb07eb13ec7c19189144df53bb044f
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Fri Aug 22 21:18:22 2025 +0700

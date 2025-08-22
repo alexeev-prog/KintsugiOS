@@ -9,6 +9,7 @@
 #include "mem.h"
 #include "../drivers/screen.h"
 #include "../libc/string.h"
+#include "../libc/stdio.h"
 
 void memory_copy(u8 *source, u8 *dest, int nbytes) {
     int i;
@@ -63,6 +64,8 @@ void* kmalloc_new(u32 size) {
 
                 current->size = size;
                 current->next = new_block;
+
+                free_mem_addr += current->size;
             }
 
             current->is_free = 0;
@@ -99,6 +102,39 @@ void kfree(void* ptr) {
         }
         current = current->next;
     }
+}
+
+meminfo_t get_meminfo() {
+    meminfo_t meminfo;
+
+    mem_block_t* current = free_blocks;
+    u32 total_used = 0;
+    u32 total_free = 0;
+    u32 block_count = 0;
+
+    kprint("Memory dump:\n");
+
+    while (current) {
+        block_count++;
+
+        if (current->is_free) {
+            total_free += current->size;
+        } else {
+            total_used += current->size;
+        }
+
+        current = current->next;
+    }
+
+    meminfo.heap_start = HEAP_START;
+    meminfo.heap_size = HEAP_SIZE;
+    meminfo.block_size = BLOCK_SIZE;
+    meminfo.free_blocks = free_blocks;
+    meminfo.total_used = total_used;
+    meminfo.total_free = total_free;
+    meminfo.block_count = block_count;
+
+    return meminfo;
 }
 
 void kmemdump() { // дамп памяти
@@ -176,9 +212,8 @@ u32 kmalloc(u32 size, int align, u32 *phys_addr) {
 }
 
 void get_freememaddr() {
-    char free_mem_addr_str[16] = "";
+    char free_mem_addr_str[32] = "";
 	hex_to_ascii(free_mem_addr, free_mem_addr_str);
 
-	kprint(free_mem_addr_str);
-    kprint("\n");
+	kprintf("%s\n", free_mem_addr_str);
 }

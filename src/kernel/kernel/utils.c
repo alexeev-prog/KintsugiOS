@@ -34,16 +34,22 @@ void halt_cpu(char** args) {
 	asm volatile("hlt");
 }
 
-void help_command_shell(char** args) {
-	kprint("END - stopping the CPU\n"
-	    	"INFO - info about OS\n"
-	    	"PAGE - to request a kmalloc()\n"
-	    	"CLEAR - clear the screen\n"
-	    	"SHUTDOWN - shutdown QEMU\n");
-}
-
 void info_command_shell(char** args) {
-	kprint("Kintsugi OS 0.1.0 by alexeev-prog\n");
+	// kprint("Kintsugi OS 0.1.0 by alexeev-prog\n");
+
+	kprint("   __    _      __                _          \n"
+		   "  / /__ (_)__  / /____ __ _____ _(_) ___  ___\n"
+           " /  '_// / _ \\/ __(_-</ // / _ `/ / / _ \\(_-<\n"
+           "/_/\\_\\/_/_//_/\\__/___/\\_,_/\\_, /_/  \\___/___/\n"
+           "                          /___/              \n");
+
+	meminfo_t meminfo = get_meminfo();
+
+	kprint("MEMORY\n");
+	kprintf("HEAP (%d): start at %d, minimal block size %d\n", meminfo.heap_size, meminfo.heap_start, meminfo.block_size);
+	kprintf("Total used: %d\n", meminfo.total_used);
+	kprintf("Total free: %d\n", meminfo.total_free);
+	kprintf("Block count: %d\n", meminfo.block_count);
 }
 
 void arena_malloc_command_shell(char** args) {

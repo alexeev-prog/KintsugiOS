@@ -20,6 +20,18 @@ typedef struct mem_block {
     u8 is_free;
 } mem_block_t;
 
+typedef struct meminfo {
+    u32 heap_start;
+    u32 heap_size;
+    u32 block_size;
+    mem_block_t* free_blocks;
+    u32 total_used;
+    u32 total_free;
+    u32 block_count;
+
+} meminfo_t;
+
+meminfo_t get_meminfo();
 void memory_copy(u8 *source, u8 *dest, int nbytes);
 void memory_set(u8 *dest, u8 val, u32 len);
 void get_freememaddr();
