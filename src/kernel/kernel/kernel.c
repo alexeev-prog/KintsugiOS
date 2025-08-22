@@ -12,6 +12,7 @@
 #include "kernel.h"
 #include "utils.h"
 #include "../libc/stdio.h"
+#include "../libc/mem.h"
 #include "../libc/string.h"
 
 void kmain() {
@@ -30,33 +31,52 @@ void kmain() {
 	kprint("Copyright (C) alexeev-prog\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
 
 	// Уведомление о старте оболочки командной строки
-	kprint("\nKeramika Busybox v0.1.0 "
+	kprint("\nKeramika Shell v0.1.0 "
 	        "Type END to halt the CPU\n"
 	        "Type HELP to view commands\n\n!#> ");
 }
 
+char** get_args(char *input) {
+	char *token = strtok(input, " ");
+	char** args;
+	int arg_counter = 0;
+
+    while(token) {
+        token = strtok(NULL, " ");
+
+		args[arg_counter] = token;
+		arg_counter++;
+    }
+
+	kfree(token);
+
+	return args;
+}
+
 void user_input(char *input) {
 	// Массив структур команд, состоящий из самой команды, подсказки и указателя до void-функции
-	struct { char *text, *hint; void (*command)(); } commands[] = {
+	struct { char *text, *hint; void (*command)(char**); } commands[] = {
 		//   Команда            		Подсказка для команды                   Указатель до функции
-		{.text="END",		   		.hint="HALT CPU", 						.command=&halt_cpu},
-		{.text="CLEAR", 	   		.hint="Clear screen",					.command=&clear_screen},
-		{.text="KMALLOC", 		   	.hint="Kernel Page Malloc",				.command=&malloc_command_shell},
-		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",					.command=&shutdown_qemu},
-		{.text="INFO",				.hint="Get info",						.command=&info_command_shell},
-		{.text="FREEMEMADDR",		.hint="Get free mem addr",				.command=&print_freememaddr},
-		{.text="TESTMEM", 			.hint="Test memory",					.command=&test_mem_command},
-		{.text="KMEMDUMP", 			.hint="Dump memory",					.command=&mem_dump}
+		{.text="END",		   		.hint="HALT CPU", 											.command=&halt_cpu},
+		{.text="CLEAR", 	   		.hint="Clear screen",										.command=&clear_screen_command},
+		{.text="AMALLOC", 		   	.hint="Kernel Arena Malloc. Usage: AMALLOC <size>",			.command=&arena_malloc_command_shell},
+		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",										.command=&shutdown_qemu},
+		{.text="INFO",				.hint="Get info",											.command=&info_command_shell},
+		{.text="FREEMEMADDR",		.hint="Get free mem addr",									.command=&print_freememaddr},
+		{.text="TESTMEM", 			.hint="Test memory",										.command=&test_mem_command},
+		{.text="KMEMDUMP", 			.hint="Dump memory",										.command=&mem_dump},
+		{.text="KMALLOC",			.hint="Alloc memory. Usage: KMALLOC <size>",				.command=&kmalloc_command}
 	};
-	// TODO: добавить поддержку аргументов
 
 	int executed = 0;
+
+	char** args = get_args(input);
 
 	const int commands_length = sizeof(commands) / sizeof(commands[0]);
 
 	for (int i = 0; i < commands_length; ++i) {
 		if (strcmp(input, commands[i].text) == 0) {
-			commands[i].command();
+			commands[i].command(args);
 			executed = 1;
 			break;
 		}

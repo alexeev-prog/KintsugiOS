@@ -18,6 +18,19 @@ void int_to_ascii(int n, char str[]) {
     reverse(str);
 }
 
+int strtoint(char* str) {
+    int rc = 0;
+    unsigned i = 0;
+    // C guarantees that '0'-'9' have consecutive values
+    while (str[i] >= '0' && str[i] <= '9') {
+        rc *= 10;
+        rc += str[i] - '0';
+        ++i;
+    }
+
+    return rc;
+}
+
 void hex_to_ascii(int n, char str[]) {
     append(str, '0');
     append(str, 'x');
@@ -82,4 +95,58 @@ int strcmp(char s1[], char s2[]) {
         if (s1[i] == '\0') return 0;
     }
     return s1[i] - s2[i];
+}
+
+unsigned int is_delim(char c, char *delim) {
+    while(*delim != '\0') {
+        if(c == *delim)
+            return 1;
+
+        delim++;
+    }
+    return 0;
+}
+
+char *strtok(char *src_str, char *delim) {
+    static char *backup_string; // бекап строки
+
+    if(!src_str) {
+        src_str = backup_string;
+    }
+
+    if(!src_str) {
+        return NULL;
+    }
+
+    while(1) {
+        if(is_delim(*src_str, delim)) {
+            src_str++;
+            continue;
+        }
+
+        if(*src_str == '\0') {
+            // конец строки
+            return NULL;
+        }
+
+        break;
+    }
+    char *ret = src_str;
+
+    while(1) {
+        if(*src_str == '\0') {
+            /*конец входной строки
+            и следующее выполнение возвратит NULL*/
+            backup_string = src_str;
+            return ret;
+        }
+
+        if(is_delim(*src_str, delim)) {
+            *src_str = '\0';
+            backup_string = src_str + 1;
+            return ret;
+        }
+
+        src_str++;
+    }
 }

@@ -10,12 +10,21 @@
 #include "../libc/mem.h"
 #include "../libc/string.h"
 #include "../cpu/ports.h"
+#include "../libc/stdio.h"
 
-void shutdown_qemu() {
+void print_freememaddr(char** args) {
+	get_freememaddr();
+}
+
+void clear_screen_command(char** args) {
+	clear_screen();
+}
+
+void shutdown_qemu(char** args) {
 	outports(0x604, 0x2000);
 }
 
-void halt_cpu() {
+void halt_cpu(char** args) {
     halted_cpu_screen_clear();
 	kprint_colored("Kintsugi  OS 0.1.0\n\n", BLUE_ON_WHITE_CLR_CODE);
 	kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE_CLR_CODE);
@@ -25,7 +34,7 @@ void halt_cpu() {
 	asm volatile("hlt");
 }
 
-void help_command_shell() {
+void help_command_shell(char** args) {
 	kprint("END - stopping the CPU\n"
 	    	"INFO - info about OS\n"
 	    	"PAGE - to request a kmalloc()\n"
@@ -33,30 +42,47 @@ void help_command_shell() {
 	    	"SHUTDOWN - shutdown QEMU\n");
 }
 
-void info_command_shell() {
+void info_command_shell(char** args) {
 	kprint("Kintsugi OS 0.1.0 by alexeev-prog\n");
 }
 
-void malloc_command_shell() {
+void arena_malloc_command_shell(char** args) {
+	if (args[0] == NULL) {
+		kprint("AMALLOC usage: AMALLOC <page size>");
+		return;
+	}
+
 	u32 phys_addr;
-	u32 page = kmalloc(16, 1, &phys_addr);
+	u32 page = kmalloc(strtoint(args[0]), 1, &phys_addr);
 	char page_str[16] = "";
 	hex_to_ascii(page, page_str);
 	char phys_str[16] = "";
 	hex_to_ascii(phys_addr, phys_str);
 
-	kprint("Page address: ");
-	kprint(page_str);
-	kprint("\nPhysical address: ");
-	kprint(phys_str);
-	kprint("\n");
+	kprintf("ARENA MALLOC %d bytes\n", strtoint(args[0]));
+	kprintf("Page address: %s\nPhysical address: %s\n", page_str, phys_str);
 }
 
-void mem_dump() {
+void mem_dump(char** args) {
 	kmemdump();
 }
 
-void test_mem_command() {
+void kmalloc_command(char** args) {
+	if (args[0] == NULL) {
+		kprint("KMALLOC usage: KMALLOC <bytes>");
+		return;
+	}
+
+	int size = strtoint(args[0]);
+	void* ptr = kmalloc_new(size);
+
+	char buf1[32] = "";
+	hex_to_ascii((int)ptr, buf1);
+
+	kprintf("Allocate %d bytes.\nPointer: %s\n", size, buf1);
+}
+
+void test_mem_command(char** args) {
     void* ptr1 = kmalloc_new(64);
     void* ptr2 = kmalloc_new(128);
     void* ptr3 = kmalloc_new(256);

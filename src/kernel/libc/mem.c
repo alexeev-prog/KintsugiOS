@@ -167,7 +167,7 @@ u32 kmalloc(u32 size, int align, u32 *phys_addr) {
     hex_to_ascii(size, size_str);
     kprint(size_str);
     kprint(" bytes at ");
-    print_freememaddr();
+    get_freememaddr();
     kprint("\n");
 
     u32 ret = free_mem_addr;
@@ -175,7 +175,7 @@ u32 kmalloc(u32 size, int align, u32 *phys_addr) {
     return ret;
 }
 
-void print_freememaddr() {
+void get_freememaddr() {
     char free_mem_addr_str[16] = "";
 	hex_to_ascii(free_mem_addr, free_mem_addr_str);
 
