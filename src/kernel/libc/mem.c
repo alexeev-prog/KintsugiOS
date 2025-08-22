@@ -43,6 +43,20 @@ void heap_init() {
     kprint("\n");
 }
 
+// TODO: Paging is not implemented
+void *get_physaddr(void *virtualaddr) {
+    unsigned long pdindex = (unsigned long)virtualaddr >> 22;
+    unsigned long ptindex = (unsigned long)virtualaddr >> 12 & 0x03FF;
+
+    unsigned long *pd = (unsigned long *)0xFFFFF000;
+    // Here you need to check whether the PD entry is present.
+
+    unsigned long *pt = ((unsigned long *)0xFFC00000) + (0x400 * pdindex);
+    // Here you need to check whether the PT entry is present.
+
+    return (void *)((pt[ptindex] & ~0xFFF) + ((unsigned long)virtualaddr & 0xFFF));
+}
+
 void* kmalloc_new(u32 size) {
     // Выравниваем размер до границы BLOCK_SIZE
     if (size % BLOCK_SIZE != 0) {
@@ -76,13 +90,13 @@ void* kmalloc_new(u32 size) {
     }
 
     kprint("No free blocks found\n");
-    return NULL; // Не нашли свободного блока
+    return NULL;
 }
 
 void kfree(void* ptr) {
     if (!ptr) return;
 
-    // Получаем указатель на заголовок блока
+    // получаем указатель на заголовок блока
     mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
 
     if (block->is_free) { // блок уже освобожден
@@ -92,13 +106,14 @@ void kfree(void* ptr) {
 
     block->is_free = 1;
 
-    // Попробуем объединить с соседними свободными блоками
+    /* попробуем объединить с соседними свободными блоками*/
     mem_block_t* current = free_blocks;
     while (current) {
         if (current->is_free && current->next && current->next->is_free) {
-            // Объединяем текущий блок со следующим
+            // соединим текущий блок со следующим
             current->size += sizeof(mem_block_t) + current->next->size;
             current->next = current->next->next;
+            free_mem_addr -= current->size;
         }
         current = current->next;
     }
@@ -111,8 +126,6 @@ meminfo_t get_meminfo() {
     u32 total_used = 0;
     u32 total_free = 0;
     u32 block_count = 0;
-
-    kprint("Memory dump:\n");
 
     while (current) {
         block_count++;
@@ -137,46 +150,19 @@ meminfo_t get_meminfo() {
     return meminfo;
 }
 
-void kmemdump() { // дамп памяти
-    mem_block_t* current = free_blocks;
-    u32 total_used = 0;
-    u32 total_free = 0;
-    u32 block_count = 0;
+void kmemdump() {
+    meminfo_t info = get_meminfo();
+    mem_block_t* current = info.free_blocks;
+    u32 counter = 0;
 
-    kprint("Memory dump:\n");
+    kprintf("Heap: %x - %x (%d bytes)\n", info.heap_start, info.heap_start + info.heap_size, info.heap_size);
+    kprintf("Block size: %d bytes\n", info.block_size);
+    kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n\n", info.total_used, info.total_free, info.block_count);
 
     while (current) {
-        kprint("Block ");
-        char buf[32];
-        int_to_ascii(block_count++, buf);
-        kprint(buf);
-        kprint(": Addr=");
-        hex_to_ascii((u32)current, buf);
-        kprint(buf);
-        kprint(", Size=");
-        int_to_ascii(current->size, buf);
-        kprint(buf);
-        kprint(", ");
-        kprint(current->is_free ? "FREE" : "USED");
-        kprint("\n");
-
-        if (current->is_free) {
-            total_free += current->size;
-        } else {
-            total_used += current->size;
-        }
-
+        kprintf("Block %d: %x, Size=%d, %s\n", counter++, (u32)current, current->size, current->is_free ? "FREE" : "USED");
         current = current->next;
     }
-
-    kprint("Total: USED=");
-    char buf2[32];
-    int_to_ascii(total_used, buf2);
-    kprint(buf2);
-    kprint(", FREE=");
-    int_to_ascii(total_free, buf2);
-    kprint(buf2);
-    kprint("\n");
 }
 
 // LEGACY Arena

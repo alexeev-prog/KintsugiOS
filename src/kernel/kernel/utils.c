@@ -73,9 +73,32 @@ void mem_dump(char** args) {
 	kmemdump();
 }
 
+void echo_command(char **args) {
+    for (int i = 0; args[i] != NULL; i++) {
+        kprintf("%s ", args[i]);
+    }
+    kprint("\n");
+}
+
+void free_command(char **args) {
+    if (!args[0]) {
+        kprint("FREE usage: FREE <hex_address>\n");
+        return;
+    }
+
+    char *addr_str = args[0];
+    if (addr_str[0] == '0' && addr_str[1] == 'x') {
+        addr_str += 2;
+    }
+
+    u32 addr = hex_strtoint(addr_str);
+    kfree((void*)addr);
+    kprintf("Freed memory at %x\n", addr);
+}
+
 void kmalloc_command(char** args) {
 	if (args[0] == NULL) {
-		kprint("KMALLOC usage: KMALLOC <bytes>");
+		kprint("MALLOC usage: MALLOC <bytes>");
 		return;
 	}
 

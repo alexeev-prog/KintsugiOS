@@ -56,7 +56,7 @@ char** get_args(char *input) {
 void user_input(char *input) {
 	// Массив структур команд, состоящий из самой команды, подсказки и указателя до void-функции
 	struct { char *text, *hint; void (*command)(char**); } commands[] = {
-		//   Команда            		Подсказка для команды                   Указатель до функции
+		//   Команда            		Подсказка для команды                  	 					Указатель до функции
 		{.text="END",		   		.hint="HALT CPU", 											.command=&halt_cpu},
 		{.text="CLEAR", 	   		.hint="Clear screen",										.command=&clear_screen_command},
 		{.text="AMALLOC", 		   	.hint="Kernel Arena Malloc. Usage: AMALLOC <size>",			.command=&arena_malloc_command_shell},
@@ -64,8 +64,10 @@ void user_input(char *input) {
 		{.text="INFO",				.hint="Get info",											.command=&info_command_shell},
 		{.text="FREEMEMADDR",		.hint="Get free mem addr",									.command=&print_freememaddr},
 		{.text="TESTMEM", 			.hint="Test memory",										.command=&test_mem_command},
-		{.text="KMEMDUMP", 			.hint="Dump memory",										.command=&mem_dump},
-		{.text="KMALLOC",			.hint="Alloc memory. Usage: KMALLOC <size>",				.command=&kmalloc_command}
+		{.text="MEMDUMP", 			.hint="Dump memory",										.command=&mem_dump},
+		{.text="MALLOC",			.hint="Alloc memory. Usage: MALLOC <size>",					.command=&kmalloc_command},
+		{.text="FREE",				.hint="Free memory. Usage: FREE <address>",					.command=&free_command},
+		{.text="ECHO",				.hint="Echo an text",										.command=&echo_command}
 	};
 
 	int executed = 0;

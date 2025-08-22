@@ -12,5 +12,7 @@ void test_mem_command(char** args);
 void mem_dump(char** args);
 void clear_screen_command(char** args);
 void kmalloc_command(char** args);
+void echo_command(char** args);
+void free_command(char **args);
 
 #endif

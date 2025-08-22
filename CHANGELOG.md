@@ -1,3 +1,9 @@
+commit 0867ca069cf902e68c0ef2e5e605c32d2d0cabcc
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Fri Aug 22 22:24:39 2025 +0700
+
+    improve info command, improve memory system
+
 commit 0176c2367607690e3198f7dccac0a1d26521e82d
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Fri Aug 22 22:03:20 2025 +0700

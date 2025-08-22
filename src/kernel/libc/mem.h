@@ -28,9 +28,9 @@ typedef struct meminfo {
     u32 total_used;
     u32 total_free;
     u32 block_count;
-
 } meminfo_t;
 
+void *get_physaddr(void *virtualaddr);
 meminfo_t get_meminfo();
 void memory_copy(u8 *source, u8 *dest, int nbytes);
 void memory_set(u8 *dest, u8 val, u32 len);
