@@ -3,4 +3,7 @@
 
 void user_input(char *input);
 
+extern int shell_cursor_offset;
+extern int shell_prompt_offset;
+
 #endif

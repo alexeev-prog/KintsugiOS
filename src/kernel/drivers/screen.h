@@ -90,6 +90,7 @@
 #define REG_SCREEN_DATA 0x3d5
 
 /* Публичное API ядра */
+int get_cursor_offset();
 void clear_screen();
 void halted_cpu_screen_clear();
 void kprint_at(char *message, int col, int row, int color);

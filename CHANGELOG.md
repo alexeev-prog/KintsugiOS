@@ -1,3 +1,9 @@
+commit 34f4acc8359288ab92953aaaaa2d1dc4ccf9de50
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Aug 23 03:21:09 2025 +0700
+
+    update shell, add free command, improve libc
+
 commit 0867ca069cf902e68c0ef2e5e605c32d2d0cabcc
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Fri Aug 22 22:24:39 2025 +0700

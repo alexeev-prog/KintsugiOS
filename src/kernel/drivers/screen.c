@@ -16,7 +16,6 @@
 #include "../libc/string.h"
 
 /* Декларирования частных функций */
-int get_cursor_offset();
 void set_cursor_offset(int offset);
 int print_char(char c, int col, int row, char attr);
 int get_offset(int col, int row);
@@ -105,12 +104,15 @@ void kprint_colored(char *message, int color) {
 }
 
 void kprint_backspace() {
-	// Вывод бекспейса (удаления символа)
-    int offset = get_cursor_offset()-2;
+    int offset = get_cursor_offset() - 2;
     int row = get_offset_row(offset);
     int col = get_offset_col(offset);
-    // TODO: подумать над заменением WHITE_ON_BLACK единой переменной
-    print_char(0x08, col, row, WHITE_ON_BLACK);
+
+    // print_char(0x08, col, row, WHITE_ON_BLACK);
+
+    print_char(' ', col, row, WHITE_ON_BLACK);
+
+    set_cursor_offset(offset);
 }
 
 

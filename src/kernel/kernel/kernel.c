@@ -15,6 +15,9 @@
 #include "../libc/mem.h"
 #include "../libc/string.h"
 
+int shell_cursor_offset = 0;
+int shell_prompt_offset = 0;
+
 void kmain() {
 	// Запускаемая функция ядра //
 	clear_screen();
@@ -67,7 +70,7 @@ void user_input(char *input) {
 		{.text="MEMDUMP", 			.hint="Dump memory",										.command=&mem_dump},
 		{.text="MALLOC",			.hint="Alloc memory. Usage: MALLOC <size>",					.command=&kmalloc_command},
 		{.text="FREE",				.hint="Free memory. Usage: FREE <address>",					.command=&free_command},
-		{.text="ECHO",				.hint="Echo an text",										.command=&echo_command}
+		{.text="ECHO",				.hint="Echo an text",										.command=&echo_command},
 	};
 
 	int executed = 0;
@@ -98,4 +101,7 @@ void user_input(char *input) {
 
     // Вывод строки шелла
     kprint("\n!#> ");
+
+	shell_cursor_offset = get_cursor_offset(); // get_cursor_offset из screen.c
+    shell_prompt_offset = shell_cursor_offset;
 }
