@@ -1,3 +1,9 @@
+commit 14696be1af1db0eb9fd795677785047285ee7277
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 24 03:27:10 2025 +0700
+
+    fix bugs and improve docstrings
+
 commit 4e7d5fc5f7531d9720774b37aebc1d97a38836b9
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 24 02:40:25 2025 +0700
