@@ -2,12 +2,15 @@
 #include "../../drivers/screen.h"
 #include "frame_alloc.h"
 #include "../stdio.h"
+#include "frame_alloc.h"
+#include "../stdlib.h"
 #include "../mem.h"
 #include "../../cpu/isr.h"
 
 // внешнии функции из paging.asm
 extern void load_page_dir(u32 *);
 extern void enable_paging();
+extern u32 frame_bitmap[FRAME_BITMAP_SIZE];
 
 // каталог страниц, выровненный по границе 4 КБ
 u32 page_dir[1024] __attribute__((aligned(4096)));
@@ -34,6 +37,36 @@ void debug_mapping(u32 vaddr) {
             kprint("PDE is not present\n");
         }
     }
+}
+
+void mark_used_frames() {
+    // Пометить фреймы, занятые ядром
+    u32 kernel_start = 0x100000; // Начало ядра
+    u32 kernel_end = 0x200000;/* твой расчет конца ядра */
+
+    for (u32 addr = kernel_start; addr < kernel_end; addr += PAGE_SIZE) {
+        set_frame_used(addr);
+    }
+
+    // Пометить фреймы, занятые таблицами страниц
+    set_frame_used((u32)page_dir);
+    set_frame_used((u32)first_page_tab);
+
+    // Пометить другие занятые области (например, видеопамять)
+    set_frame_used(0xB8000); // Видеопамять
+}
+
+
+void init_frame_allocator() {
+    // 1. Убедись, что знаешь реальный объем ОЗУ
+    u32 total_memory = 16 * 1024 * 1024; // Например, 16MB
+    u32 total_frames = total_memory / PAGE_SIZE;
+
+    // 2. Помеь все фреймы как свободные
+    // u32memory_set(frame_bitmap, 0, sizeof(frame_bitmap));
+
+    // 3. Пометиь как занятые только те фреймы, которые действительно заняты
+    // mark_used_frames();
 }
 
 void debug_page_fault(u32 fault_addr) {
@@ -78,6 +111,8 @@ void init_paging() {
 
     // 6. энейблим пажинг
     enable_paging();
+
+    init_frame_allocator();
 
     kprint("Paging enabled!\n");
     check_recursive_mapping();

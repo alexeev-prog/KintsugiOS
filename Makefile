@@ -71,11 +71,11 @@ run_bin: $(BIN_DIR)/kintsugios.bin
 
 run: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 	@printf "$(GREEN)[QEMU] Run img   %-50s$(RESET)\n" "$<"
-	@qemu-system-i386 -fda $< -boot a
+	@qemu-system-i386 -fda $< -boot a -m 16
 
 debug: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 	@printf "$(GREEN)[QEMU] Debug img %-50s$(RESET)\n" "$<"
-	@qemu-system-i386 -fda $< -boot a -s -S
+	@qemu-system-i386 -fda $< -boot a -s -S -m 16
 
 clean:
 	@printf "$(RED)[RM]   Clean $(BIN_DIR) and $(DISKIMG_DIR)$(RESET)\n"

@@ -1,14 +1,9 @@
 #include "frame_alloc.h"
 #include "../../drivers/screen.h"
 #include "../stdlib.h"
+#include "paging.h"
 
 u32 frame_bitmap[FRAME_BITMAP_SIZE]; // битмапа фреймов
-
-void init_frame_allocator() {
-    // инициализируем аллокатор фреймов для пажинга
-    u32memory_set(frame_bitmap, 0, sizeof(frame_bitmap));
-    kprint("Frame allocator initialized.\n");
-}
 
 void set_frame_used(u32 frame_addr) {
     u32 frame_num = frame_addr / FRAME_SIZE;

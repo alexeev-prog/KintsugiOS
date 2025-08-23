@@ -61,7 +61,7 @@ void memory_set(u8 *dest, u8 val, u32 len) { // задаем память
 }
 
 void u32memory_set(u32 *dest, u32 val, u32 len) { // задаем память u32
-    u8 *temp = (u8 *)dest;
+    u32 *temp = (u32 *)dest;
     for ( ; len != 0; len--) *temp++ = val;
 }
 
