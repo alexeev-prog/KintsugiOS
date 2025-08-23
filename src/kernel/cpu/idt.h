@@ -1,7 +1,7 @@
 #ifndef IDT_H
 #define IDT_H
 
-#include "type.h"
+#include "../kklibc/ctypes.h"
 
 /* Селекторы сегментов */
 #define KERNEL_CS 0x08

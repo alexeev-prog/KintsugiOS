@@ -35,7 +35,7 @@
 #define SCREEN_H
 
 // Подключаем типы из CPU
-#include "../cpu/type.h"
+#include "../kklibc/ctypes.h"
 
 #define VIDEO_ADDRESS 0xb8000					// Видео-адрес
 #define MAX_ROWS 25								// Максимальное кол-во линий

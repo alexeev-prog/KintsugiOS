@@ -8,7 +8,7 @@
 #ifndef MEM_H
 #define MEM_H
 
-#include "../cpu/type.h"
+#include "ctypes.h"
 
 #define HEAP_START 0x100000  // Начинаем кучу с 1 МБ (выше ядра)
 #define HEAP_SIZE  0x100000  // Размер кучи: 1 МБ
@@ -32,8 +32,6 @@ typedef struct meminfo {
 
 void *get_physaddr(void *virtualaddr);
 meminfo_t get_meminfo();
-void memory_copy(u8 *source, u8 *dest, int nbytes);
-void memory_set(u8 *dest, u8 val, u32 len);
 void get_freememaddr();
 
 // Новые функции

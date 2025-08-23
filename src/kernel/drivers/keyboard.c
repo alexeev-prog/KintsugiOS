@@ -10,10 +10,9 @@
 #include "lowlevel_io.h"
 #include "../cpu/isr.h"
 #include "screen.h"
-#include "../libc/string.h"
-#include "../libc/function.h"
+#include "../kklibc/stdlib.h"
+#include "../kklibc/function.h"
 #include "../kernel/kernel.h"
-#include "../libc/stdio.h"
 
 #define BACKSPACE 0x0E
 #define ENTER 0x1C

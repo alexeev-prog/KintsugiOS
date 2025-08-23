@@ -6,22 +6,11 @@
 * ----------------------------------------------------------------------------*/
 
 
+#include "ctypes.h"
 #include "mem.h"
+#include "stdlib.h"
+#include "stdio.h"
 #include "../drivers/screen.h"
-#include "../libc/string.h"
-#include "../libc/stdio.h"
-
-void memory_copy(u8 *source, u8 *dest, int nbytes) {
-    int i;
-    for (i = 0; i < nbytes; i++) {
-        *(dest + i) = *(source + i);
-    }
-}
-
-void memory_set(u8 *dest, u8 val, u32 len) {
-    u8 *temp = (u8 *)dest;
-    for ( ; len != 0; len--) *temp++ = val;
-}
 
 u32 free_mem_addr_guard1 = 0xDEADBEEF;
 static u32 free_mem_addr = HEAP_START;

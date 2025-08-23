@@ -7,10 +7,8 @@
 
 #include "utils.h"
 #include "../drivers/screen.h"
-#include "../libc/mem.h"
-#include "../libc/string.h"
+#include "../kklibc/kklibc.h"
 #include "../cpu/ports.h"
-#include "../libc/stdio.h"
 
 void print_freememaddr(char** args) {
 	get_freememaddr();

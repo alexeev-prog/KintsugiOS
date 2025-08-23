@@ -5,6 +5,6 @@
 *	Description: null
 * ----------------------------------------------------------------------------*/
 
-#include "../cpu/type.h"
+#include "../kklibc/ctypes.h"
 
 void init_keyboard();

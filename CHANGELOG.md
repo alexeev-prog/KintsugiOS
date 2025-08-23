@@ -1,3 +1,9 @@
+commit fd042d366b38bcfa6f6490dee6b93bbc7c98949d
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Aug 23 19:58:30 2025 +0700
+
+    fix issues with makefile and shell.nix, fix backspace bug
+
 commit 20bb0ee3f10fb3038fe786707da6aaac09273f3d
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Aug 23 05:14:12 2025 +0700

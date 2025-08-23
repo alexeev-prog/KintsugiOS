@@ -1,7 +1,7 @@
 #ifndef ISR_H
 #define ISR_H
 
-#include "type.h"
+#include "../kklibc/ctypes.h"
 
 /* ISR зарезервированы для исключений процессора */
 extern void isr0();

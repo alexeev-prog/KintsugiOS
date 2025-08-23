@@ -9,11 +9,10 @@
 *	Description: null
 * ----------------------------------------------------------------------------*/
 
+#include "../kklibc/ctypes.h"
 #include "screen.h"
-#include "../cpu/ports.h"
-#include "../libc/mem.h"
 #include "lowlevel_io.h"
-#include "../libc/string.h"
+#include "../kklibc/stdlib.h"
 
 /* Декларирования частных функций */
 void set_cursor_offset(int offset);

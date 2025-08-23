@@ -6,14 +6,11 @@
 * ----------------------------------------------------------------------------*/
 
 
-#include "../libc/mem.h"
 #include "../cpu/isr.h"
 #include "../drivers/screen.h"
 #include "kernel.h"
 #include "utils.h"
-#include "../libc/stdio.h"
-#include "../libc/mem.h"
-#include "../libc/string.h"
+#include "../kklibc/kklibc.h"
 
 int shell_cursor_offset = 0;
 int shell_prompt_offset = 0;
