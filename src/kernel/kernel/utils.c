@@ -10,6 +10,57 @@
 #include "../kklibc/kklibc.h"
 #include "../cpu/ports.h"
 
+void fibonacci_command(char **args) {
+    if (!args[0]) {
+        kprint("FIB usage: FIB <num>\n");
+        return;
+    }
+
+    int num = strtoint(args[0]);
+
+    u32 fib = fibonacci(num);
+
+    kprintf("fib(%d) = %d\n", num, fib);
+}
+
+void binary_pow_command(char **args) {
+    if (!args[0] || !args[1]) {
+        kprint("BINPOW usage: BINPOW <base> <exponent>\n");
+        return;
+    }
+
+    int b = strtoint(args[0]);
+    u32 e = strtoint(args[1]);
+
+    int powered = binary_pow(b, e);
+
+    kprintf("%d ** %d = %d\n", b, e, powered);
+}
+
+void rand_comamnd(char **args) {
+    if (!args[0]) {
+        kprint("RAND usage: RAND <seed>\n");
+        return;
+    }
+
+    u32 seed = strtoint(args[0]);
+
+    kprintf("%d\n", rand(&seed));
+}
+
+void rand_range_command(char **args) {
+    if (!args[0] || !args[1] || !args[2]) {
+        kprint("RANDRANGE usage: RANDRANGE <seed> <min> <max>\n");
+        return;
+    }
+
+    u32 seed = strtoint(args[0]);
+    u32 min = strtoint(args[1]);
+    u32 max = strtoint(args[2]);
+
+    kprintf("%d\n", rand_range(&seed, min, max));
+}
+
 void reboot_command(char** args) {
     reboot();
 }
@@ -23,9 +74,6 @@ void sleep_command(char** args) {
     wait(strtoint(args[0]));
 }
 
-void print_freememaddr(char** args) {
-	get_freememaddr();
-}
 
 void clear_screen_command(char** args) {
 	clear_screen();
@@ -103,36 +151,4 @@ void kmalloc_command(char** args) {
 	hex_to_ascii((int)ptr, buf1);
 
 	kprintf("Allocate %d bytes.\nPointer: %s\n", size, buf1);
-}
-
-void test_mem_command(char** args) {
-    void* ptr1 = kmalloc(64);
-    void* ptr2 = kmalloc(128);
-    void* ptr3 = kmalloc(256);
-
-	char buf1[32] = "";
-	char buf2[32] = "";
-	char buf3[32] = "";
-
-    kprint("Allocated blocks:\n");
-
-    kprint("Ptr1: ");
-    hex_to_ascii((int)ptr1, buf1);
-    kprint(buf1);
-    kprint("\n");
-
-    kprint("Ptr2: ");
-    hex_to_ascii((int)ptr2, buf2);
-    kprint(buf2);
-    kprint("\n");
-
-    kprint("Ptr3: ");
-    hex_to_ascii((int)ptr3, buf3);
-    kprint(buf3);
-    kprint("\n");
-
-    kfree(ptr2);
-
-    kprint("Freed ptr2\n\n");
-    kmemdump();
 }

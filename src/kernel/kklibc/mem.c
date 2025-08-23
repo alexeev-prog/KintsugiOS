@@ -89,6 +89,21 @@ void *kmalloc(u32 size) {
     return NULL;
 }
 
+void *krealloc(void *ptr, u32 size) {
+    if (!ptr) return kmalloc(size); // если нет указателя то просто аллоцируем память
+    if (size == 0) { kfree(ptr); return NULL; } // если размер нулевой освобождаем поинтер
+
+    mem_block_t *block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t)); // создаем блок
+    if (block->size >= size) return ptr; // если текущий блок достаточно большой
+
+    void *new_ptr = kmalloc(size); // новый поинтер
+    if (new_ptr) { // если все ок то копируем память и освобождаем старый поинтер
+        memory_copy(ptr, new_ptr, block->size);
+        kfree(ptr);
+    }
+    return new_ptr;
+}
+
 void kfree(void *ptr) {
     if (!ptr)
         return;

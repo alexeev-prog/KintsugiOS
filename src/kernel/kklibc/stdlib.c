@@ -1,5 +1,27 @@
 #include "ctypes.h"
 #include "stdlib.h"
+#include "stdio.h"
+
+u32 xorshift32(u32* state) {
+    u32 x = state[0];
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    state[0] = x;
+    return x;
+}
+
+u32 rand_range(u32* state, u32 min, u32 max) {
+    if (max < min) {
+        return 0;
+    }
+
+    return min + (xorshift32(state) % (max - min + 1));
+}
+
+u32 rand(u32* state) {
+    return xorshift32(state);
+}
 
 void reboot() {
     unsigned char reset_value = 0x06;

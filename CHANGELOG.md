@@ -1,3 +1,9 @@
+commit 8d209352971e854b05d78d786cd4c1107fee1535
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 24 01:53:08 2025 +0700
+
+    improve kklibc, add sleep and reboot command
+
 commit 2a4c59d5f13c79da2dd670bd3010dddb82da0104
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Aug 23 20:20:31 2025 +0700
