@@ -10,6 +10,19 @@
 #include "../kklibc/kklibc.h"
 #include "../cpu/ports.h"
 
+void reboot_command(char** args) {
+    reboot();
+}
+
+void sleep_command(char** args) {
+    if (!args[0]) {
+        kprint("SLEEP usage: SLEEP <ms>\n");
+        return;
+    }
+
+    wait(strtoint(args[0]));
+}
+
 void print_freememaddr(char** args) {
 	get_freememaddr();
 }
@@ -33,7 +46,7 @@ void halt_cpu(char** args) {
 }
 
 void info_command_shell(char** args) {
-	// kprint("Kintsugi OS 0.1.0 by alexeev-prog\n");
+	kprint("Kintsugi OS 0.1.0 by alexeev-prog\n");
 
 	kprint("   __    _      __                _          \n"
 		   "  / /__ (_)__  / /____ __ _____ _(_) ___  ___\n"

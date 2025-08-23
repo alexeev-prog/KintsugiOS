@@ -67,6 +67,8 @@ void user_input(char *input) {
 		{.text="MALLOC",			.hint="Alloc memory. Usage: MALLOC <size>",					.command=&kmalloc_command},
 		{.text="FREE",				.hint="Free memory. Usage: FREE <address>",					.command=&free_command},
 		{.text="ECHO",				.hint="Echo an text",										.command=&echo_command},
+		{.text="SLEEP",			.hint="Wait time. Usage: SLEEP <ms>",						.command=&sleep_command},
+		{.text="REBOOT",			.hint="Reboot system",										.command=&reboot_command},
 	};
 
 	int executed = 0;

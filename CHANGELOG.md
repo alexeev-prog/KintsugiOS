@@ -1,3 +1,9 @@
+commit 2a4c59d5f13c79da2dd670bd3010dddb82da0104
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Aug 23 20:20:31 2025 +0700
+
+    improve architecture (change libc name to kklibc), improve libc structure
+
 commit fd042d366b38bcfa6f6490dee6b93bbc7c98949d
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Aug 23 19:58:30 2025 +0700

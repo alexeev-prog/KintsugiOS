@@ -2,6 +2,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+void reboot_command(char** args);
+void sleep_command(char** args);
 void print_freememaddr(char** args);
 void shutdown_qemu(char** args);
 void halt_cpu(char** args);
