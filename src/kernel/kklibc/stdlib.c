@@ -2,7 +2,7 @@
 #include "stdlib.h"
 #include "stdio.h"
 
-u32 xorshift32(u32* state) {
+u32 xorshift32(u32* state) { // генератор псевдослучайных чисел xorshift32
     u32 x = state[0];
     x ^= x << 13;
     x ^= x >> 17;
@@ -11,6 +11,7 @@ u32 xorshift32(u32* state) {
     return x;
 }
 
+// рандомное число в диапазоне
 u32 rand_range(u32* state, u32 min, u32 max) {
     if (max < min) {
         return 0;
@@ -23,6 +24,7 @@ u32 rand(u32* state) {
     return xorshift32(state);
 }
 
+// reboot
 void reboot() {
     unsigned char reset_value = 0x06;
     __asm__ __volatile__ (
@@ -33,6 +35,7 @@ void reboot() {
     );
 }
 
+// wait ожидание
 void wait(int ms) {
     volatile int count;
     while (ms--)
@@ -45,14 +48,14 @@ void wait(int ms) {
     }
 }
 
-void memory_copy(u8 *source, u8 *dest, int nbytes) {
+void memory_copy(u8 *source, u8 *dest, int nbytes) { // копируем память
     int i;
     for (i = 0; i < nbytes; i++) {
         *(dest + i) = *(source + i);
     }
 }
 
-void memory_set(u8 *dest, u8 val, u32 len) {
+void memory_set(u8 *dest, u8 val, u32 len) { // задаем память
     u8 *temp = (u8 *)dest;
     for ( ; len != 0; len--) *temp++ = val;
 }
@@ -77,8 +80,7 @@ void int_to_ascii(int n, char str[]) {
 int strtoint(char* str) {
     int rc = 0;
     unsigned i = 0;
-    // C guarantees that '0'-'9' have consecutive values
-    while (str[i] >= '0' && str[i] <= '9') {
+    while (str[i] >= '0' && str[i] <= '9') { // перевод строк в числа
         rc *= 10;
         rc += str[i] - '0';
         ++i;
@@ -87,7 +89,7 @@ int strtoint(char* str) {
     return rc;
 }
 
-void hex_to_ascii(int n, char str[]) {
+void hex_to_ascii(int n, char str[]) { // из hex в строку
     append(str, '0');
     append(str, 'x');
 
@@ -108,14 +110,14 @@ void hex_to_ascii(int n, char str[]) {
     else append(str, tmp + '0');
 }
 
-void strcpy(char *dest, char *src) {
+void strcpy(char *dest, char *src) { // копирование строки
     while (*src) {
         *dest++ = *src++;
     }
     *dest = '\0';
 }
 
-int hex_strtoint(char *str) {
+int hex_strtoint(char *str) { // строка в число hex
     int result = 0;
     while (*str) {
         result *= 16;
@@ -128,7 +130,7 @@ int hex_strtoint(char *str) {
 }
 
 /* K&R */
-void reverse(char s[]) {
+void reverse(char s[]) { // реверс
     int c, i, j;
     for (i = 0, j = strlen(s)-1; i < j; i++, j--) {
         c = s[i];
@@ -138,19 +140,19 @@ void reverse(char s[]) {
 }
 
 /* K&R */
-int strlen(char s[]) {
+int strlen(char s[]) { // длина строки
     int i = 0;
     while (s[i] != '\0') ++i;
     return i;
 }
 
-void append(char s[], char n) {
+void append(char s[], char n) { // добавление новой строки в исходную
     int len = strlen(s);
     s[len] = n;
     s[len+1] = '\0';
 }
 
-void backspace(char s[]) {
+void backspace(char s[]) { // бекспейс
     int len = strlen(s);
 
     s[len-1] = '\0';

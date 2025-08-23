@@ -2,7 +2,7 @@
 #include "idt.h"
 #include "../drivers/screen.h"
 #include "../drivers/keyboard.h"
-#include "../libc/string.h"
+#include "../kklibc/stdlib.h"
 #include "timer.h"
 #include "../drivers/lowlevel_io.h"
 

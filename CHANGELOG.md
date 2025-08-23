@@ -1,3 +1,9 @@
+commit 4e7d5fc5f7531d9720774b37aebc1d97a38836b9
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 24 02:40:25 2025 +0700
+
+    feat/docs: add fib, binpow, xorshift32 functions, improve libc, update readme
+
 commit 8d209352971e854b05d78d786cd4c1107fee1535
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 24 01:53:08 2025 +0700

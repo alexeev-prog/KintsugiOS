@@ -30,7 +30,7 @@ int get_offset_col(int offset);
  * Если col, row отрицательные, то используем текущий оффсет
  */
 void kprint_at(char *message, int col, int row, int color) {
-    struct { int clrcode; int color; } colors[] = {
+    struct { int clrcode; int color; } colors[] = { // структура цветов, clrcode - код цвета для передачи и color - сам цвет
 		{.clrcode=WHITE_ON_BLACK_CLR_CODE,		   		.color=WHITE_ON_BLACK},
         {.clrcode=BLUE_ON_BLACK_CLR_CODE,		   		.color=BLUE_ON_BLACK},
         {.clrcode=GREEN_ON_BLACK_CLR_CODE,		   		.color=GREEN_ON_BLACK},

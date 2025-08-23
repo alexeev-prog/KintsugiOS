@@ -22,6 +22,8 @@ extern int shell_prompt_offset;
 
 static char key_buffer[256];
 
+// TODO добавить обработку lower и upper букв
+
 #define SC_MAX 57
 const char *sc_name[] = { "ERROR", "Esc", "1", "2", "3", "4", "5", "6",
     "7", "8", "9", "0", "-", "=", "Backspace", "Tab", "Q", "W", "E",
