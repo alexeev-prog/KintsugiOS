@@ -14,10 +14,20 @@
 #define HEAP_SIZE  0x100000  // Размер кучи: 1 МБ
 #define BLOCK_SIZE 16        // Минимальный размер блока
 
+typedef struct page_header {
+    u32 physical_addr;
+    u32 virtual_addr;
+    struct page_header* next;
+    u32 ref_count;
+} page_header_t;
+
+// Обновляем структуру блока памяти
 typedef struct mem_block {
     u32 size;
     struct mem_block* next;
     u8 is_free;
+    u8 is_page;
+    page_header_t* page;
 } mem_block_t;
 
 typedef struct meminfo {
@@ -32,9 +42,7 @@ typedef struct meminfo {
 
 void *get_physaddr(void *virtualaddr);
 meminfo_t get_meminfo();
-void get_freememaddr();
 
-// Новые функции
 void heap_init();
 void* kmalloc(u32 size);
 void kfree(void* ptr);

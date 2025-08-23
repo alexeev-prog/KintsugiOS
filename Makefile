@@ -17,11 +17,12 @@ LDFLAGS = -Ttext 0x1000 --oformat binary
 
 KERNEL_ENTRY = $(BIN_DIR)/bootloader/kernel_entry.o
 INTERRUPT_OBJ = $(BIN_DIR)/kernel/cpu/interrupt.o
+PAGING_OBJ = $(BIN_DIR)/bootloader/paging.o
 
 C_SOURCES = $(shell find $(SRC_DIR) -name '*.c')
 C_OBJS = $(C_SOURCES:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
 
-OBJS = $(KERNEL_ENTRY) $(INTERRUPT_OBJ) $(C_OBJS)
+OBJS = $(KERNEL_ENTRY) $(INTERRUPT_OBJ) $(PAGING_OBJ) $(C_OBJS)
 
 RED=\033[0;31m
 GREEN=\033[0;32m
@@ -77,7 +78,7 @@ debug: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 	@qemu-system-i386 -fda $< -boot a -s -S
 
 clean:
-	@printf "$(RED)[RM]   Clean bin %-50s$(RESET)\n" "$(BIN_DIR)"
+	@printf "$(RED)[RM]   Clean $(BIN_DIR) and $(DISKIMG_DIR)$(RESET)\n"
 	@rm -rf $(BIN_DIR)/* $(DISKIMG_DIR)/*
 
 .PHONY: all diskimg run run_bin debug clean clean_all

@@ -1,3 +1,9 @@
+commit ffe676bbcd462e3e7d7c8bd82ca1683361ba3bf6
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 24 04:06:51 2025 +0700
+
+    docs: add paging docs
+
 commit 14696be1af1db0eb9fd795677785047285ee7277
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 24 03:27:10 2025 +0700

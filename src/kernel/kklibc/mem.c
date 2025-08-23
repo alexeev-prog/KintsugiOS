@@ -8,21 +8,101 @@
 #include "mem.h"
 #include "../drivers/screen.h"
 #include "ctypes.h"
+#include "paging/paging.h"
 #include "stdio.h"
 #include "stdlib.h"
+#include "paging/frame_alloc.h"
 
-u32 free_mem_addr_guard1 = 0xDEADBEEF;
-static u32 free_mem_addr = HEAP_START;
-u32 free_mem_addr_guard2 = 0xCAFEBABE;
 static mem_block_t *free_blocks = NULL;
+
+static page_header_t* page_list = NULL;
+static u32 next_virtual_addr = 0xC0000000; // Начинаем с 3GB для ядра
+
+// Инициализация аллокатора страниц
+void init_page_allocator() {
+    page_list = NULL;
+    kprint("Page allocator initialized\n");
+}
+
+// Выделение новой страницы
+page_header_t* alloc_page_struct(u32 size) {
+    page_header_t* new_page = (page_header_t*)kmalloc(sizeof(page_header_t));
+    if (!new_page) {
+        kprint("Failed to allocate page header\n");
+        return NULL;
+    }
+
+    // Выделяем физический кадр
+    u32 frame_addr = alloc_frame();
+    if (!frame_addr) {
+        kprint("Failed to allocate physical frame\n");
+        kfree(new_page);
+        return NULL;
+    }
+
+    // Назначаем виртуальный адрес
+    u32 virt_addr = next_virtual_addr;
+    next_virtual_addr += PAGE_SIZE;
+
+    // Настраиваем отображение виртуального адреса на физический
+    if (!map_page(virt_addr, frame_addr, 0x03)) { // Present + R/W
+        kprint("Failed to map page\n");
+        free_frame(frame_addr);
+        kfree(new_page);
+        return NULL;
+    }
+
+    // Инициализируем структуру страницы
+    new_page->physical_addr = frame_addr;
+    new_page->virtual_addr = virt_addr;
+    new_page->next = page_list;
+    new_page->ref_count = 1;
+
+    page_list = new_page;
+    return new_page;
+}
+
+// Освобождение страницы
+void free_page_struct(page_header_t* page) {
+    if (!page) return;
+
+    if (--page->ref_count == 0) {
+        // Удаляем отображение страницы
+        unmap_page(page->virtual_addr);
+
+        // Освобождаем физический кадр
+        free_frame(page->physical_addr);
+
+        // Удаляем из списка
+        if (page_list == page) {
+            page_list = page->next;
+        } else {
+            page_header_t* current = page_list;
+            while (current && current->next != page) {
+                current = current->next;
+            }
+            if (current) {
+                current->next = page->next;
+            }
+        }
+
+        // Освобождаем саму структуру
+        kfree(page);
+    }
+}
 
 // Инициализация памяти heap
 void heap_init() {
-    // Инициализируем первый свободный блок на всей области кучи
-    free_blocks = (mem_block_t *)HEAP_START;
+    // Инициализируем аллокатор страниц
+    init_page_allocator();
+
+    // Остальная инициализация кучи
+    free_blocks = (mem_block_t*)HEAP_START;
     free_blocks->size = HEAP_SIZE - sizeof(mem_block_t);
     free_blocks->next = NULL;
     free_blocks->is_free = 1;
+    free_blocks->is_page = 0;
+    free_blocks->page = NULL;
 
     kprint("Heap initialized at ");
     char buf[32] = "";
@@ -47,39 +127,52 @@ void *get_physaddr(void *virtualaddr) {
 }
 
 void *kmalloc(u32 size) {
-    // Выравниваем размер до границы BLOCK_SIZE
+        // Выравниваем размер до границы BLOCK_SIZE
     if (size % BLOCK_SIZE != 0) {
         size += BLOCK_SIZE - (size % BLOCK_SIZE);
     }
 
-    mem_block_t *current = free_blocks;
-    mem_block_t *prev = NULL;
+    // Для больших блоков используем отдельные страницы
+    if (size >= PAGE_SIZE / 2) { // Полстраницы или больше
+        page_header_t* new_page = alloc_page_struct(size);
+        if (!new_page) {
+            kprint("Failed to allocate page for large block\n");
+            return NULL;
+        }
+
+        // Создаем блок памяти в начале страницы
+        mem_block_t* block = (mem_block_t*)new_page->virtual_addr;
+        block->size = size;
+        block->is_free = 0;
+        block->is_page = 1;
+        block->page = new_page;
+        block->next = NULL;
+
+        return (void*)((u32)block + sizeof(mem_block_t));
+    }
+
+    // Стандартная логика для маленьких блоков
+    mem_block_t* current = free_blocks;
+    mem_block_t* prev = NULL;
 
     while (current) {
         if (current->is_free && current->size >= size) {
-            // Нашли подходящий свободный блок: размер текущего больше чем размер
-            // выделяемой памяти плюс размер структуры блока памяти и плюс размер
-            // самого блока
+            // Нашли подходящий блок
             if (current->size > size + sizeof(mem_block_t) + BLOCK_SIZE) {
                 // Можем разделить блок
-                mem_block_t *new_block =
-                        (mem_block_t *)((u32)current + sizeof(mem_block_t) +
-                                                        size); // поинтер на новый блок
-                new_block->size =
-                        current->size - size -
-                        sizeof(
-                                mem_block_t); // размер текущего - выделяемый - размер структуры
-                new_block->is_free = 1; // свободен
+                mem_block_t* new_block = (mem_block_t*)((u32)current + sizeof(mem_block_t) + size);
+                new_block->size = current->size - size - sizeof(mem_block_t);
+                new_block->is_free = 1;
                 new_block->next = current->next;
+                new_block->is_page = 0;
+                new_block->page = NULL;
 
                 current->size = size;
                 current->next = new_block;
-
-                free_mem_addr += current->size;
             }
 
             current->is_free = 0;
-            return (void *)((u32)current + sizeof(mem_block_t));
+            return (void*)((u32)current + sizeof(mem_block_t));
         }
         prev = current;
         current = current->next;
@@ -90,42 +183,88 @@ void *kmalloc(u32 size) {
 }
 
 void *krealloc(void *ptr, u32 size) {
-    if (!ptr) return kmalloc(size); // если нет указателя то просто аллоцируем память
-    if (size == 0) { kfree(ptr); return NULL; } // если размер нулевой освобождаем поинтер
+    if (!ptr) return kmalloc(size);
+    if (size == 0) {
+        kfree(ptr);
+        return NULL;
+    }
 
-    mem_block_t *block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t)); // создаем блок
-    if (block->size >= size) return ptr; // если текущий блок достаточно большой
+    // Выравниваем размер как в kmalloc_new
+    if (size % BLOCK_SIZE != 0) {
+        size += BLOCK_SIZE - (size % BLOCK_SIZE);
+    }
 
-    void *new_ptr = kmalloc(size); // новый поинтер
-    if (new_ptr) { // если все ок то копируем память и освобождаем старый поинтер
+    mem_block_t *block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
+
+    // Если блок является страницей, обрабатываем особо
+    if (block->is_page) {
+        // Для страниц проверяем, можно ли расширить
+        if (size <= block->size) {
+            return ptr; // Уже достаточно места
+        }
+        // Для страниц просто выделяем новую и копируем
+        void *new_ptr = kmalloc(size);
+        if (!new_ptr) return NULL;
         memory_copy(ptr, new_ptr, block->size);
         kfree(ptr);
+        return new_ptr;
     }
+
+    // Попытка расширения на месте
+    if (block->next && block->next->is_free &&
+        (block->size + sizeof(mem_block_t) + block->next->size) >= size) {
+        // Можно расширить на месте
+        u32 needed = size - block->size;
+        if (block->next->size >= (needed + sizeof(mem_block_t))) {
+            // Разделяем следующий блок
+            mem_block_t *new_block = (mem_block_t*)((u32)block + sizeof(mem_block_t) + block->size);
+            new_block->size = block->next->size - needed - sizeof(mem_block_t);
+            new_block->is_free = 1;
+            new_block->next = block->next->next;
+            new_block->is_page = 0;
+
+            block->size = size;
+            block->next = new_block;
+
+            return ptr;
+        } else {
+            // Просто объединяем с следующим блоком
+            block->size += sizeof(mem_block_t) + block->next->size;
+            block->next = block->next->next;
+            return ptr;
+        }
+    }
+
+    // Стандартный случай: выделяем новый блок и копируем
+    void *new_ptr = kmalloc(size);
+    if (!new_ptr) return NULL;
+    memory_copy(ptr, new_ptr, block->size);
+    kfree(ptr);
     return new_ptr;
 }
 
-void kfree(void *ptr) {
-    if (!ptr)
-        return;
+void kfree(void* ptr) {
+    if (!ptr) return;
 
-    // получаем указатель на заголовок блока
-    mem_block_t *block = (mem_block_t *)((u32)ptr - sizeof(mem_block_t));
+    // Получаем заголовок блока
+    mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
 
-    if (block->is_free) { // блок уже освобожден
-        kprint("Double free detected!\n");
+    if (block->is_page) {
+        // Освобождаем всю страницу
+        free_page_struct(block->page);
         return;
     }
 
+    // Стандартная логика освобождения блока
     block->is_free = 1;
 
-    /* попробуем объединить с соседними свободными блоками*/
-    mem_block_t *current = free_blocks;
+    // Попробуем объединить с соседними свободными блоками
+    mem_block_t* current = free_blocks;
     while (current) {
         if (current->is_free && current->next && current->next->is_free) {
-            // соединим текущий блок со следующим
+            // Объединяем текущий блок со следующим
             current->size += sizeof(mem_block_t) + current->next->size;
             current->next = current->next->next;
-            free_mem_addr -= current->size;
         }
         current = current->next;
     }
@@ -178,11 +317,7 @@ void kmemdump() {
                         current->size, current->is_free ? "FREE" : "USED");
         current = current->next;
     }
-}
 
-void get_freememaddr() {
-    char free_mem_addr_str[32] = "";
-    hex_to_ascii(free_mem_addr, free_mem_addr_str);
-
-    kprintf("%s\n", free_mem_addr_str);
+    kprint("Paging:\n");
+    dump_page_tables();
 }

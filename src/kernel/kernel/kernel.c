@@ -24,15 +24,15 @@ void kmain() {
 	irq_install();
 	kprint("IRQ Installed\n");
 
+	init_paging();
+
 	heap_init();
 
 	// Приглашение
-	kprint("Success loaded! Welcome to Kintsugi OS\n");
-	kprint("Copyright (C) alexeev-prog\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
+	kprint("\nKintsugi OS (C) 2025\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
 
 	// Уведомление о старте оболочки командной строки
 	kprint("\nKeramika Shell v0.1.0 "
-	        "Type END to halt the CPU\n"
 	        "Type HELP to view commands\n\n!#> ");
 }
 
