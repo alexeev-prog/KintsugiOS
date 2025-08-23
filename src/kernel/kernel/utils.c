@@ -52,23 +52,6 @@ void info_command_shell(char** args) {
 	kprintf("Block count: %d\n", meminfo.block_count);
 }
 
-void arena_malloc_command_shell(char** args) {
-	if (args[0] == NULL) {
-		kprint("AMALLOC usage: AMALLOC <page size>");
-		return;
-	}
-
-	u32 phys_addr;
-	u32 page = kmalloc(strtoint(args[0]), 1, &phys_addr);
-	char page_str[16] = "";
-	hex_to_ascii(page, page_str);
-	char phys_str[16] = "";
-	hex_to_ascii(phys_addr, phys_str);
-
-	kprintf("ARENA MALLOC %d bytes\n", strtoint(args[0]));
-	kprintf("Page address: %s\nPhysical address: %s\n", page_str, phys_str);
-}
-
 void mem_dump(char** args) {
 	kmemdump();
 }
@@ -103,7 +86,7 @@ void kmalloc_command(char** args) {
 	}
 
 	int size = strtoint(args[0]);
-	void* ptr = kmalloc_new(size);
+	void* ptr = kmalloc(size);
 
 	char buf1[32] = "";
 	hex_to_ascii((int)ptr, buf1);
@@ -112,9 +95,9 @@ void kmalloc_command(char** args) {
 }
 
 void test_mem_command(char** args) {
-    void* ptr1 = kmalloc_new(64);
-    void* ptr2 = kmalloc_new(128);
-    void* ptr3 = kmalloc_new(256);
+    void* ptr1 = kmalloc(64);
+    void* ptr2 = kmalloc(128);
+    void* ptr3 = kmalloc(256);
 
 	char buf1[32] = "";
 	char buf2[32] = "";

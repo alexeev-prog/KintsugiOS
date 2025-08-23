@@ -55,30 +55,29 @@ $(BIN_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-diskimg: $(BIN_DIR)/kintsugios.bin
-	@printf "$(BLUE)[DD]   Make IMG  %-50s -> %s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin" "$(DISKIMG_DIR)/$(DISKIMG_NAME)"
+$(DISKIMG_DIR)/$(DISKIMG_NAME): $(BIN_DIR)/kintsugios.bin
+	@printf "$(BLUE)[DD]   Make IMG  %-50s -> %s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin" "$@"
 	@mkdir -p $(DISKIMG_DIR)
-	@dd if=/dev/zero of=$(DISKIMG_DIR)/$(DISKIMG_NAME) bs=1024 count=1440
-	@dd if=$(BIN_DIR)/kintsugios.bin of=$(DISKIMG_DIR)/$(DISKIMG_NAME) conv=notrunc
+	@dd if=/dev/zero of=$@.tmp bs=1024 count=1440
+	@dd if=$< of=$@.tmp conv=notrunc
+	@mv $@.tmp $@
+
+diskimg: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 
 run_bin: $(BIN_DIR)/kintsugios.bin
 	@printf "$(GREEN)[QEMU] Run bin   %-50s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin"
 	@qemu-system-i386 -fda $(BIN_DIR)/kintsugios.bin
 
-run: diskimg
-	@printf "$(GREEN)[QEMU] Run img   %-50s$(RESET)\n" "$(DISKIMG_DIR)/$(DISKIMG_NAME)"
-	@qemu-system-i386 -fda $(DISKIMG_DIR)/$(DISKIMG_NAME) -boot a
+run: $(DISKIMG_DIR)/$(DISKIMG_NAME)
+	@printf "$(GREEN)[QEMU] Run img   %-50s$(RESET)\n" "$<"
+	@qemu-system-i386 -fda $< -boot a
 
-debug: diskimg
-	@printf "$(GREEN)[QEMU] Debug img %-50s$(RESET)\n" "$(DISKIMG_DIR)/$(DISKIMG_NAME)"
-	@qemu-system-i386 -fda $(DISKIMG_DIR)/$(DISKIMG_NAME) -boot a -s -S
+debug: $(DISKIMG_DIR)/$(DISKIMG_NAME)
+	@printf "$(GREEN)[QEMU] Debug img %-50s$(RESET)\n" "$<"
+	@qemu-system-i386 -fda $< -boot a -s -S
 
 clean:
 	@printf "$(RED)[RM]   Clean bin %-50s$(RESET)\n" "$(BIN_DIR)"
-	@rm -rf $(BIN_DIR)/*
-
-clean_all:
-	@printf "$(RED)[RM]   Clean all %-50s$(RESET)\n" "$(BIN_DIR)"
 	@rm -rf $(BIN_DIR)/* $(DISKIMG_DIR)/*
 
-.PHONY: all diskimg run run_bin clean clean_all
+.PHONY: all diskimg run run_bin debug clean clean_all

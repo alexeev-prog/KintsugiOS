@@ -18,9 +18,6 @@ pkgs.mkShell {
 
   shellHook = ''
     export PATH="${customToolchainPath}:$PATH"
-    # Опционально: устанавливаем переменные окружения для удобства
-    export CC="i386-elf-gcc"
-    export AS="i386-elf-as"
     echo "Environment ready for KintsugiOS development!"
     echo "Using cross-compiler from: ${customToolchainPath}"
     echo "Type 'make run' to build and launch in QEMU (if your Makefile supports it)"

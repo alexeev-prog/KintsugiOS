@@ -13,6 +13,7 @@
 #include "../libc/string.h"
 #include "../libc/function.h"
 #include "../kernel/kernel.h"
+#include "../libc/stdio.h"
 
 #define BACKSPACE 0x0E
 #define ENTER 0x1C
@@ -29,6 +30,7 @@ const char *sc_name[] = { "ERROR", "Esc", "1", "2", "3", "4", "5", "6",
         "A", "S", "D", "F", "G", "H", "J", "K", "L", ";", "'", "`",
         "LShift", "\\", "Z", "X", "C", "V", "B", "N", "M", ",", ".",
         "/", "RShift", "Keypad *", "LAlt", "Spacebar"};
+
 const char sc_ascii[] = { '?', '?', '1', '2', '3', '4', '5', '6',
     '7', '8', '9', '0', '-', '=', '?', '?', 'Q', 'W', 'E', 'R', 'T', 'Y',
         'U', 'I', 'O', 'P', '[', ']', '?', '?', 'A', 'S', 'D', 'F', 'G',
@@ -38,20 +40,18 @@ const char sc_ascii[] = { '?', '?', '1', '2', '3', '4', '5', '6',
 static void keyboard_callback(registers_t regs) {
     /* PIC выходы сканкодов в порту 0x60 */
     u8 scancode = port_byte_in(0x60);
+    int current_offset = get_cursor_offset();
 
     if (scancode > SC_MAX) return;
     if (scancode == BACKSPACE) {
-        if (shell_cursor_offset <= shell_prompt_offset) {
+        // kprintf("%d %d\n", current_offset, shell_prompt_offset);
+        // return;
+        if (current_offset <= shell_prompt_offset) {
             return;
         }
 
         backspace(key_buffer);
         kprint_backspace();
-
-        backspace(key_buffer);
-        kprint_backspace();
-
-        shell_cursor_offset = get_cursor_offset();
     } else if (scancode == ENTER) {
         kprint("\n");
         user_input(key_buffer); /* функция под управлением ядра */
@@ -63,7 +63,7 @@ static void keyboard_callback(registers_t regs) {
         if(strlen(key_buffer) < sizeof(key_buffer) - 1) {
             append(key_buffer, letter);
             kprint(str);
-            shell_cursor_offset += 2;
+            shell_cursor_offset = get_cursor_offset();
         } else {
             kprint("Keyboard buffer is overflow.");
         }

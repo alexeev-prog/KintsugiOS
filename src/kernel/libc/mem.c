@@ -57,7 +57,7 @@ void *get_physaddr(void *virtualaddr) {
     return (void *)((pt[ptindex] & ~0xFFF) + ((unsigned long)virtualaddr & 0xFFF));
 }
 
-void* kmalloc_new(u32 size) {
+void* kmalloc(u32 size) {
     // Выравниваем размер до границы BLOCK_SIZE
     if (size % BLOCK_SIZE != 0) {
         size += BLOCK_SIZE - (size % BLOCK_SIZE);
@@ -163,38 +163,6 @@ void kmemdump() {
         kprintf("Block %d: %x, Size=%d, %s\n", counter++, (u32)current, current->size, current->is_free ? "FREE" : "USED");
         current = current->next;
     }
-}
-
-// LEGACY Arena
-/* Реализация - это просто указатель на некоторую свободную память, которая продолжает расти */
-u32 kmalloc(u32 size, int align, u32 *phys_addr) {
-
-    if(free_mem_addr_guard1 != 0xDEADBEEF || free_mem_addr_guard2 != 0xCAFEBABE) {
-        kprint("PANIC: Memory corruption detected around free_mem_addr!\n");
-        // Зависаем или перезагружаемся
-        // asm volatile("hlt");
-        return -1;
-    }
-
-    /* Страницы выровнены по 4K, или 0x1000 */
-    if (align == 1 && (free_mem_addr & 0xFFFFF000)) {
-        free_mem_addr &= 0xFFFFF000;
-        free_mem_addr += 0x1000;
-    }
-    /* Сохранить также физический адрес */
-    if (phys_addr) *phys_addr = free_mem_addr;
-
-    kprint("kmalloc legacy: allocating ");
-    char size_str[16] = "";
-    hex_to_ascii(size, size_str);
-    kprint(size_str);
-    kprint(" bytes at ");
-    get_freememaddr();
-    kprint("\n");
-
-    u32 ret = free_mem_addr;
-    free_mem_addr += size;
-    return ret;
 }
 
 void get_freememaddr() {

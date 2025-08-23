@@ -7,7 +7,6 @@ void shutdown_qemu(char** args);
 void halt_cpu(char** args);
 void help_command_shell(char** args);
 void info_command_shell(char** args);
-void arena_malloc_command_shell(char** args);
 void test_mem_command(char** args);
 void mem_dump(char** args);
 void clear_screen_command(char** args);

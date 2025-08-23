@@ -62,7 +62,6 @@ void user_input(char *input) {
 		//   Команда            		Подсказка для команды                  	 					Указатель до функции
 		{.text="END",		   		.hint="HALT CPU", 											.command=&halt_cpu},
 		{.text="CLEAR", 	   		.hint="Clear screen",										.command=&clear_screen_command},
-		{.text="AMALLOC", 		   	.hint="Kernel Arena Malloc. Usage: AMALLOC <size>",			.command=&arena_malloc_command_shell},
 		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",										.command=&shutdown_qemu},
 		{.text="INFO",				.hint="Get info",											.command=&info_command_shell},
 		{.text="FREEMEMADDR",		.hint="Get free mem addr",									.command=&print_freememaddr},
@@ -102,6 +101,6 @@ void user_input(char *input) {
     // Вывод строки шелла
     kprint("\n!#> ");
 
-	shell_cursor_offset = get_cursor_offset(); // get_cursor_offset из screen.c
+	shell_cursor_offset = get_cursor_offset();
     shell_prompt_offset = shell_cursor_offset;
 }
