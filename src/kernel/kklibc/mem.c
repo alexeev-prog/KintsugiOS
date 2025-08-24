@@ -191,9 +191,6 @@ meminfo_t get_meminfo() {
 
     // Информация о страницах (заглушка)
     meminfo.page_directory_phys = (u32)get_physical_address(get_current_page_directory());
-    meminfo.total_pages = 1024;  // Примерное значение
-    meminfo.used_pages = 256;    // Примерное значение
-    meminfo.free_pages = 768;    // Примерное значение
 
     return meminfo;
 }
@@ -211,8 +208,6 @@ void kmemdump() {
     kprintf("Block size: %d bytes\n", info.block_size);
     kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n",
             info.total_used, info.total_free, info.block_count);
-    kprintf("Pages: TOTAL=%d, USED=%d, FREE=%d\n\n",
-            info.total_pages, info.used_pages, info.free_pages);
 
     while (current) {
         kprintf("Block %d: virt=%x, phys=%x, Size=%d, %s\n", counter++,

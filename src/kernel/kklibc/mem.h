@@ -42,9 +42,6 @@ typedef struct meminfo {
     u32 total_free;
     u32 block_count;
     u32 page_directory_phys;  // Физический адрес каталога страниц
-    u32 total_pages;          // Общее количество страниц
-    u32 used_pages;           // Используемые страницы
-    u32 free_pages;           // Свободные страницы
 } meminfo_t;
 
 // Обновляем прототипы функций
