@@ -92,35 +92,29 @@ static u32 first_frame() {
 /* Выделение фрейма для страницы */
 void alloc_frame(page_t *page, int is_kernel, int is_writeable)
 {
-   if (page->frame != 0)
-   {
-       return; // Фрейм уже выделен
-   }
-   else
-   {
-       u32 idx = first_frame(); // Индекс первого свободного фрейма
-       if (idx == (u32)-1)
-       {
-           // PANIC - макрос выводящий сообщение и входящий в бесконечный цикл
-           kprint_colored("No free frames!", RED_ON_BLACK_CLR_CODE);
-       }
-       set_frame(idx*0x1000); // Помечаем фрейм как занятый
-       page->present = 1; // Отмечаем страницу как присутствующую
-       page->rw = (is_writeable)?1:0; // Страница доступна для записи?
-       page->user = (is_kernel)?0:1; // Страница пользовательского режима?
-       page->frame = idx;
-   }
+    if (page->frame != 0) {
+        return; // Фрейм уже выделен
+    } else {
+        u32 idx = first_frame(); // Индекс первого свободного фрейма
+        if (idx == (u32)-1) {
+            char buffer[1024];
+            snprintf(buffer, 1024, "No free frames found to allocate. IDX: %d\nAlloc Frame: IS_KERNEL=%d, IS_WRITEABLE=%d\n", idx, is_kernel, is_writeable);
+            panic_red_screen("Paging alloc_frame error", buffer);
+        }
+        set_frame(idx*0x1000); // Помечаем фрейм как занятый
+        page->present = 1; // Отмечаем страницу как присутствующую
+        page->rw = (is_writeable)?1:0; // Страница доступна для записи?
+        page->user = (is_kernel)?0:1; // Страница пользовательского режима?
+        page->frame = idx;
+    }
 }
 
 /* Освобождение фрейма страницы */
 void free_frame(page_t *page) {
     u32 frame;
-    if (!(frame=page->frame))
-    {
+    if (!(frame=page->frame)) {
         return; // У страницы не было выделенного фрейма
-    }
-    else
-    {
+    } else {
         clear_frame(frame); // Освобождаем фрейм
         page->frame = 0x0; // Сбрасываем фрейм страницы
     }
@@ -145,8 +139,8 @@ void page_fault(registers_t regs) {
     if (rw) {kprint("read-only ");}
     if (us) {kprint("user-mode ");}
     if (reserved) {kprint("reserved ");}
-    kprintf(") at %x\n\n", faulting_address);
-    kprintf("PRESENT: %d | RW: %d | US: %d | RESERVED: %d | ID: %d", present, rw, us, reserved, id);
+    printf(") at %x\n\n", faulting_address);
+    printf("PRESENT: %d | RW: %d | US: %d | RESERVED: %d | ID: %d", present, rw, us, reserved, id);
     kprint("\n");
 }
 
@@ -180,7 +174,7 @@ void initialise_paging() {
     // Включаем paging!
     switch_page_directory(kernel_directory);
 
-    kprintf("Paging enabled: nframes=%d, frames=%d, free mem addr: %x\n", nframes, frames, free_mem_addr);
+    printf("Paging enabled: nframes=%d, frames=%d, free mem addr: %x\n", nframes, frames, free_mem_addr);
 }
 
 /* Переключение page directory */

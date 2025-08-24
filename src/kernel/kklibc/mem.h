@@ -30,7 +30,6 @@ typedef struct meminfo {
     u32 block_count;
 } meminfo_t;
 
-void *get_physaddr(void *virtualaddr);
 meminfo_t get_meminfo();
 void get_freememaddr();
 

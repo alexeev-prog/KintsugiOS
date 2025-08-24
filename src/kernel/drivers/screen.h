@@ -99,5 +99,6 @@ void kprintln(char *message);
 void kprintln_colored(char *message, int color);
 void kprint_colored(char *message, int color);
 void kprint_backspace();
+void panic_red_screen(char* title, char* description);
 
 #endif

@@ -24,5 +24,12 @@ int hex_strtoint(char *str);
 void strcpy(char *dest, char *src);
 unsigned int is_delim(char c, char *delim);
 char *strtok(char *src_str, char *delim);
+char *strncpy(char *dest, const char *src, unsigned int n);
+char *strncat(char *dest, const char *src, unsigned int n);
+int strncmp(const char *s1, const char *s2, unsigned int n);
+char *strchr(const char *s, int c);
+char *strstr(const char *haystack, const char *needle);
+int sprintf(char *buf, const char *fmt, ...);
+int snprintf(char *buf, unsigned int size, const char *fmt, ...);
 
 #endif

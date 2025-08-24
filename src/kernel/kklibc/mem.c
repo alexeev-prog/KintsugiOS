@@ -31,21 +31,6 @@ void heap_init() {
     kprint("\n");
 }
 
-// TODO: Paging is not implemented
-void *get_physaddr(void *virtualaddr) {
-    unsigned long pdindex = (unsigned long)virtualaddr >> 22;
-    unsigned long ptindex = (unsigned long)virtualaddr >> 12 & 0x03FF;
-
-    unsigned long *pd = (unsigned long *)0xFFFFF000;
-    // Here you need to check whether the PD entry is present.
-
-    unsigned long *pt = ((unsigned long *)0xFFC00000) + (0x400 * pdindex);
-    // Here you need to check whether the PT entry is present.
-
-    return (void *)((pt[ptindex] & ~0xFFF) +
-                                    ((unsigned long)virtualaddr & 0xFFF));
-}
-
 void *kmalloc(u32 size) {
     // Выравниваем размер до границы BLOCK_SIZE
     if (size % BLOCK_SIZE != 0) {
@@ -167,14 +152,14 @@ void kmemdump() {
     mem_block_t *current = info.free_blocks;
     u32 counter = 0;
 
-    kprintf("Heap: %x - %x (%d bytes)\n", info.heap_start,
+    printf("Heap: %x - %x (%d bytes)\n", info.heap_start,
                     info.heap_start + info.heap_size, info.heap_size);
-    kprintf("Block size: %d bytes\n", info.block_size);
-    kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n\n",
+    printf("Block size: %d bytes\n", info.block_size);
+    printf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n\n",
                     info.total_used, info.total_free, info.block_count);
 
     while (current) {
-        kprintf("Block %d: %x, Size=%d, %s\n", counter++, (u32)current,
+        printf("Block %d: %x, Size=%d, %s\n", counter++, (u32)current,
                         current->size, current->is_free ? "FREE" : "USED");
         current = current->next;
     }
@@ -184,5 +169,5 @@ void get_freememaddr() {
     char free_mem_addr_str[32] = "";
     hex_to_ascii(free_mem_addr, free_mem_addr_str);
 
-    kprintf("%s\n", free_mem_addr_str);
+    printf("%s\n", free_mem_addr_str);
 }

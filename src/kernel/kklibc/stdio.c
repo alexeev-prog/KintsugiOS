@@ -50,7 +50,7 @@ static void format_string(char *buf, char *fmt, va_list args) {
     *ptr = '\0';
 }
 
-void kprintf(char *fmt, ...) {
+void printf(char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     format_string(printf_buf, fmt, args);
@@ -58,7 +58,7 @@ void kprintf(char *fmt, ...) {
     kprint(printf_buf);
 }
 
-void kprintf_colored(char *fmt, int color, ...) {
+void printf_colored(char *fmt, int color, ...) {
     va_list args;
     va_start(args, color);
     format_string(printf_buf, fmt, args);
@@ -66,7 +66,7 @@ void kprintf_colored(char *fmt, int color, ...) {
     kprint_colored(printf_buf, color);
 }
 
-void kprintf_at(char *fmt, int col, int row, int color, ...) {
+void printf_at(char *fmt, int col, int row, int color, ...) {
     va_list args;
     va_start(args, color);
     format_string(printf_buf, fmt, args);

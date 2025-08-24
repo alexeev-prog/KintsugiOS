@@ -1,3 +1,9 @@
+commit f1d82ba66c77d46c2b727a6af6c8ce7e559b3c07
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 02:42:53 2025 +0700
+
+    refactor/docs: fix shell, update readme
+
 commit 915ca27874432db51cd6d1370d4accd7b53d5d12
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 02:32:46 2025 +0700

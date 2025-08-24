@@ -20,7 +20,7 @@ void fibonacci_command(char **args) {
 
     u32 fib = fibonacci(num);
 
-    kprintf("fib(%d) = %d", num, fib);
+    printf("fib(%d) = %d", num, fib);
 }
 
 void binary_pow_command(char **args) {
@@ -34,7 +34,7 @@ void binary_pow_command(char **args) {
 
     int powered = binary_pow(b, e);
 
-    kprintf("%d ** %d = %d", b, e, powered);
+    printf("%d ** %d = %d", b, e, powered);
 }
 
 void rand_comamnd(char **args) {
@@ -45,7 +45,7 @@ void rand_comamnd(char **args) {
 
     u32 seed = strtoint(args[0]);
 
-    kprintf("%d", rand(&seed));
+    printf("%d", rand(&seed));
 }
 
 void rand_range_command(char **args) {
@@ -58,7 +58,7 @@ void rand_range_command(char **args) {
     u32 min = strtoint(args[1]);
     u32 max = strtoint(args[2]);
 
-    kprintf("%d", rand_range(&seed, min, max));
+    printf("%d", rand_range(&seed, min, max));
 }
 
 void reboot_command(char** args) {
@@ -105,10 +105,10 @@ void info_command_shell(char** args) {
 	meminfo_t meminfo = get_meminfo();
 
 	kprint("MEMORY\n");
-	kprintf("HEAP (%d): start at %d, minimal block size %d\n", meminfo.heap_size, meminfo.heap_start, meminfo.block_size);
-	kprintf("Total used: %d\n", meminfo.total_used);
-	kprintf("Total free: %d\n", meminfo.total_free);
-	kprintf("Block count: %d", meminfo.block_count);
+	printf("HEAP (%d): start at %d, minimal block size %d\n", meminfo.heap_size, meminfo.heap_start, meminfo.block_size);
+	printf("Total used: %d\n", meminfo.total_used);
+	printf("Total free: %d\n", meminfo.total_free);
+	printf("Block count: %d", meminfo.block_count);
 }
 
 void mem_dump(char** args) {
@@ -117,7 +117,7 @@ void mem_dump(char** args) {
 
 void echo_command(char **args) {
     for (int i = 0; args[i] != NULL; i++) {
-        kprintf("%s ", args[i]);
+        printf("%s ", args[i]);
     }
 }
 
@@ -134,7 +134,7 @@ void free_command(char **args) {
 
     u32 addr = hex_strtoint(addr_str);
     kfree((void*)addr);
-    kprintf("Freed memory at %x", addr);
+    printf("Freed memory at %x", addr);
 }
 
 void kmalloc_command(char** args) {
@@ -149,5 +149,5 @@ void kmalloc_command(char** args) {
 	char buf1[32] = "";
 	hex_to_ascii((int)ptr, buf1);
 
-	kprintf("Allocate %d bytes.\nPointer: %s", size, buf1);
+	printf("Allocate %d bytes.\nPointer: %s", size, buf1);
 }

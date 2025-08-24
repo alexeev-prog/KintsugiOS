@@ -245,3 +245,138 @@ char *strtok(char *src_str, char *delim) {
         src_str++;
     }
 }
+
+char *strncpy(char *dest, const char *src, unsigned int n) {
+    unsigned int i;
+    for (i = 0; i < n && src[i] != '\0'; i++)
+        dest[i] = src[i];
+    for (; i < n; i++)
+        dest[i] = '\0';
+    return dest;
+}
+
+// Реализация strncat
+char *strncat(char *dest, const char *src, unsigned int n) {
+    unsigned int dest_len = strlen(dest);
+    unsigned int i;
+    for (i = 0; i < n && src[i] != '\0'; i++)
+        dest[dest_len + i] = src[i];
+    dest[dest_len + i] = '\0';
+    return dest;
+}
+
+// Реализация strncmp
+int strncmp(const char *s1, const char *s2, unsigned int n) {
+    unsigned int i;
+    for (i = 0; i < n && s1[i] != '\0' && s2[i] != '\0'; i++) {
+        if (s1[i] != s2[i])
+            return s1[i] - s2[i];
+    }
+    if (i < n) {
+        return s1[i] - s2[i];
+    }
+    return 0;
+}
+
+// Реализация strchr
+char *strchr(const char *s, int c) {
+    while (*s != '\0') {
+        if (*s == (char)c)
+            return (char *)s;
+        s++;
+    }
+    if (c == '\0')
+        return (char *)s;
+    return NULL;
+}
+
+// Реализация strstr
+char *strstr(const char *haystack, const char *needle) {
+    if (*needle == '\0')
+        return (char *)haystack;
+
+    int needle_len = strlen(needle);
+    int haystack_len = strlen(haystack);
+
+    if (needle_len == 0)
+        return (char *)haystack;
+
+    for (int i = 0; i <= haystack_len - needle_len; i++) {
+        if (strncmp(haystack + i, needle, needle_len) == 0)
+            return (char *)(haystack + i);
+    }
+    return NULL;
+}
+
+// Вспомогательная функция для форматирования строки с ограничением размера
+static int vsnprintf(char *buf, unsigned int size, const char *fmt, va_list args) {
+    unsigned int i = 0;
+    char num_buf[32];
+    char c;
+    const char *s;
+
+    while (*fmt && i < size - 1) {
+        if (*fmt != '%') {
+            buf[i++] = *fmt++;
+            continue;
+        }
+
+        fmt++;
+        switch (*fmt) {
+            case 'd': {
+                int num = va_arg(args, int);
+                int_to_ascii(num, num_buf);
+                s = num_buf;
+                while (*s && i < size - 1)
+                    buf[i++] = *s++;
+                break;
+            }
+            case 'x': {
+                int num = va_arg(args, int);
+                hex_to_ascii(num, num_buf);
+                s = num_buf;
+                while (*s && i < size - 1)
+                    buf[i++] = *s++;
+                break;
+            }
+            case 's': {
+                s = va_arg(args, char*);
+                while (*s && i < size - 1)
+                    buf[i++] = *s++;
+                break;
+            }
+            case 'c': {
+                c = (char)va_arg(args, int);
+                if (i < size - 1)
+                    buf[i++] = c;
+                break;
+            }
+            default: {
+                if (i < size - 1) buf[i++] = '%';
+                if (i < size - 1) buf[i++] = *fmt;
+                break;
+            }
+        }
+        fmt++;
+    }
+    buf[i] = '\0';
+    return i;
+}
+
+// Реализация sprintf
+int sprintf(char *buf, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int ret = vsnprintf(buf, (unsigned int)-1, fmt, args);
+    va_end(args);
+    return ret;
+}
+
+// Реализация snprintf
+int snprintf(char *buf, unsigned int size, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int ret = vsnprintf(buf, size, fmt, args);
+    va_end(args);
+    return ret;
+}

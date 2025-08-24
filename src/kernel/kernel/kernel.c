@@ -90,13 +90,13 @@ void user_input(char *input) {
 	if (strcmp(input, "HELP") == 0) {
 		kprintln("Keramika Shell Help");
 		for (int i = 0; i < commands_length; ++i) {
-			kprintf("%s - %s\n", commands[i].text, commands[i].hint);
+			printf("%s - %s\n", commands[i].text, commands[i].hint);
 		}
 		executed = 1;
 	}
 
 	if (executed == 0 && strcmp(input, "") != 0) {
-		kprintf_colored("Invalid command: %s", RED_ON_BLACK_CLR_CODE, input);
+		printf_colored("Invalid command: %s", RED_ON_BLACK_CLR_CODE, input);
 	}
 
     // Вывод строки шелла
