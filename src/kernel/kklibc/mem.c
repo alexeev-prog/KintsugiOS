@@ -8,10 +8,8 @@
 #include "mem.h"
 #include "../drivers/screen.h"
 #include "ctypes.h"
-#include "paging/paging.h"
 #include "stdio.h"
 #include "stdlib.h"
-#include "paging/frame_alloc.h"
 
 static mem_block_t *free_blocks = NULL;
 
