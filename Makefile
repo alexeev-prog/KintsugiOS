@@ -17,6 +17,7 @@ LDFLAGS = -Ttext 0x1000 --oformat binary
 
 KERNEL_ENTRY = $(BIN_DIR)/bootloader/kernel_entry.o
 INTERRUPT_OBJ = $(BIN_DIR)/kernel/cpu/interrupt.o
+PAGING_OBJ = $(BIN_DIR)/kernel/paging_asm.o
 
 C_SOURCES = $(shell find $(SRC_DIR) -name '*.c')
 C_OBJS = $(C_SOURCES:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
@@ -70,11 +71,11 @@ run_bin: $(BIN_DIR)/kintsugios.bin
 
 run: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 	@printf "$(GREEN)[QEMU] Run img   %-50s$(RESET)\n" "$<"
-	@qemu-system-i386 -fda $< -boot a -m 128
+	@qemu-system-i386 -fda $< -boot a -m 16
 
 debug: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 	@printf "$(GREEN)[QEMU] Debug img %-50s$(RESET)\n" "$<"
-	@qemu-system-i386 -fda $< -boot a -s -S -m 128
+	@qemu-system-i386 -fda $< -boot a -s -S -m 16
 
 clean:
 	@printf "$(RED)[RM]   Clean $(BIN_DIR) and $(DISKIMG_DIR)$(RESET)\n"

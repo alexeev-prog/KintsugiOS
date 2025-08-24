@@ -179,6 +179,8 @@ void initialise_paging() {
 
     // Включаем paging!
     switch_page_directory(kernel_directory);
+
+    kprintf("Paging enabled: nframes=%d, frames=%d, free mem addr: %x\n", nframes, frames, free_mem_addr);
 }
 
 /* Переключение page directory */

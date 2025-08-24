@@ -12,7 +12,7 @@
 
 void fibonacci_command(char **args) {
     if (!args[0]) {
-        kprint("FIB usage: FIB <num>\n");
+        kprint("FIB usage: FIB <num>");
         return;
     }
 
@@ -20,12 +20,12 @@ void fibonacci_command(char **args) {
 
     u32 fib = fibonacci(num);
 
-    kprintf("fib(%d) = %d\n", num, fib);
+    kprintf("fib(%d) = %d", num, fib);
 }
 
 void binary_pow_command(char **args) {
     if (!args[0] || !args[1]) {
-        kprint("BINPOW usage: BINPOW <base> <exponent>\n");
+        kprint("BINPOW usage: BINPOW <base> <exponent>");
         return;
     }
 
@@ -34,23 +34,23 @@ void binary_pow_command(char **args) {
 
     int powered = binary_pow(b, e);
 
-    kprintf("%d ** %d = %d\n", b, e, powered);
+    kprintf("%d ** %d = %d", b, e, powered);
 }
 
 void rand_comamnd(char **args) {
     if (!args[0]) {
-        kprint("RAND usage: RAND <seed>\n");
+        kprint("RAND usage: RAND <seed>");
         return;
     }
 
     u32 seed = strtoint(args[0]);
 
-    kprintf("%d\n", rand(&seed));
+    kprintf("%d", rand(&seed));
 }
 
 void rand_range_command(char **args) {
     if (!args[0] || !args[1] || !args[2]) {
-        kprint("RANDRANGE usage: RANDRANGE <seed> <min> <max>\n");
+        kprint("RANDRANGE usage: RANDRANGE <seed> <min> <max>");
         return;
     }
 
@@ -58,7 +58,7 @@ void rand_range_command(char **args) {
     u32 min = strtoint(args[1]);
     u32 max = strtoint(args[2]);
 
-    kprintf("%d\n", rand_range(&seed, min, max));
+    kprintf("%d", rand_range(&seed, min, max));
 }
 
 void reboot_command(char** args) {
@@ -67,7 +67,7 @@ void reboot_command(char** args) {
 
 void sleep_command(char** args) {
     if (!args[0]) {
-        kprint("SLEEP usage: SLEEP <ms>\n");
+        kprint("SLEEP usage: SLEEP <ms>");
         return;
     }
 
@@ -108,7 +108,7 @@ void info_command_shell(char** args) {
 	kprintf("HEAP (%d): start at %d, minimal block size %d\n", meminfo.heap_size, meminfo.heap_start, meminfo.block_size);
 	kprintf("Total used: %d\n", meminfo.total_used);
 	kprintf("Total free: %d\n", meminfo.total_free);
-	kprintf("Block count: %d\n", meminfo.block_count);
+	kprintf("Block count: %d", meminfo.block_count);
 }
 
 void mem_dump(char** args) {
@@ -119,12 +119,11 @@ void echo_command(char **args) {
     for (int i = 0; args[i] != NULL; i++) {
         kprintf("%s ", args[i]);
     }
-    kprint("\n");
 }
 
 void free_command(char **args) {
     if (!args[0]) {
-        kprint("FREE usage: FREE <hex_address>\n");
+        kprint("FREE usage: FREE <hex_address>");
         return;
     }
 
@@ -135,7 +134,7 @@ void free_command(char **args) {
 
     u32 addr = hex_strtoint(addr_str);
     kfree((void*)addr);
-    kprintf("Freed memory at %x\n", addr);
+    kprintf("Freed memory at %x", addr);
 }
 
 void kmalloc_command(char** args) {
@@ -150,5 +149,5 @@ void kmalloc_command(char** args) {
 	char buf1[32] = "";
 	hex_to_ascii((int)ptr, buf1);
 
-	kprintf("Allocate %d bytes.\nPointer: %s\n", size, buf1);
+	kprintf("Allocate %d bytes.\nPointer: %s", size, buf1);
 }
