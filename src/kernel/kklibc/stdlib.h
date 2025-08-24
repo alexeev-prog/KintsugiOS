@@ -7,6 +7,8 @@ u32 rand_range(u32* state, u32 min, u32 max);
 u32 rand(u32* state);
 void reboot();
 void wait(int ms);
+void *memset(void *s, int c, unsigned int n);
+void *memcpy(void *dest, const void *src, unsigned int n);
 void memory_copy(u8 *source, u8 *dest, int nbytes);
 void memory_set(u8 *dest, u8 val, u32 len);
 void u32memory_set(u32 *dest, u32 val, u32 len);

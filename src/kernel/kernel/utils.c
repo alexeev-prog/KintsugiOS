@@ -145,7 +145,7 @@ void kmalloc_command(char** args) {
 	}
 
 	int size = strtoint(args[0]);
-	void* ptr = kmalloc_a(size);
+	void* ptr = (void*)kmalloc(size);
 
 	char buf1[32] = "";
 	hex_to_ascii((int)ptr, buf1);

@@ -1,6 +1,8 @@
 #ifndef LIBC_STDIO_H
 #define LIBC_STDIO_H
 
+#include "../drivers/screen.h"
+
 typedef char* va_list;
 #define va_start(ap, last) (ap = (va_list)&last + sizeof(last))
 #define va_arg(ap, type) (*(type*)((ap += sizeof(type)) - sizeof(type)))

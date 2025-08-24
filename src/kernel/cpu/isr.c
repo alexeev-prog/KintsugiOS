@@ -118,7 +118,7 @@ char *exception_messages[] = {
 };
 
 void isr_handler(registers_t r) {
-    kprint("received interrupt: ");
+    kprint("Received interrupt: ");
     char s[3];
     int_to_ascii(r.int_no, s);
 
@@ -126,6 +126,11 @@ void isr_handler(registers_t r) {
     kprint("\n");
     kprint(exception_messages[r.int_no]);
     kprint("\n");
+
+    if (interrupt_handlers[r.int_no]) {
+        interrupt_handlers[r.int_no](r);
+    }
+
     asm volatile("hlt");
 }
 

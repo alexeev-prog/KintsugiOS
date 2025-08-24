@@ -48,6 +48,25 @@ void wait(int ms) {
     }
 }
 
+/* Заполняет область памяти указанным значением */
+void *memset(void *s, int c, unsigned int n) {
+    unsigned char *p = (unsigned char*)s;
+    while (n--) {
+        *p++ = (unsigned char)c;
+    }
+    return s;
+}
+
+/* Копирует блок памяти из источника в назначение */
+void *memcpy(void *dest, const void *src, unsigned int n) {
+    unsigned char *d = (unsigned char*)dest;
+    const unsigned char *s = (const unsigned char*)src;
+    while (n--) {
+        *d++ = *s++;
+    }
+    return dest;
+}
+
 void memory_copy(u8 *source, u8 *dest, int nbytes) { // копируем память
     int i;
     for (i = 0; i < nbytes; i++) {

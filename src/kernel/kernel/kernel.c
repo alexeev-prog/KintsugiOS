@@ -10,7 +10,7 @@
 #include "../drivers/screen.h"
 #include "kernel.h"
 #include "utils.h"
-#include "../cpu/paging.h"
+#include "../kklibc/paging.h"
 #include "../kklibc/kklibc.h"
 
 int shell_cursor_offset = 0;
@@ -25,9 +25,7 @@ void kmain() {
 	irq_install();
 	kprint("IRQ Installed\n");
 
-	// register_interrupt_handler(14, page_fault_handler);
-	paging_init();
-
+	initialise_paging();
     heap_init();
 
 	// Приглашение

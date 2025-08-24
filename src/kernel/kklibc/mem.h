@@ -1,4 +1,3 @@
-// [file name]: mem.h (обновленная версия)
 /*------------------------------------------------------------------------------
 *  Kintsugi OS C Libraries source code
 *  File: libc/mem.h
@@ -29,10 +28,6 @@ typedef struct meminfo {
     u32 total_used;
     u32 total_free;
     u32 block_count;
-    u32 used_pages;      // Добавлено: использовано страниц
-    u32 free_pages;      // Добавлено: свободно страниц
-    u32 total_pages;     // Добавлено: всего страниц
-    u32 page_size;       // Добавлено: размер страницы
 } meminfo_t;
 
 void *get_physaddr(void *virtualaddr);
@@ -41,7 +36,6 @@ void get_freememaddr();
 
 // Новые функции
 void heap_init();
-void* kmalloc_a(u32 size);
 void* kmalloc(u32 size);
 void kfree(void* ptr);
 void kmemdump();
