@@ -105,7 +105,7 @@ void info_command_shell(char** args) {
 	meminfo_t meminfo = get_meminfo();
 
 	kprint("MEMORY\n");
-	kprintf("HEAP (%d): start at %d, minimal block size %d\n", meminfo.heap_size, meminfo.heap_start, meminfo.block_size);
+	kprintf("HEAP (%d): start at %d (phys: %d), minimal block size %d\n", meminfo.heap_size, meminfo.heap_virtual_start, meminfo.heap_physical_start, meminfo.block_size);
 	kprintf("Total used: %d\n", meminfo.total_used);
 	kprintf("Total free: %d\n", meminfo.total_free);
 	kprintf("Block count: %d\n", meminfo.block_count);
@@ -145,7 +145,7 @@ void kmalloc_command(char** args) {
 	}
 
 	int size = strtoint(args[0]);
-	void* ptr = kmalloc(size);
+	void* ptr = kmalloc_a(size);
 
 	char buf1[32] = "";
 	hex_to_ascii((int)ptr, buf1);

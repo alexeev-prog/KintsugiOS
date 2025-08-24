@@ -10,6 +10,7 @@
 #include "../drivers/screen.h"
 #include "kernel.h"
 #include "utils.h"
+#include "../cpu/paging.h"
 #include "../kklibc/kklibc.h"
 
 int shell_cursor_offset = 0;
@@ -26,7 +27,7 @@ void kmain() {
 
 	init_paging();
 
-	heap_init();
+    heap_init();
 
 	// Приглашение
 	kprint("\nKintsugi OS (C) 2025\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");

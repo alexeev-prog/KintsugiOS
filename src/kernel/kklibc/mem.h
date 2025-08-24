@@ -9,10 +9,11 @@
 #define MEM_H
 
 #include "ctypes.h"
+#include "../cpu/paging.h"
 
-#define HEAP_START 0x100000  // Начинаем кучу с 1 МБ (выше ядра)
-#define HEAP_SIZE  0x100000  // Размер кучи: 1 МБ
-#define BLOCK_SIZE 16        // Минимальный размер блока
+#define HEAP_VIRTUAL_START 0xC0000000  // Виртуальный адрес начала кучи (3GB)
+#define HEAP_SIZE          0x100000    // Размер кучи: 1 МБ
+#define BLOCK_SIZE         16          // Минимальный размер блока
 
 typedef struct page_header {
     u32 physical_addr;
@@ -30,22 +31,31 @@ typedef struct mem_block {
     page_header_t* page;
 } mem_block_t;
 
+// Добавляем информацию о страницах в структуру meminfo
 typedef struct meminfo {
-    u32 heap_start;
+    u32 heap_virtual_start;
+    u32 heap_physical_start;
     u32 heap_size;
     u32 block_size;
     mem_block_t* free_blocks;
     u32 total_used;
     u32 total_free;
     u32 block_count;
+    u32 page_directory_phys;  // Физический адрес каталога страниц
+    u32 total_pages;          // Общее количество страниц
+    u32 used_pages;           // Используемые страницы
+    u32 free_pages;           // Свободные страницы
 } meminfo_t;
 
+// Обновляем прототипы функций
 void *get_physaddr(void *virtualaddr);
 meminfo_t get_meminfo();
 
 void heap_init();
 void* kmalloc(u32 size);
 void kfree(void* ptr);
+void* krealloc(void* ptr, u32 size);
+void *kmalloc_a(u32 size);
 void kmemdump();
 
 #endif

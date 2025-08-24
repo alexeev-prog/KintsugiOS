@@ -1,9 +1,12 @@
+<<<<<<< HEAD
 commit 5c5167c783467a1441565edfd12b130a741e999c
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 24 06:05:27 2025 +0700
 
     feat: realize paging, add page, frame allocator and change kfree, kmalloc, krealloc
 
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 commit ffe676bbcd462e3e7d7c8bd82ca1683361ba3bf6
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 24 04:06:51 2025 +0700

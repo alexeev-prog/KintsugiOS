@@ -102,26 +102,48 @@ void heap_init() {
     free_blocks->is_page = 0;
     free_blocks->page = NULL;
 
-    kprint("Heap initialized at ");
+    kprint("Heap initialized at virtual: ");
     char buf[32] = "";
-    hex_to_ascii(HEAP_START, buf);
+    hex_to_ascii(HEAP_VIRTUAL_START, buf);
+    kprint(buf);
+    kprint(", physical: ");
+    hex_to_ascii(heap_physical_start, buf);
     kprint(buf);
     kprint("\n");
 }
 
+
 // TODO: Paging is not implemented
 void *get_physaddr(void *virtualaddr) {
-    unsigned long pdindex = (unsigned long)virtualaddr >> 22;
-    unsigned long ptindex = (unsigned long)virtualaddr >> 12 & 0x03FF;
+    return get_physical_address(virtualaddr);
+}
 
-    unsigned long *pd = (unsigned long *)0xFFFFF000;
-    // Here you need to check whether the PD entry is present.
+void *kmalloc_a(u32 size) {
+    // Выравниваем размер до границы страницы
+    if (size % PAGE_SIZE != 0) {
+        size += PAGE_SIZE - (size % PAGE_SIZE);
+    }
 
-    unsigned long *pt = ((unsigned long *)0xFFC00000) + (0x400 * pdindex);
-    // Here you need to check whether the PT entry is present.
+    // Ищем свободную физическую страницу
+    // (здесь должна быть реализация аллокатора физических страниц)
+    static u32 next_physical_page = 0x300000;  // Начинаем с 3MB
 
-    return (void *)((pt[ptindex] & ~0xFFF) +
-                                    ((unsigned long)virtualaddr & 0xFFF));
+    void *physical_addr = (void*)next_physical_page;
+    next_physical_page += size;
+
+    // Выделяем виртуальный адрес
+    static u32 next_virtual_addr = HEAP_VIRTUAL_START + HEAP_SIZE;
+    void *virtual_addr = (void*)next_virtual_addr;
+    next_virtual_addr += size;
+
+    // Отображаем виртуальный адрес на физический
+    for (u32 i = 0; i < size; i += PAGE_SIZE) {
+        map_page((void*)((u32)virtual_addr + i),
+                 (void*)((u32)physical_addr + i),
+                 PAGE_PRESENT | PAGE_WRITABLE);
+    }
+
+    return virtual_addr;
 }
 
 void *kmalloc(u32 size) {
@@ -288,7 +310,8 @@ meminfo_t get_meminfo() {
         current = current->next;
     }
 
-    meminfo.heap_start = HEAP_START;
+    meminfo.heap_virtual_start = HEAP_VIRTUAL_START;
+    meminfo.heap_physical_start = heap_physical_start;
     meminfo.heap_size = HEAP_SIZE;
     meminfo.block_size = BLOCK_SIZE;
     meminfo.free_blocks = free_blocks;
@@ -296,23 +319,35 @@ meminfo_t get_meminfo() {
     meminfo.total_free = total_free;
     meminfo.block_count = block_count;
 
+    // Информация о страницах (заглушка)
+    meminfo.page_directory_phys = (u32)get_physical_address(get_current_page_directory());
+    meminfo.total_pages = 1024;  // Примерное значение
+    meminfo.used_pages = 256;    // Примерное значение
+    meminfo.free_pages = 768;    // Примерное значение
+
     return meminfo;
 }
 
+// Дамп информации о памяти
 void kmemdump() {
     meminfo_t info = get_meminfo();
     mem_block_t *current = info.free_blocks;
     u32 counter = 0;
 
-    kprintf("Heap: %x - %x (%d bytes)\n", info.heap_start,
-                    info.heap_start + info.heap_size, info.heap_size);
+    kprintf("Heap: virtual %x - %x (%d bytes)\n", info.heap_virtual_start,
+            info.heap_virtual_start + info.heap_size, info.heap_size);
+    kprintf("Heap: physical %x - %x\n", info.heap_physical_start,
+            info.heap_physical_start + info.heap_size);
     kprintf("Block size: %d bytes\n", info.block_size);
-    kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n\n",
-                    info.total_used, info.total_free, info.block_count);
+    kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n",
+            info.total_used, info.total_free, info.block_count);
+    kprintf("Pages: TOTAL=%d, USED=%d, FREE=%d\n\n",
+            info.total_pages, info.used_pages, info.free_pages);
 
     while (current) {
-        kprintf("Block %d: %x, Size=%d, %s\n", counter++, (u32)current,
-                        current->size, current->is_free ? "FREE" : "USED");
+        kprintf("Block %d: virt=%x, phys=%x, Size=%d, %s\n", counter++,
+                (u32)current, (u32)get_physical_address(current),
+                current->size, current->is_free ? "FREE" : "USED");
         current = current->next;
     }
 
