@@ -51,7 +51,11 @@ typedef struct meminfo {
 void *get_physaddr(void *virtualaddr);
 meminfo_t get_meminfo();
 <<<<<<< HEAD
+<<<<<<< HEAD
 
+=======
+void get_freememaddr();
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 =======
 void get_freememaddr();
 >>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)

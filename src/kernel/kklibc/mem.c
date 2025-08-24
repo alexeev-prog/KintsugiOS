@@ -39,22 +39,31 @@ void heap_init() {
     free_blocks->page = NULL;
 
     kprint("Heap initialized at virtual: ");
+<<<<<<< HEAD
     kprint("Heap initialized at virtual: ");
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
     char buf[32] = "";
     hex_to_ascii(HEAP_VIRTUAL_START, buf);
     kprint(buf);
     kprint(", physical: ");
     hex_to_ascii(heap_physical_start, buf);
+<<<<<<< HEAD
     hex_to_ascii(HEAP_VIRTUAL_START, buf);
     kprint(buf);
     kprint(", physical: ");
     hex_to_ascii(heap_physical_start, buf);
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
     kprint(buf);
     kprint("\n");
 }
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 // TODO: Paging is not implemented
 void *get_physaddr(void *virtualaddr) {
     return get_physical_address(virtualaddr);
@@ -86,6 +95,7 @@ void *kmalloc_a(u32 size) {
     }
 
     return virtual_addr;
+<<<<<<< HEAD
     return get_physical_address(virtualaddr);
 }
 
@@ -115,6 +125,8 @@ void *kmalloc_a(u32 size) {
     }
 
     return virtual_addr;
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 }
 
 void *kmalloc(u32 size) {
@@ -164,7 +176,10 @@ void *kmalloc(u32 size) {
 
             current->is_free = 0;
             return (void*)((u32)current + sizeof(mem_block_t));
+<<<<<<< HEAD
             return (void*)((u32)current + sizeof(mem_block_t));
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
         }
         prev = current;
         current = current->next;
@@ -284,8 +299,11 @@ meminfo_t get_meminfo() {
 
     meminfo.heap_virtual_start = HEAP_VIRTUAL_START;
     meminfo.heap_physical_start = heap_physical_start;
+<<<<<<< HEAD
     meminfo.heap_virtual_start = HEAP_VIRTUAL_START;
     meminfo.heap_physical_start = heap_physical_start;
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
     meminfo.heap_size = HEAP_SIZE;
     meminfo.block_size = BLOCK_SIZE;
     meminfo.free_blocks = free_blocks;
@@ -299,17 +317,23 @@ meminfo_t get_meminfo() {
     meminfo.used_pages = 256;    // Примерное значение
     meminfo.free_pages = 768;    // Примерное значение
 
+<<<<<<< HEAD
     // Информация о страницах (заглушка)
     meminfo.page_directory_phys = (u32)get_physical_address(get_current_page_directory());
     meminfo.total_pages = 1024;  // Примерное значение
     meminfo.used_pages = 256;    // Примерное значение
     meminfo.free_pages = 768;    // Примерное значение
 
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
     return meminfo;
 }
 
 // Дамп информации о памяти
+<<<<<<< HEAD
 // Дамп информации о памяти
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 void kmemdump() {
     meminfo_t info = get_meminfo();
     mem_block_t *current = info.free_blocks;
@@ -319,27 +343,36 @@ void kmemdump() {
             info.heap_virtual_start + info.heap_size, info.heap_size);
     kprintf("Heap: physical %x - %x\n", info.heap_physical_start,
             info.heap_physical_start + info.heap_size);
+<<<<<<< HEAD
     kprintf("Heap: virtual %x - %x (%d bytes)\n", info.heap_virtual_start,
             info.heap_virtual_start + info.heap_size, info.heap_size);
     kprintf("Heap: physical %x - %x\n", info.heap_physical_start,
             info.heap_physical_start + info.heap_size);
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
     kprintf("Block size: %d bytes\n", info.block_size);
     kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n",
             info.total_used, info.total_free, info.block_count);
     kprintf("Pages: TOTAL=%d, USED=%d, FREE=%d\n\n",
             info.total_pages, info.used_pages, info.free_pages);
+<<<<<<< HEAD
     kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n",
             info.total_used, info.total_free, info.block_count);
     kprintf("Pages: TOTAL=%d, USED=%d, FREE=%d\n\n",
             info.total_pages, info.used_pages, info.free_pages);
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 
     while (current) {
         kprintf("Block %d: virt=%x, phys=%x, Size=%d, %s\n", counter++,
                 (u32)current, (u32)get_physical_address(current),
                 current->size, current->is_free ? "FREE" : "USED");
+<<<<<<< HEAD
         kprintf("Block %d: virt=%x, phys=%x, Size=%d, %s\n", counter++,
                 (u32)current, (u32)get_physical_address(current),
                 current->size, current->is_free ? "FREE" : "USED");
+=======
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
         current = current->next;
     }
 

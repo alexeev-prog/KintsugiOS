@@ -1,15 +1,33 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
+commit f606112b639b04e51fd6449516d295f348cb1cc7
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 24 22:24:16 2025 +0700
+
+    realize paging memory, add kmalloc aligned; todo: realize kmemdump fully
+
+commit 4f3b9d7ea973f1106a9afb68682d8abf371640e8
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 24 22:22:55 2025 +0700
+
+    realize paging memory, add kmalloc aligned; todo: realize kmemdump fully
+
+commit a4deb10c546b41616b0a8ffb9a58a27016704d22
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 24 21:23:39 2025 +0700
+
+    replace paging
+
+commit 87ef6daf677ce9a7451a29a1ad1a51858e8034cf
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 24 06:23:40 2025 +0700
+
+    try fix paging; TODO: FIX PAGING AND FRAME ALLOC
+
 commit 5c5167c783467a1441565edfd12b130a741e999c
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 24 06:05:27 2025 +0700
 
     feat: realize paging, add page, frame allocator and change kfree, kmalloc, krealloc
 
-=======
->>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
-=======
->>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 commit ffe676bbcd462e3e7d7c8bd82ca1683361ba3bf6
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 24 04:06:51 2025 +0700
