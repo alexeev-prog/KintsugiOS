@@ -12,7 +12,7 @@
 
 void fibonacci_command(char **args) {
     if (!args[0]) {
-        kprint("FIB usage: FIB <num>");
+        kprint("fib usage: fib <num>");
         return;
     }
 
@@ -25,7 +25,7 @@ void fibonacci_command(char **args) {
 
 void binary_pow_command(char **args) {
     if (!args[0] || !args[1]) {
-        kprint("BINPOW usage: BINPOW <base> <exponent>");
+        kprint("binpow usage: binpow <base> <exponent>");
         return;
     }
 
@@ -39,7 +39,7 @@ void binary_pow_command(char **args) {
 
 void rand_comamnd(char **args) {
     if (!args[0]) {
-        kprint("RAND usage: RAND <seed>");
+        kprint("rand usage: rand <seed>");
         return;
     }
 
@@ -50,7 +50,7 @@ void rand_comamnd(char **args) {
 
 void rand_range_command(char **args) {
     if (!args[0] || !args[1] || !args[2]) {
-        kprint("RANDRANGE usage: RANDRANGE <seed> <min> <max>");
+        kprint("randrange usage: randrange <seed> <min> <max>");
         return;
     }
 
@@ -67,7 +67,7 @@ void reboot_command(char** args) {
 
 void sleep_command(char** args) {
     if (!args[0]) {
-        kprint("SLEEP usage: SLEEP <ms>");
+        kprint("sleep usage: sleep <ms>");
         return;
     }
 
@@ -123,7 +123,7 @@ void echo_command(char **args) {
 
 void free_command(char **args) {
     if (!args[0]) {
-        kprint("FREE usage: FREE <hex_address>");
+        kprint("free usage: free <hex_address>");
         return;
     }
 
@@ -139,7 +139,7 @@ void free_command(char **args) {
 
 void kmalloc_command(char** args) {
 	if (args[0] == NULL) {
-		kprint("MALLOC usage: MALLOC <bytes>");
+		kprint("malloc usage: malloc <bytes>");
 		return;
 	}
 

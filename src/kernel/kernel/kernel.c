@@ -31,10 +31,10 @@ void kmain() {
     heap_init();
 
 	// Приглашение
-	kprint("\nKintsugi OS (C) 2025\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
+	kprint("\nKintsugi OS v0.1.1a (C) 2025\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
 
 	// Уведомление о старте оболочки командной строки
-	kprint("\nKeramika Shell v0.1.0 "
+	kprint("\nKeramika Shell "
 	        "Type HELP to view commands\n\n!#> ");
 }
 
@@ -64,20 +64,20 @@ void user_input(char *input) {
 	// Массив структур команд, состоящий из самой команды, подсказки и указателя до void-функции
 	struct { char *text, *hint; void (*command)(char**); } commands[] = {
 		//   Команда            		Подсказка для команды                  	 														Указатель до функции
-		{.text="END",		   		.hint="HALT CPU", 																				.command=&halt_cpu},
-		{.text="CLEAR", 	   		.hint="Clear screen",																			.command=&clear_screen_command},
-		{.text="QEMUSHUTDOWN",		.hint="Shutdown QEMU",																			.command=&shutdown_qemu},
-		{.text="INFO",				.hint="Get info",																				.command=&info_command_shell},
-		{.text="MEMDUMP", 			.hint="Dump memory",																			.command=&mem_dump},
-		{.text="MALLOC",			.hint="Alloc memory. Usage: MALLOC <size>",														.command=&kmalloc_command},
-		{.text="FREE",				.hint="Free memory. Usage: FREE <address>",														.command=&free_command},
-		{.text="ECHO",				.hint="Echo an text",																			.command=&echo_command},
-		{.text="SLEEP",				.hint="Wait time. Usage: SLEEP <ms>",															.command=&sleep_command},
-		{.text="REBOOT",			.hint="Reboot system",																			.command=&reboot_command},
-		{.text="RAND",				.hint="Gen random num. Usage: RAND <seed>",														.command=&rand_comamnd},
-		{.text="RANDRANGE",		.hint="Get random num from range. Usage: RANDRANGE <seed> <min> <max>",							.command=&rand_range_command},
-		{.text="FIB",				.hint="Fibonacci. Usage: FIB <num>",															.command=&fibonacci_command},
-		{.text="BINPOW",			.hint="Binary power. Usage: BINPOW <base> <exponent>",											.command=&binary_pow_command},
+		{.text="end",		   		.hint="HALT CPU", 																				.command=&halt_cpu},
+		{.text="clear", 	   		.hint="Clear screen",																			.command=&clear_screen_command},
+		{.text="qemushutdown",		.hint="Shutdown QEMU",																			.command=&shutdown_qemu},
+		{.text="info",				.hint="Get info",																				.command=&info_command_shell},
+		{.text="memdump", 			.hint="Dump memory",																			.command=&mem_dump},
+		{.text="malloc",			.hint="Alloc memory. Usage: malloc <size>",														.command=&kmalloc_command},
+		{.text="free",				.hint="Free memory. Usage: free <address>",														.command=&free_command},
+		{.text="echo",				.hint="Echo an text",																			.command=&echo_command},
+		{.text="sleep",				.hint="Wait time. Usage: sleep <ms>",															.command=&sleep_command},
+		{.text="reboot",			.hint="Reboot system",																			.command=&reboot_command},
+		{.text="rand",				.hint="Gen random num. Usage: rand <seed>",														.command=&rand_comamnd},
+		{.text="randrange",		.hint="Get random num from range. Usage: randrange <seed> <min> <max>",							.command=&rand_range_command},
+		{.text="fib",				.hint="Fibonacci. Usage: fib <num>",															.command=&fibonacci_command},
+		{.text="binpow",			.hint="Binary power. Usage: binpow <base> <exponent>",											.command=&binary_pow_command},
 	};
 
 	int executed = 0;
@@ -94,7 +94,7 @@ void user_input(char *input) {
 		}
 	}
 
-	if (strcmp(input, "HELP") == 0) {
+	if (strcmp(input, "help") == 0) {
 		kprintln("Keramika Shell Help");
 		for (int i = 0; i < commands_length; ++i) {
 			printf("%s - %s\n", commands[i].text, commands[i].hint);
