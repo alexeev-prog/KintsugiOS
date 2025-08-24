@@ -266,7 +266,8 @@ meminfo_t get_meminfo() {
     }
 
     meminfo.heap_start = HEAP_START;
-    meminfo.heap_size = HEAP_SIZE;
+    meminfo.heap_size = heap_current_end - HEAP_START;
+    meminfo.heap_current_end = heap_current_end;
     meminfo.block_size = BLOCK_SIZE;
     meminfo.free_blocks = free_blocks;
     meminfo.total_used = total_used;
@@ -276,15 +277,17 @@ meminfo_t get_meminfo() {
     return meminfo;
 }
 
+
+
 void kmemdump() {
     meminfo_t info = get_meminfo();
     mem_block_t *current = info.free_blocks;
     u32 counter = 0;
 
-    printf("Heap: %x - %x (%d bytes)\n", info.heap_start,
+    printf("Heap: %x - %x (%d bytes)\n", HEAP_START,
                     info.heap_current_end, info.heap_current_end - info.heap_start);
     printf("Block size: %d bytes\n", info.block_size);
-    printf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n\n",
+    printf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n",
                     info.total_used, info.total_free, info.block_count);
 
     // Вывод информации о страницах хипа
