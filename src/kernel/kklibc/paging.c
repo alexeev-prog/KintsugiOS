@@ -90,8 +90,7 @@ static u32 first_frame() {
 }
 
 /* Выделение фрейма для страницы */
-void alloc_frame(page_t *page, int is_kernel, int is_writeable)
-{
+void alloc_frame(page_t *page, int is_kernel, int is_writeable) {
     if (page->frame != 0) {
         return; // Фрейм уже выделен
     } else {

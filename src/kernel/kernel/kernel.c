@@ -13,6 +13,8 @@
 #include "../kklibc/paging.h"
 #include "../kklibc/kklibc.h"
 
+#define MAX_ARGS 32
+
 int shell_cursor_offset = 0;
 int shell_prompt_offset = 0;
 
@@ -38,11 +40,16 @@ void kmain() {
 
 char** get_args(char *input) {
 	char *token = strtok(input, " ");
-	char** args;
+	static char* args[MAX_ARGS + 1];
 	int arg_counter = 0;
 
     while(token) {
         token = strtok(NULL, " ");
+
+		if (arg_counter + 1 > MAX_ARGS + 1) {
+			printf_colored("Error when parsing args: %d args exceed the limit %d\n", RED_ON_BLACK_CLR_CODE, arg_counter + 1, MAX_ARGS + 1);
+			break;
+		}
 
 		args[arg_counter] = token;
 		arg_counter++;

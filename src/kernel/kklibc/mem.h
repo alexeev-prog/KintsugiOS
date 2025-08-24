@@ -23,6 +23,7 @@ typedef struct mem_block {
 typedef struct meminfo {
     u32 heap_start;
     u32 heap_size;
+    u32 heap_current_end;
     u32 block_size;
     mem_block_t* free_blocks;
     u32 total_used;
@@ -33,9 +34,10 @@ typedef struct meminfo {
 meminfo_t get_meminfo();
 void get_freememaddr();
 
-// Новые функции
+int expand_heap(u32 size);
 void heap_init();
 void* kmalloc(u32 size);
+void *krealloc(void *ptr, u32 size);
 void kfree(void* ptr);
 void kmemdump();
 

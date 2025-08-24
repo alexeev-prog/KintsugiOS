@@ -1,3 +1,9 @@
+commit 1257a001f3ade050a2d997495921417e27a880d4
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 03:18:16 2025 +0700
+
+    improve kklibc stdlib and stdio, add kernel panic red screen
+
 commit f1d82ba66c77d46c2b727a6af6c8ce7e559b3c07
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 02:42:53 2025 +0700

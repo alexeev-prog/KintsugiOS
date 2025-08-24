@@ -4,6 +4,12 @@
 #include "ctypes.h"
 #include "../cpu/isr.h"
 
+/* Макросы для работы с битовыми массивами */
+#define INDEX_FROM_BIT(a) (a/(8*4))
+#define OFFSET_FROM_BIT(a) (a%(8*4))
+
+#define PAGE_SIZE 0x1000
+
 /* Внутренняя функция выделения памяти */
 u32 pkmalloc_internal(u32 sz, int align, u32 *phys);
 
@@ -18,10 +24,6 @@ u32 pkmalloc_ap(u32 sz, u32 *phys);
 
 /* Обычное выделение памяти */
 u32 pkmalloc(u32 sz);
-
-/* Макросы для работы с битовыми массивами */
-#define INDEX_FROM_BIT(a) (a/(8*4))
-#define OFFSET_FROM_BIT(a) (a%(8*4))
 
 /* Внешняя переменная текущего адреса свободной памяти */
 extern u32 free_mem_addr;
@@ -88,5 +90,8 @@ page_t *get_page(u32 address, int make, page_directory_t *dir);
   Обработчик пейдж фаултов
 **/
 void page_fault(registers_t regs);
+
+void alloc_frame(page_t *page, int is_kernel, int is_writeable);
+void free_frame(page_t *page);
 
 #endif
