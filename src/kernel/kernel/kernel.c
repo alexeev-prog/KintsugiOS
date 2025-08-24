@@ -25,7 +25,8 @@ void kmain() {
 	irq_install();
 	kprint("IRQ Installed\n");
 
-	register_interrupt_handler(14, page_fault_handler);
+	// register_interrupt_handler(14, page_fault_handler);
+	paging_init();
 
     heap_init();
 

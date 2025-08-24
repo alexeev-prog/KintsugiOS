@@ -1,18 +1,17 @@
-// paging.h
+// [file name]: paging.h
 #ifndef PAGING_H
 #define PAGING_H
 
 #include "../kklibc/ctypes.h"
-#include "isr.h"
 
 #define PAGE_SIZE 4096
-#define PAGE_DIRECTORY_INDEX(x) ((x) >> 22)
+#define PAGE_DIRECTORY_INDEX(x) (((x) >> 22) & 0x3FF)
 #define PAGE_TABLE_INDEX(x) (((x) >> 12) & 0x3FF)
-#define PAGE_GET_PHYS_ADDRESS(x) ((x) & ~0xFFF)
+#define PAGE_GET_PHYS_ADDRESS(x) ((x) & 0xFFFFF000)
 
-// Флаги для записей в таблицах страниц
+// Флаги для записей страниц
 #define PAGE_PRESENT        0x1
-#define PAGE_WRITABLE       0x2
+#define PAGE_WRITE          0x2
 #define PAGE_USER           0x4
 #define PAGE_WRITE_THROUGH  0x8
 #define PAGE_CACHE_DISABLE  0x10
@@ -62,11 +61,16 @@ typedef struct {
 
 // Функции для работы с paging
 void paging_init();
-void switch_page_directory(page_directory_t *dir);
-page_directory_t *get_current_page_directory();
+void switch_page_directory(page_directory_t *new_dir);
+page_directory_t *get_kernel_page_directory();
 void map_page(void *virtual_addr, void *physical_addr, u32 flags);
 void unmap_page(void *virtual_addr);
 void *get_physical_address(void *virtual_addr);
-void page_fault_handler(registers_t regs);
+u32 get_memory_used_pages();
+u32 get_memory_free_pages();
+
+// Функции для выровненного выделения памяти
+void *kmalloc_a(u32 size);
+void kfree_a(void *ptr);
 
 #endif

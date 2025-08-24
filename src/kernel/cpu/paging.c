@@ -1,159 +1,147 @@
-// paging.c
+// [file name]: paging.c
 #include "paging.h"
 #include "../kklibc/kklibc.h"
-#include "isr.h"
 #include "../drivers/screen.h"
 
 // Текущий каталог страниц
-page_directory_t *current_directory = NULL;
+static page_directory_t *current_directory = NULL;
+// Каталог страниц ядра
+static page_directory_t *kernel_directory = NULL;
 
-// Внешние функции из assembly
-extern void load_page_directory(u32);
-extern void enable_paging();
+// Статистика использования памяти
+static u32 used_pages = 0;
+static u32 total_pages = 0;
 
-// Инициализация paging
+// Временная таблица страниц для идентичного отображения
+static page_table_t *identity_table = NULL;
+
+#define PAGING_STRUCTS_START 0x200000
+#define KERNEL_PAGE_DIRECTORY_ADDR (PAGING_STRUCTS_START)
+#define IDENTITY_PAGE_TABLE_ADDR (PAGING_STRUCTS_START + 0x1000)
+
 void paging_init() {
     kprint("Initializing paging...\n");
 
-    // Создаем каталог страниц
-    current_directory = (page_directory_t*)kmalloc_a(sizeof(page_directory_t));
-    memory_set((u8*)current_directory, 0, sizeof(page_directory_t));
+    // Используем фиксированные адреса для структур paging
+    kernel_directory = (page_directory_t *)KERNEL_PAGE_DIRECTORY_ADDR;
+    memory_set((u8 *)kernel_directory, 0, sizeof(page_directory_t));
 
-    // Создаем таблицы страниц для идентичного отображения первых 4MB
-    for (u32 i = 0; i < 1024; i++) {
-        // Каждая запись каталога указывает на таблицу страниц
-        page_table_t *table = (page_table_t*)kmalloc_a(sizeof(page_table_t));
-        memory_set((u8*)table, 0, sizeof(page_table_t));
+    // Создаем таблицу для идентичного отображения первых 4MB
+    page_table_t *identity_table = (page_table_t *)IDENTITY_PAGE_TABLE_ADDR;
+    memory_set((u8 *)identity_table, 0, sizeof(page_table_t));
 
-        // Заполняем таблицу страниц
-        for (u32 j = 0; j < 1024; j++) {
-            u32 frame = (i * 1024 + j) * PAGE_SIZE;
-            table->entries[j].present = 1;
-            table->entries[j].rw = 1;
-            table->entries[j].frame = frame >> 12;
-        }
-
-        // Устанавливаем запись в каталоге страниц
-        current_directory->entries[i].present = 1;
-        current_directory->entries[i].rw = 1;
-        current_directory->entries[i].frame = ((u32)table) >> 12;
+    // Заполняем таблицу идентичного отображения
+    u32 i;
+    for (i = 0; i < 1024; i++) {
+        identity_table->entries[i].present = 1;
+        identity_table->entries[i].rw = 1;
+        identity_table->entries[i].frame = i;
     }
 
-    // Переключаемся на новый каталог страниц
-    switch_page_directory(current_directory);
+    // Добавляем таблицу в каталог
+    kernel_directory->entries[0].present = 1;
+    kernel_directory->entries[0].rw = 1;
+    kernel_directory->entries[0].frame = (u32)identity_table >> 12;
+
+    // Устанавливаем каталог страниц
+    current_directory = kernel_directory;
+    switch_page_directory(kernel_directory);
 
     // Включаем paging
-    enable_paging();
+    u32 cr0;
+    asm volatile("mov %%cr0, %0" : "=r"(cr0));
+    cr0 |= 0x80000000; // Устанавливаем бит PG
+    asm volatile("mov %0, %%cr0" :: "r"(cr0));
 
     kprint("Paging enabled\n");
+
+    // Инициализируем статистику
+    total_pages = (HEAP_SIZE + HEAP_START) / PAGE_SIZE;
+    used_pages = 1024; // Уже использовано для идентичного отображения
 }
 
-// Переключение каталога страниц
-void switch_page_directory(page_directory_t *dir) {
-    current_directory = dir;
-    load_page_directory((u32)dir);
+void switch_page_directory(page_directory_t *new_dir) {
+    current_directory = new_dir;
+    asm volatile("mov %0, %%cr3" :: "r"(new_dir));
 }
 
-// Получение текущего каталога страниц
-page_directory_t *get_current_page_directory() {
-    return current_directory;
+page_directory_t *get_kernel_page_directory() {
+    return kernel_directory;
 }
 
-// Отображение виртуальной страницы на физическую
 void map_page(void *virtual_addr, void *physical_addr, u32 flags) {
-    u32 virtual = (u32)virtual_addr;
-    u32 physical = (u32)physical_addr;
+    u32 pd_index = PAGE_DIRECTORY_INDEX((u32)virtual_addr);
+    u32 pt_index = PAGE_TABLE_INDEX((u32)virtual_addr);
 
-    u32 pd_index = PAGE_DIRECTORY_INDEX(virtual);
-    u32 pt_index = PAGE_TABLE_INDEX(virtual);
+    // Проверяем, существует ли таблица страниц
+    if (!current_directory->entries[pd_index].present) {
+        // Создаем новую таблицу страниц
+        page_table_t *new_table = (page_table_t *)kmalloc_a(sizeof(page_table_t));
+        memory_set((u8 *)new_table, 0, sizeof(page_table_t));
 
-    // Получаем таблицу страниц
-    page_table_t *table = (page_table_t*)(current_directory->entries[pd_index].frame << 12);
+        // Добавляем таблицу в каталог
+        current_directory->entries[pd_index].present = 1;
+        current_directory->entries[pd_index].rw = 1;
+        current_directory->entries[pd_index].frame = (u32)new_table >> 12;
+    }
 
-    // Устанавливаем запись в таблице страниц
+    // Получаем указатель на таблицу страниц
+    page_table_t *table = (page_table_t *)(current_directory->entries[pd_index].frame << 12);
+
+    // Заполняем запись в таблице страниц
     table->entries[pt_index].present = (flags & PAGE_PRESENT) ? 1 : 0;
-    table->entries[pt_index].rw = (flags & PAGE_WRITABLE) ? 1 : 0;
+    table->entries[pt_index].rw = (flags & PAGE_WRITE) ? 1 : 0;
     table->entries[pt_index].user = (flags & PAGE_USER) ? 1 : 0;
-    table->entries[pt_index].frame = physical >> 12;
+    table->entries[pt_index].write_through = (flags & PAGE_WRITE_THROUGH) ? 1 : 0;
+    table->entries[pt_index].cache_disable = (flags & PAGE_CACHE_DISABLE) ? 1 : 0;
+    table->entries[pt_index].global = (flags & PAGE_GLOBAL) ? 1 : 0;
+    table->entries[pt_index].frame = (u32)physical_addr >> 12;
 
-    // Инвалидируем TLB
-    asm volatile("invlpg (%0)" : : "r" (virtual_addr));
+    // Обновляем статистику
+    if (table->entries[pt_index].present) {
+        used_pages++;
+    }
+
+    // Принудительно обновляем TLB
+    asm volatile("invlpg (%0)" :: "r"(virtual_addr));
 }
 
-// Удаление отображения страницы
 void unmap_page(void *virtual_addr) {
-    u32 virtual = (u32)virtual_addr;
-    u32 pd_index = PAGE_DIRECTORY_INDEX(virtual);
-    u32 pt_index = PAGE_TABLE_INDEX(virtual);
+    u32 pd_index = PAGE_DIRECTORY_INDEX((u32)virtual_addr);
+    u32 pt_index = PAGE_TABLE_INDEX((u32)virtual_addr);
 
-    // Получаем таблицу страниц
-    page_table_t *table = (page_table_t*)(current_directory->entries[pd_index].frame << 12);
+    if (current_directory->entries[pd_index].present) {
+        page_table_t *table = (page_table_t *)(current_directory->entries[pd_index].frame << 12);
+        if (table->entries[pt_index].present) {
+            table->entries[pt_index].present = 0;
+            used_pages--;
 
-    // Очищаем запись
-    table->entries[pt_index].present = 0;
-
-    // Инвалидируем TLB
-    asm volatile("invlpg (%0)" : : "r" (virtual_addr));
+            // Принудительно обновляем TLB
+            asm volatile("invlpg (%0)" :: "r"(virtual_addr));
+        }
+    }
 }
 
-// Получение физического адреса по виртуальному
 void *get_physical_address(void *virtual_addr) {
-    u32 virtual = (u32)virtual_addr;
-    u32 pd_index = PAGE_DIRECTORY_INDEX(virtual);
-    u32 pt_index = PAGE_TABLE_INDEX(virtual);
+    u32 pd_index = PAGE_DIRECTORY_INDEX((u32)virtual_addr);
+    u32 pt_index = PAGE_TABLE_INDEX((u32)virtual_addr);
 
-    // Проверяем наличие страницы
     if (!current_directory->entries[pd_index].present) {
         return NULL;
     }
 
-    // Получаем таблицу страниц
-    page_table_t *table = (page_table_t*)(current_directory->entries[pd_index].frame << 12);
-
-    // Проверяем наличие записи в таблице
+    page_table_t *table = (page_table_t *)(current_directory->entries[pd_index].frame << 12);
     if (!table->entries[pt_index].present) {
         return NULL;
     }
 
-    // Вычисляем физический адрес
-    u32 physical = (table->entries[pt_index].frame << 12) + (virtual & 0xFFF);
-    return (void*)physical;
+    return (void *)(table->entries[pt_index].frame << 12);
 }
 
-// Обработчик page fault
-void page_fault_handler(registers_t regs) {
-    u32 faulting_address;
-    asm volatile("mov %%cr2, %0" : "=r" (faulting_address));
+u32 get_memory_used_pages() {
+    return used_pages;
+}
 
-    // Проверяем причину page fault
-    int present = regs.err_code & 0x1;
-    int rw = regs.err_code & 0x2;
-    int user = regs.err_code & 0x4;
-    int reserved = regs.err_code & 0x8;
-    int id = regs.err_code & 0x10;
-
-    kprintf("Page fault at 0x%x, caused by ", faulting_address);
-
-    if (present) {
-        kprint("page protection violation");
-    } else {
-        kprint("non-present page");
-    }
-
-    if (rw) {
-        kprint(" write attempt");
-    } else {
-        kprint(" read attempt");
-    }
-
-    if (user) {
-        kprint(" in user mode");
-    } else {
-        kprint(" in kernel mode");
-    }
-
-    kprint("\n");
-
-    // Зависаем систему при page fault в ядре
-    asm volatile("hlt");
+u32 get_memory_free_pages() {
+    return total_pages - used_pages;
 }

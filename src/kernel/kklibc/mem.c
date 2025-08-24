@@ -1,92 +1,64 @@
+// [file name]: mem.c (обновленная версия)
 /*------------------------------------------------------------------------------
  *  Kintsugi OS KKLIBC source code
  *  File: kklibc/mem.c
  *  Title: Функции работы с памятью
- *	Description: null
+ *	Description: Реализация менеджера памяти с поддержкой paging
  * ----------------------------------------------------------------------------*/
 
 #include "mem.h"
 #include "../cpu/paging.h"
 #include "../drivers/screen.h"
+#include "ctypes.h"
 #include "stdio.h"
 #include "stdlib.h"
 
-// Глобальные переменные кучи
 u32 free_mem_addr_guard1 = 0xDEADBEEF;
-static u32 free_mem_addr = HEAP_VIRTUAL_START;  // Теперь виртуальный адрес
+static u32 free_mem_addr = HEAP_START;
 u32 free_mem_addr_guard2 = 0xCAFEBABE;
 static mem_block_t *free_blocks = NULL;
 
-// Физический адрес начала кучи
-static u32 heap_physical_start = 0;
-
-// Инициализация памяти heap с учетом paging
+// Инициализация памяти heap с поддержкой paging
 void heap_init() {
-    // Выделяем физическую память для кучи
-    heap_physical_start = 0x200000;  // Начинаем кучу с 2MB
+    // Инициализируем paging
+    paging_init();
 
-    // Отображаем виртуальные адреса кучи на физические
-    for (u32 i = 0; i < HEAP_SIZE; i += PAGE_SIZE) {
-        void *virtual_addr = (void*)(HEAP_VIRTUAL_START + i);
-        void *physical_addr = (void*)(heap_physical_start + i);
-        map_page(virtual_addr, physical_addr, PAGE_PRESENT | PAGE_WRITABLE);
-    }
-
-    // Инициализируем первый свободный блок
-    free_blocks = (mem_block_t *)HEAP_VIRTUAL_START;
+    // Инициализируем первый свободный блок на всей области кучи
+    free_blocks = (mem_block_t *)HEAP_START;
     free_blocks->size = HEAP_SIZE - sizeof(mem_block_t);
     free_blocks->next = NULL;
     free_blocks->is_free = 1;
 
-    kprint("Heap initialized at virtual: ");
+    // Отображаем всю кучу в виртуальную память
+    u32 virtual_addr = HEAP_START;
+    u32 physical_addr = HEAP_START;
+    u32 end_addr = HEAP_START + HEAP_SIZE;
+
+    while (physical_addr < end_addr) {
+        map_page((void *)virtual_addr, (void *)physical_addr,
+                 PAGE_PRESENT | PAGE_WRITE);
+        virtual_addr += PAGE_SIZE;
+        physical_addr += PAGE_SIZE;
+    }
+
+    kprint("Heap initialized at ");
     char buf[32] = "";
-    hex_to_ascii(HEAP_VIRTUAL_START, buf);
-    kprint(buf);
-    kprint(", physical: ");
-    hex_to_ascii(heap_physical_start, buf);
+    hex_to_ascii(HEAP_START, buf);
     kprint(buf);
     kprint("\n");
 }
 
-// Получение физического адреса по виртуальному
-void *get_physaddr(void *virtualaddr) {
-    return get_physical_address(virtualaddr);
-}
-
-// Аллокация памяти с выравниванием по страницам
-void *kmalloc_a(u32 size) {
-    // Выравниваем размер до границы страницы
-    if (size % PAGE_SIZE != 0) {
-        size += PAGE_SIZE - (size % PAGE_SIZE);
-    }
-
-    // Ищем свободную физическую страницу
-    // (здесь должна быть реализация аллокатора физических страниц)
-    static u32 next_physical_page = 0x300000;  // Начинаем с 3MB
-
-    void *physical_addr = (void*)next_physical_page;
-    next_physical_page += size;
-
-    // Выделяем виртуальный адрес
-    static u32 next_virtual_addr = HEAP_VIRTUAL_START + HEAP_SIZE;
-    void *virtual_addr = (void*)next_virtual_addr;
-    next_virtual_addr += size;
-
-    // Отображаем виртуальный адрес на физический
-    for (u32 i = 0; i < size; i += PAGE_SIZE) {
-        map_page((void*)((u32)virtual_addr + i),
-                 (void*)((u32)physical_addr + i),
-                 PAGE_PRESENT | PAGE_WRITABLE);
-    }
-
-    return virtual_addr;
-}
-
-// Стандартная аллокация памяти
 void *kmalloc(u32 size) {
+    return kmalloc_a(size);
     // Выравниваем размер до границы BLOCK_SIZE
     if (size % BLOCK_SIZE != 0) {
         size += BLOCK_SIZE - (size % BLOCK_SIZE);
+    }
+
+    // Добавляем размер для заголовка страницы, если нужно
+    u32 total_size = size + sizeof(mem_block_t);
+    if (total_size % PAGE_SIZE != 0) {
+        total_size += PAGE_SIZE - (total_size % PAGE_SIZE);
     }
 
     mem_block_t *current = free_blocks;
@@ -97,17 +69,35 @@ void *kmalloc(u32 size) {
             // Нашли подходящий свободный блок
             if (current->size > size + sizeof(mem_block_t) + BLOCK_SIZE) {
                 // Можем разделить блок
-                mem_block_t *new_block = (mem_block_t*)((u32)current + sizeof(mem_block_t) + size);
-                new_block->size = current->size - size - sizeof(mem_block_t);
+                mem_block_t *new_block =
+                        (mem_block_t *)((u32)current + sizeof(mem_block_t) + size);
+                new_block->size =
+                        current->size - size - sizeof(mem_block_t);
                 new_block->is_free = 1;
                 new_block->next = current->next;
 
                 current->size = size;
                 current->next = new_block;
+
+                free_mem_addr += current->size;
             }
 
             current->is_free = 0;
-            return (void*)((u32)current + sizeof(mem_block_t));
+
+            // Отображаем физическую память в виртуальную, если нужно
+            void *virtual_addr = (void *)((u32)current + sizeof(mem_block_t));
+            void *physical_addr = get_physical_address(virtual_addr);
+
+            if (!physical_addr) {
+                // Нужно выделить новую физическую страницу
+                physical_addr = (void *)free_mem_addr;
+                free_mem_addr += PAGE_SIZE;
+
+                map_page(virtual_addr, physical_addr,
+                         PAGE_PRESENT | PAGE_WRITE);
+            }
+
+            return virtual_addr;
         }
         prev = current;
         current = current->next;
@@ -117,7 +107,6 @@ void *kmalloc(u32 size) {
     return NULL;
 }
 
-// Реаллокация памяти
 void *krealloc(void *ptr, u32 size) {
     if (!ptr) return kmalloc(size);
     if (size == 0) { kfree(ptr); return NULL; }
@@ -133,12 +122,12 @@ void *krealloc(void *ptr, u32 size) {
     return new_ptr;
 }
 
-// Освобождение памяти
 void kfree(void *ptr) {
-    if (!ptr) return;
+    if (!ptr)
+        return;
 
-    // Получаем указатель на заголовок блока
-    mem_block_t *block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
+    // получаем указатель на заголовок блока
+    mem_block_t *block = (mem_block_t *)((u32)ptr - sizeof(mem_block_t));
 
     if (block->is_free) {
         kprint("Double free detected!\n");
@@ -147,19 +136,93 @@ void kfree(void *ptr) {
 
     block->is_free = 1;
 
-    // Попробуем объединить с соседними свободными блоками
+    // Освобождаем связанные страницы, если нужно
+    u32 start_addr = (u32)block;
+    u32 end_addr = start_addr + sizeof(mem_block_t) + block->size;
+
+    for (u32 addr = start_addr; addr < end_addr; addr += PAGE_SIZE) {
+        if (addr % PAGE_SIZE == 0) {
+            // Проверяем, используются ли еще другие блоки в этой странице
+            int page_in_use = 0;
+            mem_block_t *check = free_blocks;
+            while (check) {
+                u32 check_start = (u32)check;
+                u32 check_end = check_start + sizeof(mem_block_t) + check->size;
+
+                if (check != block && !check->is_free &&
+                    addr >= check_start && addr < check_end) {
+                    page_in_use = 1;
+                    break;
+                }
+                check = check->next;
+            }
+
+            if (!page_in_use) {
+                unmap_page((void *)addr);
+            }
+        }
+    }
+
+    /* попробуем объединить с соседними свободными блоками*/
     mem_block_t *current = free_blocks;
     while (current) {
         if (current->is_free && current->next && current->next->is_free) {
-            // Соединяем текущий блок со следующим
+            // соединим текущий блок со следующим
             current->size += sizeof(mem_block_t) + current->next->size;
             current->next = current->next->next;
+            free_mem_addr -= current->size;
         }
         current = current->next;
     }
 }
 
-// Получение информации о памяти
+void *kmalloc_a(u32 size) {
+    // Выравниваем размер до границы PAGE_SIZE
+    if (size % PAGE_SIZE != 0) {
+        size += PAGE_SIZE - (size % PAGE_SIZE);
+    }
+
+    // Для простоты используем обычный kmalloc и выравниваем вручную
+    // Это не оптимально, но работает на ранних этапах инициализации
+    void *ptr = kmalloc(size + PAGE_SIZE);
+    if (!ptr) {
+        kprint("kmalloc_a: No memory available\n");
+        return NULL;
+    }
+
+    // Выравниваем указатель
+    u32 addr = (u32)ptr;
+    u32 aligned_addr = (addr + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+
+    // Если нужно, создаем смещение для последующего освобождения
+    if (aligned_addr != addr) {
+        // Сохраняем оригинальный указатель перед выровненным адресом
+        *((u32 *)(aligned_addr - sizeof(u32))) = addr;
+    } else {
+        // Если адрес уже выровнен, сохраняем 0 как маркер
+        *((u32 *)(aligned_addr - sizeof(u32))) = 0;
+    }
+
+    return (void *)aligned_addr;
+}
+
+// Функция для освобождения выровненной памяти
+void kfree_a(void *ptr) {
+    if (!ptr) return;
+
+    u32 aligned_addr = (u32)ptr;
+    u32 original_addr = *((u32 *)(aligned_addr - sizeof(u32)));
+
+    if (original_addr == 0) {
+        // Адрес был уже выровнен, освобождаем как есть
+        kfree(ptr);
+    } else {
+        // Освобождаем оригинальный указатель
+        kfree((void *)original_addr);
+    }
+}
+
+// Обновленная функция get_meminfo с информацией о paging
 meminfo_t get_meminfo() {
     meminfo_t meminfo;
 
@@ -180,8 +243,7 @@ meminfo_t get_meminfo() {
         current = current->next;
     }
 
-    meminfo.heap_virtual_start = HEAP_VIRTUAL_START;
-    meminfo.heap_physical_start = heap_physical_start;
+    meminfo.heap_start = HEAP_START;
     meminfo.heap_size = HEAP_SIZE;
     meminfo.block_size = BLOCK_SIZE;
     meminfo.free_blocks = free_blocks;
@@ -189,30 +251,41 @@ meminfo_t get_meminfo() {
     meminfo.total_free = total_free;
     meminfo.block_count = block_count;
 
-    // Информация о страницах (заглушка)
-    meminfo.page_directory_phys = (u32)get_physical_address(get_current_page_directory());
+    // Добавляем информацию о paging
+    meminfo.used_pages = get_memory_used_pages();
+    meminfo.free_pages = get_memory_free_pages();
+    meminfo.total_pages = meminfo.used_pages + meminfo.free_pages;
+    meminfo.page_size = PAGE_SIZE;
 
     return meminfo;
 }
 
-// Дамп информации о памяти
+// Обновленная функция kmemdump с информацией о paging
 void kmemdump() {
     meminfo_t info = get_meminfo();
     mem_block_t *current = info.free_blocks;
     u32 counter = 0;
 
-    kprintf("Heap: virtual %x - %x (%d bytes)\n", info.heap_virtual_start,
-            info.heap_virtual_start + info.heap_size, info.heap_size);
-    kprintf("Heap: physical %x - %x\n", info.heap_physical_start,
-            info.heap_physical_start + info.heap_size);
+    kprintf("Heap: %x - %x (%d bytes)\n", info.heap_start,
+                    info.heap_start + info.heap_size, info.heap_size);
     kprintf("Block size: %d bytes\n", info.block_size);
-    kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n",
-            info.total_used, info.total_free, info.block_count);
+    kprintf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n\n",
+                    info.total_used, info.total_free, info.block_count);
+
+    kprintf("Paging: USED=%d pages, FREE=%d pages, TOTAL=%d pages (%d KB)\n",
+                    info.used_pages, info.free_pages, info.total_pages,
+                    info.total_pages * info.page_size / 1024);
 
     while (current) {
-        kprintf("Block %d: virt=%x, phys=%x, Size=%d, %s\n", counter++,
-                (u32)current, (u32)get_physical_address(current),
-                current->size, current->is_free ? "FREE" : "USED");
+        kprintf("Block %d: %x, Size=%d, %s\n", counter++, (u32)current,
+                        current->size, current->is_free ? "FREE" : "USED");
         current = current->next;
     }
+}
+
+void get_freememaddr() {
+    char free_mem_addr_str[32] = "";
+    hex_to_ascii(free_mem_addr, free_mem_addr_str);
+
+    kprintf("%s\n", free_mem_addr_str);
 }
