@@ -277,8 +277,6 @@ meminfo_t get_meminfo() {
     return meminfo;
 }
 
-
-
 void kmemdump() {
     meminfo_t info = get_meminfo();
     mem_block_t *current = info.free_blocks;
