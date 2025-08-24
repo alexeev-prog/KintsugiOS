@@ -6,7 +6,6 @@
 #include "timer.h"
 #include "../drivers/lowlevel_io.h"
 #include "../kklibc/stdio.h"
-#include "../kklibc/paging/paging.h"
 
 isr_t interrupt_handlers[256];
 
@@ -118,38 +117,7 @@ char *exception_messages[] = {
     "Reserved"
 };
 
-void page_fault_handler(registers_t r) {
-    u32 fault_addr;
-    asm volatile("mov %%cr2, %0" : "=r" (fault_addr));
-
-    int present = !(r.err_code & 0x1); // Bit 0: 0 if not present
-    int rw = r.err_code & 0x2;         // Bit 1: 1 if write
-    int us = r.err_code & 0x4;         // Bit 2: 1 if user mode
-    int reserved = r.err_code & 0x8;   // Bit 3: 1 if reserved bit overwritten
-
-    kprintf("Page fault at %x: %s %s in %s mode\n",
-            fault_addr,
-            present ? "protection fault" : "not present",
-            rw ? "write" : "read",
-            us ? "user" : "kernel");
-
-    debug_page_fault(fault_addr);
-
-    if (us) {
-        kprintf("Killing process.\n");
-        asm volatile("hlt");
-        return;
-    }
-
-    kprintf("Kernel page fault! Halting.\n");
-    for(;;);
-}
-
 void isr_handler(registers_t r) {
-    if (r.int_no == 14) {
-        page_fault_handler(r);
-    }
-
     kprint("received interrupt: ");
     char s[3];
     int_to_ascii(r.int_no, s);

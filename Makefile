@@ -17,23 +17,7 @@ LDFLAGS = -Ttext 0x1000 --oformat binary
 
 KERNEL_ENTRY = $(BIN_DIR)/bootloader/kernel_entry.o
 INTERRUPT_OBJ = $(BIN_DIR)/kernel/cpu/interrupt.o
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-PAGING_OBJ = $(BIN_DIR)/bootloader/paging.o
-=======
 PAGING_OBJ = $(BIN_DIR)/kernel/paging_asm.o
->>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
-=======
-PAGING_OBJ = $(BIN_DIR)/kernel/paging_asm.o
->>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
-=======
-PAGING_OBJ = $(BIN_DIR)/kernel/paging_asm.o
->>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
-=======
-PAGING_OBJ = $(BIN_DIR)/kernel/paging_asm.o
->>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 
 C_SOURCES = $(shell find $(SRC_DIR) -name '*.c')
 C_OBJS = $(C_SOURCES:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
