@@ -25,7 +25,11 @@ void kmain() {
 	irq_install();
 	kprint("IRQ Installed\n");
 
+<<<<<<< HEAD
 	init_paging();
+=======
+	register_interrupt_handler(14, page_fault_handler);
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 
     heap_init();
 
