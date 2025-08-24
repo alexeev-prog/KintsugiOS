@@ -27,7 +27,11 @@ void kmain() {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	init_paging();
+=======
+	register_interrupt_handler(14, page_fault_handler);
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 =======
 	register_interrupt_handler(14, page_fault_handler);
 >>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)

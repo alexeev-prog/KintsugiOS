@@ -20,7 +20,11 @@ INTERRUPT_OBJ = $(BIN_DIR)/kernel/cpu/interrupt.o
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 PAGING_OBJ = $(BIN_DIR)/bootloader/paging.o
+=======
+PAGING_OBJ = $(BIN_DIR)/kernel/paging_asm.o
+>>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
 =======
 PAGING_OBJ = $(BIN_DIR)/kernel/paging_asm.o
 >>>>>>> 3fe2ead (realize paging memory, add kmalloc aligned; todo: realize kmemdump fully)
