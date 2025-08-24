@@ -1,3 +1,15 @@
+commit 8d33becaee903423d2f95bfef6339837dfa839b5
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 04:10:39 2025 +0700
+
+    fix bug with memdump, update readme
+
+commit 5ba6f3d6450583ababfa509b88b8d0d855a65928
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 03:48:38 2025 +0700
+
+    improve memory allocators methods, improve paging, update readme
+
 commit 1257a001f3ade050a2d997495921417e27a880d4
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 03:18:16 2025 +0700
