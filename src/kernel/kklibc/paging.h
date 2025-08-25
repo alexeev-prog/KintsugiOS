@@ -10,6 +10,8 @@
 
 #define PAGE_SIZE 0x1000
 
+extern u32 nframes;
+
 /* Внутренняя функция выделения памяти */
 u32 pkmalloc_internal(u32 sz, int align, u32 *phys);
 
@@ -93,5 +95,6 @@ void page_fault(registers_t regs);
 
 void alloc_frame(page_t *page, int is_kernel, int is_writeable);
 void free_frame(page_t *page);
+u32 test_frame(u32 frame_addr);
 
 #endif

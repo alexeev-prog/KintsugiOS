@@ -9,6 +9,7 @@
 #include "../drivers/screen.h"
 #include "../kklibc/kklibc.h"
 #include "../cpu/ports.h"
+#include "sysinfo.h"
 
 void fibonacci_command(char **args) {
     if (!args[0]) {
@@ -94,12 +95,15 @@ void halt_cpu(char** args) {
 }
 
 void sysinfo_command() {
-    meminfo_t meminfo = get_meminfo();
-    printf("Memory: %d KB used, %d KB free\n",
-            meminfo.total_used / 1024, meminfo.total_free / 1024);
-    printf("Heap: %x - %x (%d KB)",
-            meminfo.heap_start, meminfo.heap_current_end,
-            (meminfo.heap_current_end - meminfo.heap_start) / 1024);
+    system_info_t* info = get_system_info();
+
+    printf("CPU: %s, %d core(s)\n", info->cpu_vendor, info->cpu_cores);
+    printf("Memory: %d MB total, %d MB free, %d MB used\n",
+            info->total_memory / (1024 * 1024),
+            info->free_memory / (1024 * 1024),
+            info->used_memory / (1024 * 1024));
+    printf("Kernel memory: %d KB\n", info->kernel_memory / 1024);
+    printf("Heap size: %d KB\n", info->heap_size / 1024);
 }
 
 void info_command_shell(char** args) {
