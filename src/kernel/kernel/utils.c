@@ -93,6 +93,15 @@ void halt_cpu(char** args) {
 	asm volatile("hlt");
 }
 
+void sysinfo_command() {
+    meminfo_t meminfo = get_meminfo();
+    printf("Memory: %d KB used, %d KB free\n",
+            meminfo.total_used / 1024, meminfo.total_free / 1024);
+    printf("Heap: %x - %x (%d KB)",
+            meminfo.heap_start, meminfo.heap_current_end,
+            (meminfo.heap_current_end - meminfo.heap_start) / 1024);
+}
+
 void info_command_shell(char** args) {
 	kprint("Kintsugi OS 0.1.0 by alexeev-prog\n");
 
@@ -102,13 +111,8 @@ void info_command_shell(char** args) {
            "/_/\\_\\/_/_//_/\\__/___/\\_,_/\\_, /_/  \\___/___/\n"
            "                          /___/              \n");
 
-	meminfo_t meminfo = get_meminfo();
-
 	kprint("MEMORY\n");
-	printf("HEAP (%d): start at %d, minimal block size %d\n", meminfo.heap_size, meminfo.heap_start, meminfo.block_size);
-	printf("Total used: %d\n", meminfo.total_used);
-	printf("Total free: %d\n", meminfo.total_free);
-	printf("Block count: %d", meminfo.block_count);
+	sysinfo_command();
 }
 
 void mem_dump(char** args) {
