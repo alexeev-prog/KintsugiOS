@@ -8,6 +8,107 @@
 #include "stdlib.h"
 #include "stdio.h"
 
+void boolToChar(u8 value, u8 *str) {
+    if (value) {
+        strcpy(str, (u8 *)"true");
+    } else {
+        strcpy(str, (u8 *)"false");
+    }
+}
+
+void itoa(int num, char* str, int base) {
+    int i = 0;
+    u8 isNegative = 0;
+
+    if (num == 0) {
+        str[i++] = '0';
+        str[i] = '\0';
+        return;
+    }
+
+    if (num < 0 && base == 10) {
+        isNegative = 1;
+        num = -num;
+    }
+
+    while (num != 0) {
+        int rem = num % base;
+        str[i++] = (rem > 9) ? (rem - 10) + 'a' : rem + '0';
+        num = num / base;
+    }
+
+    if (isNegative) {
+        str[i++] = '-';
+    }
+
+    str[i] = '\0';
+
+    // Reverse the string
+    int start = 0;
+    int end = i - 1;
+    while (start < end) {
+        char temp = str[start];
+        str[start] = str[end];
+        str[end] = temp;
+        start++;
+        end--;
+    }
+}
+
+// Helper function for unsigned integer to string conversion
+void utoa(u32 num, char* str, int base) {
+    int i = 0;
+
+    if (num == 0) {
+        str[i++] = '0';
+        str[i] = '\0';
+        return;
+    }
+
+    while (num != 0) {
+        int rem = num % base;
+        str[i++] = (rem > 9) ? (rem - 10) + 'a' : rem + '0';
+        num = num / base;
+    }
+
+    str[i] = '\0';
+
+    // Reverse the string
+    int start = 0;
+    int end = i - 1;
+    while (start < end) {
+        char temp = str[start];
+        str[start] = str[end];
+        str[end] = temp;
+        start++;
+        end--;
+    }
+}
+
+int atoi(const char* str) {
+    int result = 0;
+    int sign = 1;
+
+    while (*str == ' ' || *str == '\t' || *str == '\n') {
+        str++;
+    }
+
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    } else if (*str == '+') {
+        str++;
+    }
+
+    while (*str >= '0' && *str <= '9') {
+        result = result * 10 + (*str - '0');
+        str++;
+    }
+
+    return result * sign;
+}
+
+
 u32 xorshift32(u32* state) { // генератор псевдослучайных чисел xorshift32
     u32 x = state[0];
     x ^= x << 13;

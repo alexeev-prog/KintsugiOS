@@ -9,7 +9,7 @@ void detect_cpu(void) {
     u32 eax, ebx, ecx, edx;
     char vendor[13];
 
-    // Получаем vendor string
+    // вендор
     asm volatile("cpuid"
                  : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
                  : "a"(0));
@@ -21,7 +21,7 @@ void detect_cpu(void) {
 
     strcpy(sys_info.cpu_vendor, vendor);
 
-    // Получаем информацию о функциях процессора
+    // функция процессора
     asm volatile("cpuid"
                  : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
                  : "a"(1));
@@ -35,7 +35,7 @@ void detect_memory() {
     sys_info.total_memory = nframes * PAGE_SIZE;
     sys_info.free_memory = 0;
 
-    // Подсчитываем свободные фреймы
+    // подсчет свободныъ фреймов
     for (u32 i = 0; i < nframes; i++) {
         if (!test_frame(i * PAGE_SIZE)) {
             sys_info.free_memory += PAGE_SIZE;
