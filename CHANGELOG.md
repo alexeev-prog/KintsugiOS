@@ -1,3 +1,9 @@
+commit 7a3d6002fc1849810a6a0e974b823c36dd716b61
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 04:47:02 2025 +0700
+
+    update keyboard driver and add case-sensitive input
+
 commit 2fbcd0e1033a3bf3abdf6c147d95504f16e190b5
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 04:26:27 2025 +0700

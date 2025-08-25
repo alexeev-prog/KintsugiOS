@@ -1,3 +1,10 @@
+/*------------------------------------------------------------------------------
+ *  Kintsugi OS KKLIBC source code
+ *  File: kklibc/stdio.c
+ *  Title: Набор средств ввода/вывода
+ *	Description: null
+ * ----------------------------------------------------------------------------*/
+
 #include "stdlib.h"
 #include "stdio.h"
 #include "../drivers/screen.h"

@@ -1,5 +1,11 @@
-#ifndef STRINGS_H
-#define STRINGS_H
+/*------------------------------------------------------------------------------
+ *  Kintsugi OS KKLIBC source code
+ *  File: kklibc/stdlib.h
+ *  Title: Стандартный набор методов (заголовочный файл)
+ *	Description: null
+ * ----------------------------------------------------------------------------*/
+#ifndef STDLIB_H
+#define STDLIB_H
 
 #include "ctypes.h"
 

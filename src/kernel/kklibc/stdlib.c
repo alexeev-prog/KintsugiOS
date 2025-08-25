@@ -1,3 +1,9 @@
+/*------------------------------------------------------------------------------
+ *  Kintsugi OS KKLIBC source code
+ *  File: kklibc/stdlib.c
+ *  Title: Стандартный набор методов
+ *	Description: null
+ * ----------------------------------------------------------------------------*/
 #include "ctypes.h"
 #include "stdlib.h"
 #include "stdio.h"
