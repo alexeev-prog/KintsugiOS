@@ -72,10 +72,10 @@ extern void irq15();
 
 /* Struct which aggregates many registers */
 typedef struct {
-   u32 ds; /* сегмент данных */
-   u32 edi, esi, ebp, esp, ebx, edx, ecx, eax; /* запушен pusha. */
-   u32 int_no, err_code; /* Число прерывания и код ошибки */
-   u32 eip, cs, eflags, useresp, ss; /* запушить процессором автоматически */
+  u32 ds;                                     /* сегмент данных */
+  u32 edi, esi, ebp, esp, ebx, edx, ecx, eax; /* запушен pusha. */
+  u32 int_no, err_code;             /* Число прерывания и код ошибки */
+  u32 eip, cs, eflags, useresp, ss; /* запушить процессором автоматически */
 } registers_t;
 
 void isr_install();

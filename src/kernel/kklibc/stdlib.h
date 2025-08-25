@@ -10,15 +10,15 @@
 #include "ctypes.h"
 
 void booltochar(u8 value, u8 *str);
-void itoa(int num, char* str, int base);
-void utoa(u32 num, char* str, int base);
-u32 rand_range(u32* state, u32 min, u32 max);
-u32 rand(u32* state);
+void itoa(int num, char *str, int base);
+void utoa(u32 num, char *str, int base);
+u32 rand_range(u32 *state, u32 min, u32 max);
+u32 rand(u32 *state);
 void reboot();
 void wait(int ms);
 void int_to_ascii(int n, char str[]);
 void hex_to_ascii(int n, char str[]);
-int strtoint(char* str);
+int strtoint(char *str);
 void reverse(char s[]);
 int strlen(char s[]);
 void backspace(char s[]);
