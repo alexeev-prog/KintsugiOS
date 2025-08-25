@@ -9,18 +9,13 @@
 
 #include "ctypes.h"
 
-void boolToChar(u8 value, u8 *str);
+void booltochar(u8 value, u8 *str);
 void itoa(int num, char* str, int base);
 void utoa(u32 num, char* str, int base);
 u32 rand_range(u32* state, u32 min, u32 max);
 u32 rand(u32* state);
 void reboot();
 void wait(int ms);
-void *memset(void *s, int c, unsigned int n);
-void *memcpy(void *dest, const void *src, unsigned int n);
-void memory_copy(u8 *source, u8 *dest, int nbytes);
-void memory_set(u8 *dest, u8 val, u32 len);
-void u32memory_set(u32 *dest, u32 val, u32 len);
 void int_to_ascii(int n, char str[]);
 void hex_to_ascii(int n, char str[]);
 int strtoint(char* str);
@@ -28,17 +23,33 @@ void reverse(char s[]);
 int strlen(char s[]);
 void backspace(char s[]);
 void append(char s[], char n);
-int strcmp(char s1[], char s2[]);
 int hex_strtoint(char *str);
-void strcpy(char *dest, char *src);
 unsigned int is_delim(char c, char *delim);
+
+int sprintf(char *buf, const char *fmt, ...);
+int snprintf(char *buf, unsigned int size, const char *fmt, ...);
+
+// String
+u32 strspn(const u8 *str1, const u8 *str2);
+u32 strcspn(const u8 *str1, const u8 *str2);
+u8 *strpbrk(const u8 *str1, const u8 *str2);
 char *strtok(char *src_str, char *delim);
 char *strncpy(char *dest, const char *src, unsigned int n);
 char *strncat(char *dest, const char *src, unsigned int n);
 int strncmp(const char *s1, const char *s2, unsigned int n);
 char *strchr(const char *s, int c);
+void strcpy(char *dest, char *src);
+int strcmp(char s1[], char s2[]);
 char *strstr(const char *haystack, const char *needle);
-int sprintf(char *buf, const char *fmt, ...);
-int snprintf(char *buf, unsigned int size, const char *fmt, ...);
+
+// Memory
+void *memmove(void *dest, const void *src, u32 n);
+int memcmp(const void *str1, const void *str2, u32 n);
+void *memchr(const void *str, int c, u32 n);
+void *memset(void *s, int c, unsigned int n);
+void *memcpy(void *dest, const void *src, unsigned int n);
+void memory_copy(u8 *source, u8 *dest, int nbytes);
+void memory_set(u8 *dest, u8 val, u32 len);
+void u32memory_set(u32 *dest, u32 val, u32 len);
 
 #endif

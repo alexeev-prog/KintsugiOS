@@ -1,3 +1,9 @@
+commit dcaab5eab313b41d4b8204a6c126eb9cf57e8ba6
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 22:41:55 2025 +0700
+
+    fix kklibc
+
 commit 4a3c9a1adb5593a7008a9d3dcaf66ed9a3b19775
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 15:13:59 2025 +0700

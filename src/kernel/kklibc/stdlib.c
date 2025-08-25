@@ -8,7 +8,7 @@
 #include "stdlib.h"
 #include "stdio.h"
 
-void boolToChar(u8 value, u8 *str) {
+void booltochar(u8 value, u8 *str) {
     if (value) {
         strcpy(str, (u8 *)"true");
     } else {
@@ -487,3 +487,94 @@ int snprintf(char *buf, unsigned int size, const char *fmt, ...) {
     va_end(args);
     return ret;
 }
+
+u32 strspn(const u8 *str1, const u8 *str2) {
+    const u8 *s1 = str1;
+    const u8 *s2;
+
+    while (*s1 != '\0') {
+        s2 = str2;
+        while (*s2 != '\0') {
+            if (*s1 == *s2) break;
+
+            s2++;
+        }
+
+        if (*s2 == '\0') break;
+
+        s1++;
+    }
+
+    return s1 - str1;
+}
+
+u32 strcspn(const u8 *str1, const u8 *str2) {
+    const u8 *s1 = str1;
+    const u8 *s2;
+
+    while (*s1 != '\0') {
+        s2 = str2;
+        while (*s2 != '\0') {
+            if (*s1 == *s2) return s1 - str1;
+
+            s2++;
+        }
+        s1++;
+    }
+
+    return s1 - str1;
+}
+
+u8 *strpbrk(const u8 *str1, const u8 *str2) {
+
+    while (*str1 != '\0') {
+
+        const u8 *s2 = str2;
+        while (*s2 != '\0') {
+            if (*str1 == *s2) return (u8 *)str1;
+
+            s2++;
+        }
+        str1++;
+    }
+
+    return NULL;
+}
+
+void *memmove(void *dest, const void *src, u32 n) {
+    u8 *d = (u8 *)dest;
+    const u8 *s = (const u8 *)src;
+
+    if (s < d && d < s + n) {
+        d += n;
+        s += n;
+        while (n--) *(--d) = *(--s);
+
+    } else {
+        for (u32 i = 0; i < n; i++) d[i] = s[i];
+    }
+
+    return dest;
+}
+
+int memcmp(const void *str1, const void *str2, u32 n) {
+    const u8 *s1 = (const u8 *)str1;
+    const u8 *s2 = (const u8 *)str2;
+
+    for (u32 i = 0; i < n; i++) {
+        if (s1[i] != s2[i]) return s1[i] - s2[i];
+    }
+
+    return (int)NULL;
+}
+
+void *memchr(const void *str, int c, u32 n) {
+    const u8 *s = (const u8 *)str;
+
+    for (u32 i = 0; i < n; i++) {
+        if (s[i] == (u8)c) return (void *)(s + i);
+    }
+
+    return NULL;
+}
+
