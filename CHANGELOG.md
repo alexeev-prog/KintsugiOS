@@ -1,3 +1,9 @@
+commit 61757137ce982e564b44f1de38d10f409cc0cd70
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 15:12:57 2025 +0700
+
+    fix version state
+
 commit 0edddbfff06b314dc2c7da86a010a949591c54d3
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 15:08:41 2025 +0700
