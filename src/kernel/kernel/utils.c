@@ -10,6 +10,7 @@
 #include "../kklibc/kklibc.h"
 #include "../cpu/ports.h"
 #include "sysinfo.h"
+#include "_default.h"
 
 void fibonacci_command(char **args) {
     if (!args[0]) {
@@ -86,7 +87,7 @@ void shutdown_qemu(char** args) {
 
 void halt_cpu(char** args) {
     halted_cpu_screen_clear();
-	kprint_colored("Kintsugi  OS 0.1.0\n\n", BLUE_ON_WHITE_CLR_CODE);
+	printf_colored("Kintsugi OS %s\n\n", BLUE_ON_WHITE_CLR_CODE, VERSION);
 	kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE_CLR_CODE);
 	kprint_colored("CPU is halted.\n\n", BLUE_ON_WHITE_CLR_CODE);
 	kprint_colored("asm volatile(\"hlt\")", BLUE_ON_WHITE_CLR_CODE);
@@ -107,7 +108,7 @@ void sysinfo_command() {
 }
 
 void info_command_shell(char** args) {
-	kprint("Kintsugi OS 0.1.0 by alexeev-prog\n");
+	printf("Kintsugi OS %s by alexeev-prog\n", VERSION);
 
 	kprint("   __    _      __                _          \n"
 		   "  / /__ (_)__  / /____ __ _____ _(_) ___  ___\n"

@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "../kklibc/paging.h"
 #include "../kklibc/kklibc.h"
+#include "_default.h"
 
 #define MAX_ARGS 32
 
@@ -31,7 +32,7 @@ void kmain() {
     heap_init();
 
 	// Приглашение
-	kprint("\nKintsugi OS v0.1.1a (C) 2025\nRepository: https://github.com/alexeev-prog/KintsugiOS\n");
+	printf("\nKintsugi OS %s (C) 2025\nRepository: https://github.com/alexeev-prog/KintsugiOS\n", VERSION);
 
 	// Уведомление о старте оболочки командной строки
 	kprint("\nKeramika Shell "

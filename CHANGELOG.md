@@ -1,3 +1,9 @@
+commit 0edddbfff06b314dc2c7da86a010a949591c54d3
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 15:08:41 2025 +0700
+
+    add sysinfo in kernel
+
 commit cec2ae3ea56da2ea7753122dd91053073b0f6099
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 14:58:58 2025 +0700
