@@ -6,147 +6,157 @@
  * ----------------------------------------------------------------------------*/
 
 #include "utils.h"
+
 #include "../cpu/ports.h"
 #include "../drivers/screen.h"
 #include "../kklibc/kklibc.h"
 #include "_default.h"
 #include "sysinfo.h"
 
-void fibonacci_command(char **args) {
-  if (!args[0]) {
-    kprint("fib usage: fib <num>");
-    return;
-  }
+void fibonacci_command(char** args) {
+    if (!args[0]) {
+        kprint("fib usage: fib <num>");
+        return;
+    }
 
-  int num = strtoint(args[0]);
+    int num = strtoint(args[0]);
 
-  u32 fib = fibonacci(num);
+    u32 fib = fibonacci(num);
 
-  printf("fib(%d) = %d", num, fib);
+    printf("fib(%d) = %d", num, fib);
 }
 
-void binary_pow_command(char **args) {
-  if (!args[0] || !args[1]) {
-    kprint("binpow usage: binpow <base> <exponent>");
-    return;
-  }
+void binary_pow_command(char** args) {
+    if (!args[0] || !args[1]) {
+        kprint("binpow usage: binpow <base> <exponent>");
+        return;
+    }
 
-  int b = strtoint(args[0]);
-  u32 e = strtoint(args[1]);
+    int b = strtoint(args[0]);
+    u32 e = strtoint(args[1]);
 
-  int powered = binary_pow(b, e);
+    int powered = binary_pow(b, e);
 
-  printf("%d ** %d = %d", b, e, powered);
+    printf("%d ** %d = %d", b, e, powered);
 }
 
-void rand_comamnd(char **args) {
-  if (!args[0]) {
-    kprint("rand usage: rand <seed>");
-    return;
-  }
+void rand_comamnd(char** args) {
+    if (!args[0]) {
+        kprint("rand usage: rand <seed>");
+        return;
+    }
 
-  u32 seed = strtoint(args[0]);
+    u32 seed = strtoint(args[0]);
 
-  printf("%d", rand(&seed));
+    printf("%d", rand(&seed));
 }
 
-void rand_range_command(char **args) {
-  if (!args[0] || !args[1] || !args[2]) {
-    kprint("randrange usage: randrange <seed> <min> <max>");
-    return;
-  }
+void rand_range_command(char** args) {
+    if (!args[0] || !args[1] || !args[2]) {
+        kprint("randrange usage: randrange <seed> <min> <max>");
+        return;
+    }
 
-  u32 seed = strtoint(args[0]);
-  u32 min = strtoint(args[1]);
-  u32 max = strtoint(args[2]);
+    u32 seed = strtoint(args[0]);
+    u32 min = strtoint(args[1]);
+    u32 max = strtoint(args[2]);
 
-  printf("%d", rand_range(&seed, min, max));
+    printf("%d", rand_range(&seed, min, max));
 }
 
-void reboot_command(char **args) { reboot(); }
-
-void sleep_command(char **args) {
-  if (!args[0]) {
-    kprint("sleep usage: sleep <ms>");
-    return;
-  }
-
-  wait(strtoint(args[0]));
+void reboot_command(char** args) {
+    reboot();
 }
 
-void clear_screen_command(char **args) { clear_screen(); }
+void sleep_command(char** args) {
+    if (!args[0]) {
+        kprint("sleep usage: sleep <ms>");
+        return;
+    }
 
-void shutdown_qemu(char **args) { outports(0x604, 0x2000); }
+    wait(strtoint(args[0]));
+}
 
-void halt_cpu(char **args) {
-  halted_cpu_screen_clear();
-  printf_colored("Kintsugi OS %s\n\n", BLUE_ON_WHITE_CLR_CODE, VERSION);
-  kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE_CLR_CODE);
-  kprint_colored("CPU is halted.\n\n", BLUE_ON_WHITE_CLR_CODE);
-  kprint_colored("asm volatile(\"hlt\")", BLUE_ON_WHITE_CLR_CODE);
+void clear_screen_command(char** args) {
+    clear_screen();
+}
 
-  asm volatile("hlt");
+void shutdown_qemu(char** args) {
+    outports(0x604, 0x2000);
+}
+
+void halt_cpu(char** args) {
+    halted_cpu_screen_clear();
+    printf_colored("Kintsugi OS %s\n\n", BLUE_ON_WHITE_CLR_CODE, VERSION);
+    kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE_CLR_CODE);
+    kprint_colored("CPU is halted.\n\n", BLUE_ON_WHITE_CLR_CODE);
+    kprint_colored("asm volatile(\"hlt\")", BLUE_ON_WHITE_CLR_CODE);
+
+    asm volatile("hlt");
 }
 
 void sysinfo_command() {
-  system_info_t *info = get_system_info();
+    system_info_t* info = get_system_info();
 
-  printf("CPU: %s, %d core(s)\n", info->cpu_vendor, info->cpu_cores);
-  printf("Memory: %d MB total, %d MB free, %d MB used\n",
-         info->total_memory / (1024 * 1024), info->free_memory / (1024 * 1024),
-         info->used_memory / (1024 * 1024));
-  printf("Kernel memory: %d KB\n", info->kernel_memory / 1024);
-  printf("Heap size: %d KB\n", info->heap_size / 1024);
+    printf("CPU: %s, %d core(s)\n", info->cpu_vendor, info->cpu_cores);
+    printf("Memory: %d MB total, %d MB free, %d MB used\n",
+           info->total_memory / (1024 * 1024),
+           info->free_memory / (1024 * 1024),
+           info->used_memory / (1024 * 1024));
+    printf("Kernel memory: %d KB\n", info->kernel_memory / 1024);
+    printf("Heap size: %d KB\n", info->heap_size / 1024);
 }
 
-void info_command_shell(char **args) {
-  printf("Kintsugi OS %s by alexeev-prog\n", VERSION);
+void info_command_shell(char** args) {
+    printf("Kintsugi OS %s by alexeev-prog\n", VERSION);
 
-  kprint("   __    _      __                _          \n"
+    kprint("   __    _      __                _          \n"
          "  / /__ (_)__  / /____ __ _____ _(_) ___  ___\n"
          " /  '_// / _ \\/ __(_-</ // / _ `/ / / _ \\(_-<\n"
          "/_/\\_\\/_/_//_/\\__/___/\\_,_/\\_, /_/  \\___/___/\n"
          "                          /___/              \n");
 
-  kprint("MEMORY\n");
-  sysinfo_command();
+    kprint("MEMORY\n");
+    sysinfo_command();
 }
 
-void mem_dump(char **args) { kmemdump(); }
-
-void echo_command(char **args) {
-  for (int i = 0; args[i] != NULL; i++) {
-    printf("%s ", args[i]);
-  }
+void mem_dump(char** args) {
+    kmemdump();
 }
 
-void free_command(char **args) {
-  if (!args[0]) {
-    kprint("free usage: free <hex_address>");
-    return;
-  }
-
-  char *addr_str = args[0];
-  if (addr_str[0] == '0' && addr_str[1] == 'x') {
-    addr_str += 2;
-  }
-
-  u32 addr = hex_strtoint(addr_str);
-  kfree((void *)addr);
-  printf("Freed memory at %x", addr);
+void echo_command(char** args) {
+    for (int i = 0; args[i] != NULL; i++) {
+        printf("%s ", args[i]);
+    }
 }
 
-void kmalloc_command(char **args) {
-  if (args[0] == NULL) {
-    kprint("malloc usage: malloc <bytes>");
-    return;
-  }
+void free_command(char** args) {
+    if (!args[0]) {
+        kprint("free usage: free <hex_address>");
+        return;
+    }
 
-  int size = strtoint(args[0]);
-  void *ptr = (void *)kmalloc(size);
+    char* addr_str = args[0];
+    if (addr_str[0] == '0' && addr_str[1] == 'x') {
+        addr_str += 2;
+    }
 
-  char buf1[32] = "";
-  hex_to_ascii((int)ptr, buf1);
+    u32 addr = hex_strtoint(addr_str);
+    kfree((void*)addr);
+    printf("Freed memory at %x", addr);
+}
 
-  printf("Allocate %d bytes.\nPointer: %s", size, buf1);
+void kmalloc_command(char** args) {
+    if (args[0] == NULL) {
+        kprint("malloc usage: malloc <bytes>");
+        return;
+    }
+
+    int size = strtoint(args[0]);
+    void* ptr = (void*)kmalloc(size);
+
+    char buf1[32] = "";
+    hex_to_ascii((int)ptr, buf1);
+
+    printf("Allocate %d bytes.\nPointer: %s", size, buf1);
 }

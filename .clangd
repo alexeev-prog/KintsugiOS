@@ -1,0 +1,10 @@
+CompileFlags:
+  Add:
+    - "-I./include/"
+    - "-I/include/"
+    - "-I./source/"
+    - "-I/source/"
+    - "-I../../source/"
+    - "-I."
+    - "-I../"
+  CompilationDatabase: build/dev
