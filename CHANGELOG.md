@@ -1,3 +1,15 @@
+commit 9b746484f95ced37c6ab2f2ac6c6bbb48b051a59
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 07:39:23 2025 +0700
+
+    docs: update docs
+
+commit bc177b66de9a0d7041732d0ebd98de7832960a65
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 07:33:46 2025 +0700
+
+    update readme, utils and add vector datatype
+
 commit 5609e450af229528c63cf686646e0bdc9734a9a8
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 07:26:03 2025 +0700

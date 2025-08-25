@@ -3,7 +3,7 @@
 
  > Также я занимаюсь [переводом OSDEV-Notes](https://github.com/alexeev-prog/Osdev-Notes-RU)
 
-![](image.png)
+![](./gallery/image.png)
 
 <div align="center">
 <img src=https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS>
