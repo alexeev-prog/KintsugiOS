@@ -130,7 +130,7 @@ void isr_handler(registers_t r) {
         interrupt_handlers[r.int_no](r);
     }
 
-    asm volatile("hlt");
+    __asm__ volatile("hlt");
 }
 
 void register_interrupt_handler(u8 n, isr_t handler) {
@@ -154,7 +154,7 @@ void irq_handler(registers_t r) {
 
 void irq_install() {
     /* Разрешить прерывания */
-    asm volatile("sti");
+    __asm__ volatile("sti");
     /* IRQ0: таймер */
     init_timer(50);
 

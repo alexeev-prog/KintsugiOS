@@ -90,9 +90,9 @@ void halt_cpu(char** args) {
     printf_colored("Kintsugi OS %s\n\n", BLUE_ON_WHITE_CLR_CODE, VERSION);
     kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE_CLR_CODE);
     kprint_colored("CPU is halted.\n\n", BLUE_ON_WHITE_CLR_CODE);
-    kprint_colored("asm volatile(\"hlt\")", BLUE_ON_WHITE_CLR_CODE);
+    kprint_colored("__asm__ volatile(\"hlt\")", BLUE_ON_WHITE_CLR_CODE);
 
-    asm volatile("hlt");
+    __asm__ volatile("hlt");
 }
 
 void sysinfo_command() {

@@ -143,7 +143,7 @@ void free_frame(page_t* page) {
 void page_fault(registers_t regs) {
     // Адрес вызвавший ошибку хранится в регистре CR2
     u32 faulting_address;
-    asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
+    __asm__ volatile("mov %%cr2, %0" : "=r"(faulting_address));
 
     // Анализируем код ошибки
     int present = !(regs.err_code & 0x1);    // Страница отсутствует
@@ -207,11 +207,11 @@ void initialise_paging() {
 /* Переключение page directory */
 void switch_page_directory(page_directory_t* dir) {
     current_directory = dir;
-    asm volatile("mov %0, %%cr3" ::"r"(&dir->tablesPhysical));
+    __asm__ volatile("mov %0, %%cr3" ::"r"(&dir->tablesPhysical));
     u32 cr0;
-    asm volatile("mov %%cr0, %0" : "=r"(cr0));
+    __asm__ volatile("mov %%cr0, %0" : "=r"(cr0));
     cr0 |= 0x80000000;    // Включаем paging!
-    asm volatile("mov %0, %%cr0" ::"r"(cr0));
+    __asm__ volatile("mov %0, %%cr0" ::"r"(cr0));
 }
 
 /* Получение страницы по адресу */

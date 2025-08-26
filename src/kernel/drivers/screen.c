@@ -146,7 +146,7 @@ void panic_red_screen(char* title, char* description) {
     kprint_colored("\n\n", WHITE_ON_RED_CLR_CODE);
     kprint_colored(description, WHITE_ON_RED_CLR_CODE);
 
-    asm volatile("hlt");
+    __asm__ volatile("hlt");
 }
 
 /**********************************************************

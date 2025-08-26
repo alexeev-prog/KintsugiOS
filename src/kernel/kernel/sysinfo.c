@@ -11,7 +11,7 @@ void detect_cpu(void) {
     char vendor[13];
 
     // вендор
-    asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(0));
+    __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(0));
 
     *((u32*)vendor) = ebx;
     *((u32*)(vendor + 4)) = edx;
@@ -20,8 +20,7 @@ void detect_cpu(void) {
 
     strcpy(sys_info.cpu_vendor, vendor);
 
-    // функция процессора
-    asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+    __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
 
     // упрощение
     sys_info.cpu_cores = 1;
