@@ -4,10 +4,10 @@
  *  Title: Стандартный набор методов
  *	Description: null
  * ----------------------------------------------------------------------------*/
-#include "stdlib.h"
 
 #include "ctypes.h"
 #include "stdio.h"
+#include "stdlib.h"
 
 void booltochar(u8 value, u8* str) {
     if (value) {
@@ -443,7 +443,7 @@ char* strstr(const char* haystack, const char* needle) {
 }
 
 // Вспомогательная функция для форматирования строки с ограничением размера
-static int vsnprintf(char* buf, unsigned int size, const char* fmt, va_list args) {
+int vsnprintf(char* buf, unsigned int size, const char* fmt, va_list args) {
     unsigned int i = 0;
     char num_buf[32];
     char c;
@@ -626,3 +626,4 @@ void* memchr(const void* ptr, int c, u32 n) {
 
     return NULL;
 }
+

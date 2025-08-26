@@ -10,6 +10,7 @@
 #define STDLIB_H
 
 #include "ctypes.h"
+#include "stdio.h"
 
 /*******************************************************************************
  * Преобразования данных
@@ -313,6 +314,8 @@ int sprintf(char* buf, const char* fmt, ...);
  *         произошло усечение.
  */
 int snprintf(char* buf, unsigned int size, const char* fmt, ...);
+
+int vsnprintf(char* buf, unsigned int size, const char* fmt, va_list args);
 
 /*******************************************************************************
  * Управление системой

@@ -13,6 +13,7 @@
 #include "../kklibc/paging.h"
 #include "_default.h"
 #include "utils.h"
+#include "sysinfo.h"
 
 #define MAX_ARGS 32
 
@@ -30,6 +31,11 @@ void kmain() {
 
     initialise_paging();
     heap_init();
+
+    detect_cpu();
+    kprint("CPU detected\n");
+    detect_memory();
+    kprint("Memory Detected\n");
 
     // Приглашение
     printf("\nKintsugi OS %s (C) 2025\nRepository: " "https://github.com/alexeev-prog/KintsugiOS\n", VERSION);

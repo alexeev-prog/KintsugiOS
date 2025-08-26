@@ -11,7 +11,7 @@
 #include "ctypes.h"
 
 #define HEAP_START 0x100000    // Начинаем кучу с 1 МБ (выше ядра)
-#define HEAP_SIZE 0x100000    // Размер кучи: 1 МБ
+#define HEAP_SIZE 0x1000000    // Размер кучи: 1 МБ
 #define BLOCK_SIZE 16    // Минимальный размер блока
 
 typedef struct mem_block {

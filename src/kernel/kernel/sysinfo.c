@@ -31,7 +31,7 @@ void detect_memory() {
     sys_info.total_memory = nframes * PAGE_SIZE;
     sys_info.free_memory = 0;
 
-    // подсчет свободныъ фреймов
+    // подсчет свободных фреймов
     for (u32 i = 0; i < nframes; i++) {
         if (!test_frame(i * PAGE_SIZE)) {
             sys_info.free_memory += PAGE_SIZE;
@@ -44,7 +44,5 @@ void detect_memory() {
 }
 
 system_info_t* get_system_info() {
-    detect_cpu();
-    detect_memory();
     return &sys_info;
 }
