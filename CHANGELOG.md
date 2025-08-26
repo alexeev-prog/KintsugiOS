@@ -1,3 +1,15 @@
+commit cfa9ffcc2507488d0b9d335940824d5eb09a6701
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 26 23:09:15 2025 +0700
+
+    improve docstrings and update docs
+
+commit 8b3a72626021910ceeefe0199ae3c5501220a5e6
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 26 23:03:26 2025 +0700
+
+    fix code style and update docstrings
+
 commit 33dde61b182fc6aa9df844692d2682040772fc7c
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Tue Aug 26 22:54:29 2025 +0700

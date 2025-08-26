@@ -1,23 +1,15 @@
 # KintsugiOS
 
 <div align="center">
-  <!-- <img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/docs/logo.png" width="250" alt="MorningLang Logo"> -->
-
   <h3>Минималистичная операционная 32 разрядная система с монолитным ядром и собственным загрузчиком на (N)ASM и GCC 15</h3>
+  <br>
 
-  <div align="center">
-    <!-- <a href="https://marketplace.visualstudio.com/items?itemName=alexeevdev.KintsugiOSuage-syntax">
-      	<img src="https://img.shields.io/badge/VSCode-extension?style=for-the-badge" alt="vscode">
-    </a> todo: идея сделать расширение для вскода со сниппетами для ядра -->
-    <a href="https://alexeev-prog.github.io/KintsugiOS/">
-		  <img src="https://img.shields.io/badge/Documentation-online?style=for-the-badge&logo=gitbook" alt="docs">
-    </a>
-  </div>
-</div>
-
-<br>
-
-<div align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=alexeevdev.KintsugiOSuage-syntax">
+      <img src="https://img.shields.io/badge/VSCode-extension?style=for-the-badge" alt="vscode">
+  </a>
+  <a href="https://alexeev-prog.github.io/KintsugiOS/">
+    <img src="https://img.shields.io/badge/Documentation-online?style=for-the-badge&logo=gitbook" alt="docs">
+  </a>
   <img src="https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Top Language">
   <img src="https://img.shields.io/github/languages/count/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Language Count">
   <img src="https://img.shields.io/github/license/alexeev-prog/KintsugiOS?style=for-the-badge" alt="License">
