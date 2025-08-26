@@ -7,4 +7,6 @@ CompileFlags:
     - "-I./source/"
     - "-I/source/"
     - "-I../../source/"
+    - "-nostdlib"
+    - "-nostdinc"
   CompilationDatabase: build/dev

@@ -1,3 +1,21 @@
+commit 33dde61b182fc6aa9df844692d2682040772fc7c
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 26 22:54:29 2025 +0700
+
+    update codestyle and github actions
+
+commit b3336b266451f0ad7951990109fdf4d474eea88f
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 26 22:02:26 2025 +0700
+
+    update codestyle
+
+commit 20accf438d0bf735e34a7f8c1d4ddadf7bb24223
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Aug 25 23:44:34 2025 +0700
+
+    update changelog
+
 commit 816b85736691976d393d5796bf18a5f87a3aad39
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Aug 25 23:43:51 2025 +0700
