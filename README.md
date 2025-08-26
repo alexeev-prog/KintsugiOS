@@ -1,19 +1,50 @@
 # KintsugiOS
+
+<div align="center">
+  <!-- <img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/docs/logo.png" width="250" alt="MorningLang Logo"> -->
+
+  <h3>Минималистичная операционная 32 разрядная система с монолитным ядром и собственным загрузчиком на (N)ASM и GCC 15</h3>
+
+  <div align="center">
+    <!-- <a href="https://marketplace.visualstudio.com/items?itemName=alexeevdev.KintsugiOSuage-syntax">
+      	<img src="https://img.shields.io/badge/VSCode-extension?style=for-the-badge" alt="vscode">
+    </a> todo: идея сделать расширение для вскода со сниппетами для ядра -->
+    <a href="https://alexeev-prog.github.io/KintsugiOS/">
+		  <img src="https://img.shields.io/badge/Documentation-online?style=for-the-badge&logo=gitbook" alt="docs">
+    </a>
+  </div>
+</div>
+
+<br>
+
+<div align="center">
+  <img src="https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Top Language">
+  <img src="https://img.shields.io/github/languages/count/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Language Count">
+  <img src="https://img.shields.io/github/license/alexeev-prog/KintsugiOS?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/github/issues/alexeev-prog/KintsugiOS?style=for-the-badge&color=critical" alt="Issues">
+  <a href="https://github.com/alexeev-prog/KintsugiOS/stargazers">
+        <img src="https://img.shields.io/github/stars/alexeev-prog/KintsugiOS?style=for-the-badge&logo=github" alt="Stars">
+  </a>
+  <img src="https://img.shields.io/github/last-commit/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Last Commit">
+  <img src="https://img.shields.io/github/contributors/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Contributors">
+</div>
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/docs/pallet-0.png" width="600" alt="">
+</div>
+
+
 Минималистичная x86 операционная система на (N)ASM и C, созданная в образовательных целях для глубокого понимания принципов работы операционных систем.
 
 Текущая нестабильная версия: v0.1.1a
 Последняя стабильная версия: [v0.1.0a](https://github.com/alexeev-prog/KintsugiOS/releases/tag/v0.1.0a)
 
+> [!CAUTION]
+> KintsugiOS еще в активной стадии разработки и многие решения не финальные или нестабильные.
+
  > Также я занимаюсь [переводом OSDEV-Notes](https://github.com/alexeev-prog/Osdev-Notes-RU)
 
 ![](./gallery/image.png)
-
-<div align="center">
-<img src=https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS>
-<img src=https://img.shields.io/github/license/alexeev-prog/KintsugiOS>
-<img src=https://img.shields.io/github/stars/alexeev-prog/KintsugiOS>
-<img src="https://img.shields.io/github/issues/alexeev-prog/KintsugiOS">
-</div>
 
 ## Особенности
 
