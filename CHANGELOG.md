@@ -1,3 +1,27 @@
+commit bcde3a3da901d2bfdc91c09f64e6d1a062a1808f
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Wed Aug 27 01:16:27 2025 +0700
+
+    update codestyle
+
+commit 2ea723b846eb3f5c884a4a22a2225de9fe81c5c0
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 26 23:26:50 2025 +0700
+
+    remove trash files
+
+commit c7003d0479ea050b36b2eeb15741705205238eac
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 26 23:20:51 2025 +0700
+
+    update doxyfile
+
+commit 3c5adc82f97fa562604c5aaf94b4d09c0052ceef
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Tue Aug 26 23:10:39 2025 +0700
+
+    update readme
+
 commit cfa9ffcc2507488d0b9d335940824d5eb09a6701
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Tue Aug 26 23:09:15 2025 +0700

@@ -4,11 +4,8 @@
   <h3>Минималистичная операционная 32 разрядная система с монолитным ядром и собственным загрузчиком на (N)ASM и GCC 15</h3>
   <br>
 
-  <a href="https://marketplace.visualstudio.com/items?itemName=alexeevdev.KintsugiOSuage-syntax">
-      <img src="https://img.shields.io/badge/VSCode-extension?style=for-the-badge" alt="vscode">
-  </a>
   <a href="https://alexeev-prog.github.io/KintsugiOS/">
-    <img src="https://img.shields.io/badge/Documentation-online?style=for-the-badge&logo=gitbook" alt="docs">
+    <img src="https://img.shields.io/badge/Документация-онлайн?style=for-the-badge&logo=gitbook" alt="docs">
   </a>
   <img src="https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Top Language">
   <img src="https://img.shields.io/github/languages/count/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Language Count">

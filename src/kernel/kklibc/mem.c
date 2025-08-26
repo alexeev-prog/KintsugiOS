@@ -48,7 +48,7 @@ int expand_heap(u32 size) {
     u32 virtual_address = heap_current_end;
 
     for (u32 i = 0; i < num_pages; i++) {
-        // Запрашиваем физический фрейм
+        // нужен физ фрейм
         page_t* page = get_page(virtual_address, 1, kernel_directory);
         if (!page) {
             kprint("Failed to get page for heap expansion!\n");
@@ -79,7 +79,7 @@ int expand_heap(u32 size) {
 }
 
 void* kmalloc(u32 size) {
-    // Выравниваем размер до границы BLOCK_SIZE
+    // Выравниваем размер до границы макроса BLOCK_SIZE
     if (size % BLOCK_SIZE != 0) {
         size += BLOCK_SIZE - (size % BLOCK_SIZE);
     }
