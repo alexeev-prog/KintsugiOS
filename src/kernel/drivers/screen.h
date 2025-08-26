@@ -37,10 +37,10 @@
 // Подключаем типы из CPU
 #include "../kklibc/ctypes.h"
 
-#define VIDEO_ADDRESS 0xb8000    // Видео-адрес
-#define MAX_ROWS 25    // Максимальное кол-во линий
-#define MAX_COLS 80    // Максимальное кол-во колонок
-#define WHITE_ON_BLACK 0x0f    // HEX-код белого на черном
+#define VIDEO_ADDRESS 0xb8000 // Видео-адрес
+#define MAX_ROWS 25           // Максимальное кол-во линий
+#define MAX_COLS 80           // Максимальное кол-во колонок
+#define WHITE_ON_BLACK 0x0f   // HEX-код белого на черном
 #define WHITE_ON_BLUE 0x1f
 #define WHITE_ON_RED 0x4f
 #define BLUE_ON_WHITE 0x1f
@@ -93,12 +93,12 @@
 int get_cursor_offset();
 void clear_screen();
 void halted_cpu_screen_clear();
-void kprint_at(char* message, int col, int row, int color);
-void kprint(char* message);
-void kprintln(char* message);
-void kprintln_colored(char* message, int color);
-void kprint_colored(char* message, int color);
+void kprint_at(char *message, int col, int row, int color);
+void kprint(char *message);
+void kprintln(char *message);
+void kprintln_colored(char *message, int color);
+void kprint_colored(char *message, int color);
 void kprint_backspace();
-void panic_red_screen(char* title, char* description);
+void panic_red_screen(char *title, char *description);
 
 #endif

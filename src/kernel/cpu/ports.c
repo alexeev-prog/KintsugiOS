@@ -22,7 +22,7 @@
 // }
 
 void outports(u16 port, u16 data) {
-    __asm__ __volatile__("outw %1, %0" : : "dN"(port), "a"(data));
+  __asm__ __volatile__("outw %1, %0" : : "dN"(port), "a"(data));
 }
 
 // u16 port_word_in (u16 port) {
