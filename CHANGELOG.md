@@ -1,3 +1,9 @@
+commit a434b2841dc660887729e91eb9e92fb7e82e498e
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 28 22:15:29 2025 +0700
+
+    add ata-pio driver and improve lowlevel io driver
+
 commit 528cc20f905bd6803deb9861b83412baad1ed38a
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Aug 28 22:00:25 2025 +0700
