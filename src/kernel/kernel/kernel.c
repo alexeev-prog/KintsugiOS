@@ -36,6 +36,8 @@ void kmain() {
     detect_memory();
     kprint("Memory Detected\n");
 
+    kprint("ATA PIO in development\n");
+
     // Приглашение
     printf("\nKintsugi OS %s (C) 2025\nRepository: " "https://github.com/alexeev-prog/KintsugiOS\n", VERSION);
 

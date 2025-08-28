@@ -1,5 +1,6 @@
 #include "ata_pio.h"
 #include "lowlevel_io.h"
+#include "screen.h"
 
 // Источник: https://wiki.osdev.org/ATA_PIO_Mode
 
