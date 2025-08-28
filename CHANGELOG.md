@@ -1,3 +1,15 @@
+commit b0d040b5cdb21d35d7e5cedf6e5683964c8c81b5
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 28 22:30:39 2025 +0700
+
+    todo: complete ata pio driver and integrate him with kernel
+
+commit 02a5fe407e415972270980fbade08a49bedbd275
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 28 22:27:42 2025 +0700
+
+    update ata pio driver
+
 commit a434b2841dc660887729e91eb9e92fb7e82e498e
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Aug 28 22:15:29 2025 +0700
