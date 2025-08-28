@@ -51,7 +51,7 @@ int expand_heap(u32 size) {
         // нужен физ фрейм
         page_t* page = get_page(virtual_address, 1, kernel_directory);
         if (!page) {
-            kprint("Failed to get page for heap expansion!\n");
+            panic_red_screen("Expand Heap Error", "Failed to get page for heap expansion!\n");
             return 0;
         }
 
@@ -66,7 +66,7 @@ int expand_heap(u32 size) {
     mem_block_t* new_block = (mem_block_t*)heap_current_end;
     new_block->size = expand_size - sizeof(mem_block_t);    // Учитываем заголовок
     new_block->is_free = 1;
-    new_block->next = free_blocks;    // Добавляем в начало списка
+    new_block->next = free_blocks;      // Добавляем в начало списка
 
     // Обновляем глобальный список свободных блоков
     free_blocks = new_block;
@@ -121,7 +121,7 @@ void* kmalloc(u32 size) {
         // После расширения кучи пробуем аллоцировать снова (рекурсивно)
         return kmalloc(size);
     } else {
-        kprint("Heap expansion failed!\n");
+        panic_red_screen("Expand Heap Error", "Heap Expansion Failed when try to allocate memory\n");
         return NULL;
     }
 }
