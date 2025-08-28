@@ -14,12 +14,20 @@
 #define HEAP_SIZE 0x1000000     // Размер кучи: 1 МБ
 #define BLOCK_SIZE 16           // Минимальный размер блока
 
+/**
+ * @brief Блок памяти
+ *
+ **/
 typedef struct mem_block {
     u32 size;
     struct mem_block* next;
     u8 is_free;
 } mem_block_t;
 
+/**
+ * @brief Структура информации о памяти
+ *
+ **/
 typedef struct meminfo {
     u32 heap_start;
     u32 heap_size;

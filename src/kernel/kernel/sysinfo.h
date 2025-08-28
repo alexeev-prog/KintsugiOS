@@ -3,6 +3,10 @@
 
 #include "../kklibc/ctypes.h"
 
+/**
+ * @brief Структура информации о системе
+ *
+ **/
 typedef struct {
     u32 total_memory;
     u32 free_memory;
@@ -15,8 +19,24 @@ typedef struct {
 } system_info_t;
 
 // Функции для получения информации
+
+/**
+ * @brief Детектирование процессора
+ *
+ **/
 void detect_cpu(void);
+
+/**
+ * @brief Детектирование памяти
+ *
+ **/
 void detect_memory(void);
+
+/**
+ * @brief Получение системной информации
+ *
+ * @return system_info_t*
+ **/
 system_info_t* get_system_info();
 
 #endif

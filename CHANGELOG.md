@@ -1,3 +1,9 @@
+commit c84a331ecb6a9547e255a833f04024ec20e0ac1d
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 28 15:39:31 2025 +0700
+
+    update docstrings and small changes in architecture
+
 commit fe56d138e16ac2875812c876bd9059d8c80e9e72
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Wed Aug 27 04:47:13 2025 +0700

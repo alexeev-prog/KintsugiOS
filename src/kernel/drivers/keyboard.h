@@ -7,4 +7,8 @@
 
 #include "../kklibc/ctypes.h"
 
+/**
+ * @brief Инициализация драйвера клавиатуры
+ *
+ **/
 void init_keyboard();

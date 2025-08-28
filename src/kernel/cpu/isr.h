@@ -70,7 +70,7 @@ extern void irq15();
 #define IRQ14 46
 #define IRQ15 47
 
-/* Struct which aggregates many registers */
+/* Структура для аггрегации регистров */
 typedef struct {
     u32 ds; /* сегмент данных */
     u32 edi, esi, ebp, esp, ebx, edx, ecx, eax; /* запушен pusha. */
@@ -78,10 +78,33 @@ typedef struct {
     u32 eip, cs, eflags, useresp, ss; /* запушить процессором автоматически */
 } registers_t;
 
+/**
+ * @brief Обработка ISR
+ *
+ **/
 void isr_install();
+
+/**
+ * @brief Обработчик ISR
+ *
+ * @param r регистры
+ **/
 void isr_handler(registers_t r);
+
+/**
+ * @brief установка IRQ
+ *
+ **/
 void irq_install();
+
 typedef void (*isr_t)(registers_t);
+
+/**
+ * @brief Регистрация обработчика прерывания
+ *
+ * @param n номер прерывания
+ * @param handler обработчик
+ **/
 void register_interrupt_handler(u8 n, isr_t handler);
 
 #endif

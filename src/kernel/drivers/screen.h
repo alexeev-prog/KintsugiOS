@@ -90,15 +90,78 @@
 #define REG_SCREEN_DATA 0x3d5
 
 /* Публичное API ядра */
+
+/**
+ * @brief Получение оффсета курсора
+ *
+ * @return int
+ **/
 int get_cursor_offset();
+
+/**
+ * @brief Стандартная очистка экрана
+ *
+ **/
 void clear_screen();
+
+/**
+ * @brief Очистка и заполнение экраном halted cpu
+ *
+ **/
 void halted_cpu_screen_clear();
+
+/**
+ * @brief Вывод текста в определенном месте
+ *
+ * @param message сообщение
+ * @param col колонка
+ * @param row ряд
+ * @param color цвет
+ **/
 void kprint_at(char* message, int col, int row, int color);
+
+/**
+ * @brief Вывод текста
+ *
+ * @param message сообщение
+ **/
 void kprint(char* message);
+
+/**
+ * @brief Вывод текста с новой строкой
+ *
+ * @param message сообщение
+ **/
 void kprintln(char* message);
+
+/**
+ * @brief Цветной вывод с новой строкой
+ *
+ * @param message сообщение
+ * @param color цвет
+ **/
 void kprintln_colored(char* message, int color);
+
+/**
+ * @brief Цветной вывод
+ *
+ * @param message сообщение
+ * @param color цвет
+ **/
 void kprint_colored(char* message, int color);
+
+/**
+ * @brief Вывод символа backspace
+ *
+ **/
 void kprint_backspace();
+
+/**
+ * @brief Красный экран для паники ядра
+ *
+ * @param title заголовок
+ * @param description описание
+ **/
 void panic_red_screen(char* title, char* description);
 
 #endif
