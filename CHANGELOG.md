@@ -1,3 +1,9 @@
+commit 528cc20f905bd6803deb9861b83412baad1ed38a
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Aug 28 22:00:25 2025 +0700
+
+    small updates in kklibc/mem.c
+
 commit 1a32b6cff7252ca9e6a9c59f8cd77122a7d0fc40
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Aug 28 21:48:24 2025 +0700

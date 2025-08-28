@@ -28,6 +28,8 @@
  *       придется использовать inline assembly.
  * ----------------------------------------------------------------------------*/
 
+#include "lowlevel_io.h"
+
 unsigned char port_byte_in(unsigned short port) {
     /* Функция-обертка над assembly, читающая 1 байт из параметра port */
     /* unsigned short port: адрес регистра какого-либо девайса, из которого */
@@ -73,4 +75,12 @@ unsigned char port_word_in(unsigned short port) {
 void port_word_out(unsigned short port, unsigned short data) {
     /* Функция-обертка над assembly, пишущая data (2 байта, т.е. word) в port */
     __asm__("out %%ax, %%dx" : : "a"(data), "d"(port));
+}
+
+void outsw(u16 port, u16 value) {
+    __asm__ volatile ("outw %0, %1" : : "a"(value), "Nd"(port));
+}
+
+void rep_insw(u16 port, void *addr, u32 count) {
+    __asm__ volatile ("rep insw" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
 }

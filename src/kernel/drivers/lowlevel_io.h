@@ -4,6 +4,8 @@
  *  Title: Заголовочный файл для drivers/lowlevel_io.c
  */
 
+#include "../kklibc/ctypes.h"
+
 /**
  * @brief Port byte in
  *
@@ -34,3 +36,20 @@ unsigned char port_word_in(unsigned short port);
  * @param data данные
  **/
 void port_word_out(unsigned short port, unsigned short data);
+
+/**
+ * @brief Outsw
+ *
+ * @param port порт
+ * @param value значение
+ **/
+void outsw(u16 port, u16 value);
+
+/**
+ * @brief rep_insw
+ *
+ * @param port порт
+ * @param addr адрес
+ * @param count количество
+ **/
+void rep_insw(u16 port, void *addr, u32 count);
