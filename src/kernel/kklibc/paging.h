@@ -12,19 +12,48 @@
 
 extern u32 nframes;
 
-/* Внутренняя функция выделения памяти */
+/**
+ * @brief Внутренняя функция выделения памяти
+ *
+ * @param sz размер
+ * @param align выравнивание
+ * @param phys физический адрес
+ * @return u32
+ **/
 u32 pkmalloc_internal(u32 sz, int align, u32* phys);
 
-/* Выделение с выравниванием по странице */
+/**
+ * @brief Выделение с выравниванием по странице
+ *
+ * @param sz размер
+ * @return u32
+ **/
 u32 pkmalloc_a(u32 sz);
 
-/* Выделение с возвратом физического адреса */
+/**
+ * @brief Выделение с возвратом физического адреса
+ *
+ * @param sz размер
+ * @param phys физический размер
+ * @return u32
+ **/
 u32 pkmalloc_p(u32 sz, u32* phys);
 
-/* Выделение с выравниванием и возвратом физического адреса */
+/**
+ * @brief Выделение с выравниванием и возвратом физического адреса
+ *
+ * @param sz размер
+ * @param phys физический адрес
+ * @return u32
+ **/
 u32 pkmalloc_ap(u32 sz, u32* phys);
 
-/* Обычное выделение памяти */
+/**
+ * @brief Обычное выделение памяти
+ *
+ * @param sz размер
+ * @return u32
+ **/
 u32 pkmalloc(u32 sz);
 
 /* Внешняя переменная текущего адреса свободной памяти */
@@ -49,18 +78,18 @@ typedef struct page_table {
 /* Структура директории страниц */
 typedef struct page_directory {
     /**
-         Массив указателей на таблицы страниц
+     Массив указателей на таблицы страниц
     **/
     page_table_t* tables[1024];
 
     /**
-         Массив указателей на таблицы страниц выше, но с их *физическим*
-        расположением, для загрузки в регистр CR3
+     Массив указателей на таблицы страниц выше, но с их *физическим*
+     расположением, для загрузки в регистр CR3
     **/
     u32 tablesPhysical[1024];
 
     /**
-         Физический адрес tablesPhysical
+     Физический адрес tablesPhysical
     **/
     u32 physicalAddr;
 } page_directory_t;
@@ -70,28 +99,58 @@ extern page_directory_t* kernel_directory;
 extern page_directory_t* current_directory;
 
 /**
-  Настройка окружения, директорий страниц и включение paging
+ * @brief Настройка окружения, директорий страниц и включение paging
 **/
 void initialise_paging();
 
 /**
-  Загрузка указанной директории страниц в регистр CR3
-**/
+ * @brief Загрузка указанной директории страниц в регистр CR3
+ * @param dir директория страницы в памяти
+ **/
 void switch_page_directory(page_directory_t* dir);
 
 /**
-  Получение указателя на требуемую страницу
-  Если make == 1, создает таблицу страниц если она не создана
-**/
+ * @brief Get the page object
+ *
+ * Получение указателя на требуемую страницу.
+ * Если make == 1, создает таблицу страниц если она не создана
+ *
+ * @param address
+ * @param make
+ * @param dir
+ * @return page_t*
+ **/
 page_t* get_page(u32 address, int make, page_directory_t* dir);
 
 /**
-  Обработчик пейдж фаултов
-**/
+ * @brief Обработчик Page Fault
+ *
+ * @param regs регистры
+ **/
 void page_fault(registers_t regs);
 
+/**
+ * @brief Аллокация фрейма
+ *
+ * @param page страница в памяти
+ * @param is_kernel это ядро
+ * @param is_writeable этот участок возможен для записи
+ **/
 void alloc_frame(page_t* page, int is_kernel, int is_writeable);
+
+/**
+ * @brief Освобождение фрейма
+ *
+ * @param page страница в памяти
+ **/
 void free_frame(page_t* page);
+
+/**
+ * @brief Тест фрейма
+ *
+ * @param frame_addr адрес фрейма
+ * @return u32
+ **/
 u32 test_frame(u32 frame_addr);
 
 #endif

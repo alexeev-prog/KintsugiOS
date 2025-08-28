@@ -10,9 +10,9 @@
 
 #include "ctypes.h"
 
-#define HEAP_START 0x100000    // Начинаем кучу с 1 МБ (выше ядра)
-#define HEAP_SIZE 0x1000000    // Размер кучи: 1 МБ
-#define BLOCK_SIZE 16    // Минимальный размер блока
+#define HEAP_START 0x100000     // Начинаем кучу с 1 МБ (выше ядра)
+#define HEAP_SIZE 0x1000000     // Размер кучи: 1 МБ
+#define BLOCK_SIZE 16           // Минимальный размер блока
 
 typedef struct mem_block {
     u32 size;
@@ -31,14 +31,60 @@ typedef struct meminfo {
     u32 block_count;
 } meminfo_t;
 
+/**
+ * @brief Получение информации о памяти
+ *
+ * @return meminfo_t
+ **/
 meminfo_t get_meminfo();
+
+/**
+ * @brief Получение адреса свободной памяти
+ *
+ **/
 void get_freememaddr();
 
+/**
+ * @brief Увеличение хипа
+ *
+ * @param size размер
+ * @return int
+ **/
 int expand_heap(u32 size);
+
+/**
+ * @brief Инициализация хипа
+ *
+ **/
 void heap_init();
+
+/**
+ * @brief Аллокация памяти
+ *
+ * @param size размер
+ * @return void*
+ **/
 void* kmalloc(u32 size);
+
+/**
+ * @brief Реаллокация памяти
+ *
+ * @param ptr указатель
+ * @param size размер
+ * @return void*
+ **/
 void* krealloc(void* ptr, u32 size);
+
+/**
+ * @brief Освобождение памяти
+ *
+ * @param ptr указатель
+ **/
 void kfree(void* ptr);
+
+/**
+ * @brief Информация о памяти
+ **/
 void kmemdump();
 
 #endif

@@ -11,7 +11,6 @@
 #include "../drivers/screen.h"
 #include "../kklibc/kklibc.h"
 #include "../kklibc/paging.h"
-#include "_default.h"
 #include "utils.h"
 #include "sysinfo.h"
 

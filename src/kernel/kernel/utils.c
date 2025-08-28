@@ -10,7 +10,6 @@
 #include "../cpu/ports.h"
 #include "../drivers/screen.h"
 #include "../kklibc/kklibc.h"
-#include "_default.h"
 #include "sysinfo.h"
 
 void fibonacci_command(char** args) {

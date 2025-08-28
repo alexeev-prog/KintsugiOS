@@ -9,7 +9,21 @@
 
 #include "ctypes.h"
 
+/**
+ * @brief Фибоначчи
+ *
+ * @param num число
+ * @return u32
+ **/
 u32 fibonacci(int num);
+
+/**
+ * @brief Возведение в степень
+ *
+ * @param b основа
+ * @param e экспонента
+ * @return int
+ **/
 int binary_pow(int b, u32 e);
 
 #endif
