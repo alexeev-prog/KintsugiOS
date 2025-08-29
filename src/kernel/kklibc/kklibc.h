@@ -8,6 +8,6 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-#define VERSION "v0.1.1a"
+#define VERSION "v0.2.0a"
 
 #endif
