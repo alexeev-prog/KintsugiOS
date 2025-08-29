@@ -33,7 +33,7 @@
 
  > Также я занимаюсь [переводом OSDEV-Notes](https://github.com/alexeev-prog/Osdev-Notes-RU)
 
-![](./gallery/image.png)
+![](https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/gallery/image.png)
 
 ## Особенности
 
