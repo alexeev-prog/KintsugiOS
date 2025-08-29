@@ -100,7 +100,7 @@ extern page_directory_t* current_directory;
 
 /**
  * @brief Настройка окружения, директорий страниц и включение paging
-**/
+ **/
 void initialise_paging();
 
 /**

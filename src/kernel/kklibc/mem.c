@@ -66,7 +66,7 @@ int expand_heap(u32 size) {
     mem_block_t* new_block = (mem_block_t*)heap_current_end;
     new_block->size = expand_size - sizeof(mem_block_t);    // Учитываем заголовок
     new_block->is_free = 1;
-    new_block->next = free_blocks;      // Добавляем в начало списка
+    new_block->next = free_blocks;    // Добавляем в начало списка
 
     // Обновляем глобальный список свободных блоков
     free_blocks = new_block;

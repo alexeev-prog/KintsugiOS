@@ -40,7 +40,7 @@
 #define VIDEO_ADDRESS 0xb8000    // Видео-адрес
 #define MAX_ROWS 25    // Максимальное кол-во линий
 #define MAX_COLS 80    // Максимальное кол-во колонок
-#define WHITE_ON_BLACK 0x0f    // HEX-код белого на черном
+#define WHITE_ON_BLACK 0x0F    // HEX-код белого на черном
 #define WHITE_ON_BLUE 0x1f
 #define WHITE_ON_RED 0x4f
 #define BLUE_ON_WHITE 0x1f

@@ -11,8 +11,8 @@
 #include "../drivers/screen.h"
 #include "../kklibc/kklibc.h"
 #include "../kklibc/paging.h"
-#include "utils.h"
 #include "sysinfo.h"
+#include "utils.h"
 
 #define MAX_ARGS 32
 

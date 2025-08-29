@@ -52,4 +52,4 @@ void outsw(u16 port, u16 value);
  * @param addr адрес
  * @param count количество
  **/
-void rep_insw(u16 port, void *addr, u32 count);
+void rep_insw(u16 port, void* addr, u32 count);

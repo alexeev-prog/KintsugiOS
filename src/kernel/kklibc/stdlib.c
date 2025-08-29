@@ -5,9 +5,10 @@
  *	Description: null
  * ----------------------------------------------------------------------------*/
 
+#include "stdlib.h"
+
 #include "ctypes.h"
 #include "stdio.h"
-#include "stdlib.h"
 
 void booltochar(u8 value, u8* str) {
     if (value) {
@@ -626,4 +627,3 @@ void* memchr(const void* ptr, int c, u32 n) {
 
     return NULL;
 }
-

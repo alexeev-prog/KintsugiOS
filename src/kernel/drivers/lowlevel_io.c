@@ -78,9 +78,9 @@ void port_word_out(unsigned short port, unsigned short data) {
 }
 
 void outsw(u16 port, u16 value) {
-    __asm__ volatile ("outw %0, %1" : : "a"(value), "Nd"(port));
+    __asm__ volatile("outw %0, %1" : : "a"(value), "Nd"(port));
 }
 
-void rep_insw(u16 port, void *addr, u32 count) {
-    __asm__ volatile ("rep insw" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
+void rep_insw(u16 port, void* addr, u32 count) {
+    __asm__ volatile("rep insw" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
 }
