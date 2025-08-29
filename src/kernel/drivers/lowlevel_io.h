@@ -27,7 +27,7 @@ void port_byte_out(unsigned short port, unsigned char data);
  * @param port порт
  * @return unsigned char
  **/
-unsigned char port_word_in(unsigned short port);
+u16 port_word_in(u16 port);
 
 /**
  * @brief Port word out
@@ -38,18 +38,17 @@ unsigned char port_word_in(unsigned short port);
 void port_word_out(unsigned short port, unsigned short data);
 
 /**
- * @brief Outsw
- *
+ * @brief Чтение нескольких слов из порта
  * @param port порт
- * @param value значение
- **/
-void outsw(u16 port, u16 value);
+ * @param buffer буфер для данных
+ * @param count количество слов
+ */
+void insw(u16 port, void* buffer, u32 count);
 
 /**
- * @brief rep_insw
- *
+ * @brief Запись нескольких слов в порт
  * @param port порт
- * @param addr адрес
- * @param count количество
- **/
-void rep_insw(u16 port, void* addr, u32 count);
+ * @param buffer буфер с данными
+ * @param count количество слов
+ */
+void outsw(u16 port, void* buffer, u32 count);

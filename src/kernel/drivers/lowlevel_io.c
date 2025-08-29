@@ -64,23 +64,43 @@ void port_byte_out(unsigned short port, unsigned char data) {
     /* : "d" (port)			- Загрузить port в регистр EDX */
 }
 
-unsigned char port_word_in(unsigned short port) {
-    /* Функция-обертка над assembly, читающая 2 байта из параметра port */
-    /* Перемещаем результат в регистр AX т.к. размер AX == 2 байта */
-    unsigned short result;
-    __asm__("in %%dx, %%ax" : "=a"(result) : "d"(port));
-    return (result);
+// unsigned char port_word_in(unsigned short port) {
+//     /* Функция-обертка над assembly, читающая 2 байта из параметра port */
+//     /* Перемещаем результат в регистр AX т.к. размер AX == 2 байта */
+//     unsigned short result;
+//     __asm__("in %%dx, %%ax" : "=a"(result) : "d"(port));
+//     return (result);
+// }
+
+/**
+ * @brief Чтение слова из порта
+ * @param port порт
+ * @return прочитанное слово
+ */
+u16 port_word_in(u16 port) {
+    u16 result;
+    __asm__ volatile("inw %1, %0" : "=a"(result) : "Nd"(port));
+    return result;
 }
 
-void port_word_out(unsigned short port, unsigned short data) {
-    /* Функция-обертка над assembly, пишущая data (2 байта, т.е. word) в port */
-    __asm__("out %%ax, %%dx" : : "a"(data), "d"(port));
+/**
+ * @brief Запись слова в порт
+ * @param port порт
+ * @param data данные для записи
+ */
+void port_word_out(u16 port, u16 data) {
+    __asm__ volatile("outw %0, %1" : : "a"(data), "Nd"(port));
 }
 
-void outsw(u16 port, u16 value) {
-    __asm__ volatile("outw %0, %1" : : "a"(value), "Nd"(port));
+void insw(u16 port, void* buffer, u32 count) {
+    __asm__ volatile("cld; rep insw"
+                     : "+D"(buffer), "+c"(count)
+                     : "d"(port)
+                     : "memory");
 }
 
-void rep_insw(u16 port, void* addr, u32 count) {
-    __asm__ volatile("rep insw" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
+void outsw(u16 port, void* buffer, u32 count) {
+    __asm__ volatile("cld; rep outsw"
+                     : "+S"(buffer), "+c"(count)
+                     : "d"(port));
 }

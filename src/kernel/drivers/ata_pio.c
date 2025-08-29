@@ -1,121 +1,214 @@
-#include "ata_pio.h"
+/*------------------------------------------------------------------------------
+ *  Kintsugi OS Drivers source code
+ *  File: kernel/drivers/ata_pio.c
+ *  Title: Драйвер ATA PIO
+ *  Description: Реализация драйвера для работы с жесткими дисками через PIO mode.
+ * ---------------------------------------------------------------------------*/
 
+#include "ata_pio.h"
 #include "lowlevel_io.h"
+#include "../kklibc/kklibc.h"
 #include "screen.h"
 
-// Источник: https://wiki.osdev.org/ATA_PIO_Mode
+// внутреннее API ядра
+static void ata_pio_select_drive(u8 drive);
+static void ata_pio_set_lba(u32 lba, u8 drive);
 
-static void ata_wait_ready() {
-    while (port_byte_in(ATA_REG_STATUS) & ATA_SR_BSY)
-        ;
-}
+// глобал переменные для хранения информации о дисках
+ata_disk_info_t ata_disks[2]; // 0 - master, 1 - slave
 
-static void ata_cache_flush() {
-    ata_wait_ready();
-    port_byte_out(ATA_REG_COMMAND, ATA_CMD_CACHE_FLUSH);
-    ata_wait_ready();
-}
+// внешнее api ядра
 
-void ata_read_sectors(u32 lba, u32 sector_count, const u8* buffer) {
-    ata_wait_ready();
+void ata_pio_init() {
+    kprint("Initializing ATA PIO driver...\n");
 
-    // Выбор диска (Master)
-    port_byte_out(ATA_REG_DRIVE_SELECT, 0xE0 | ((lba >> 24) & 0x0F));
+    for (int i = 0; i < 2; i++) {
+        u8 drive = (i == 0) ? ATA_MASTER : ATA_SLAVE;
 
-    // Задержка для стабилизации контроллера
-    port_byte_out(ATA_REG_ERROR, 0x00);
+        // чекаем наличие устройства
+        ata_pio_select_drive(drive);
+        u8 status = port_byte_in(ATA_PRIMARY_STATUS);
 
-    port_byte_out(ATA_REG_SECCOUNT, sector_count);    // Количество секторов для чтения
-    port_byte_out(ATA_REG_LBA0, (u8)(lba & 0xFF));
-    port_byte_out(ATA_REG_LBA1, (u8)((lba >> 8) & 0xFF));
-    port_byte_out(ATA_REG_LBA2, (u8)((lba >> 16) & 0xFF));
-    port_byte_out(ATA_REG_COMMAND, ATA_CMD_READ_SECTORS);
-
-    ata_wait_ready();
-
-    for (u8 sector = 0; sector < sector_count; sector++) {
-        while (!(port_byte_in(ATA_REG_STATUS) & ATA_SR_DRQ))
-            ;
-        // ПРИМЕЧАНИЕ: При чтении слов в little-endian порядок байт сохраняется корректно
-        rep_insw(
-            ATA_REG_DATA, (void*)(&buffer[sector * SECTOR_BYTES]), SECTOR_WORDS);    // 256 слов (512 байт)
-    }
-}
-
-void ata_write_sectors(u32 lba, u32 sector_count, const u8* buffer) {
-    ata_wait_ready();
-
-    // Выбор диска (Master)
-    port_byte_out(ATA_REG_DRIVE_SELECT, 0xE0 | ((lba >> 24) & 0x0F));
-
-    // Задержка для стабилизации контроллера
-    port_byte_out(ATA_REG_ERROR, 0x00);
-
-    port_byte_out(ATA_REG_SECCOUNT, (u8)sector_count);    // Количество секторов для записи
-    port_byte_out(ATA_REG_LBA0, (u8)(lba & 0xFF));
-    port_byte_out(ATA_REG_LBA1, (u8)((lba >> 8) & 0xFF));
-    port_byte_out(ATA_REG_LBA2, (u8)((lba >> 16) & 0xFF));
-    port_byte_out(ATA_REG_COMMAND, ATA_CMD_WRITE_SECTORS);
-
-    for (u8 sector = 0; sector < sector_count; sector++) {
-        while (!(port_byte_in(ATA_REG_STATUS) & ATA_SR_DRQ))
-            ;
-        for (u32 sw = 0; sw < SECTOR_WORDS; sw++) {
-            // Преобразование в big-endian для контроллера
-            outsw(ATA_REG_DATA,
-                  ((u16)buffer[sector * SECTOR_BYTES + sw * 2 + 1]) << 8
-                      | (u16)(buffer[sector * SECTOR_BYTES + sw * 2]));
+        if (status == 0xFF) {
+            printf("Drive %d: no device connected\n", i);
+            continue;
         }
-    }
 
-    ata_cache_flush();
-}
+        int result = ata_pio_identify(drive, &ata_disks[i]);
 
-void ata_select_drive(int is_master) {
-    port_byte_out(ATA_REG_DRIVE_SELECT, is_master ? 0xA0 : 0xB0);
-}
-
-void ata_identify() {
-    ata_select_drive(1);    // Выбор master-диска
-
-    port_byte_out(ATA_REG_SECCOUNT, 0);
-    port_byte_out(ATA_REG_LBA0, 0);
-    port_byte_out(ATA_REG_LBA1, 0);
-    port_byte_out(ATA_REG_LBA2, 0);
-    port_byte_out(ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
-}
-
-int ata_wait() {
-    while (1) {
-        u8 status = port_byte_in(ATA_REG_STATUS);
-        if (!(status & 0x80)) {
-            return 1;    // Проверка бита BSY (занято)
+        if (result == 0) {
+            printf("Drive %d: %s %d MB\n", i, ata_disks[i].model,
+                   (ata_disks[i].size * 512) / (1024 * 1024));
+        } else {
+            printf("Drive %d: identification failed (error %d)\n", i, result);
         }
     }
 }
 
-void ata_read_buffer(u16* buffer) {
-    // Чтение всего сектора: 256 слов, 512 байт
+static void ata_pio_select_drive(u8 drive) {
+    // выюор диска (master/slave) и режима LBA
+    port_byte_out(ATA_PRIMARY_DRIVE_SEL, drive | 0x40); // LBA mode
+    // задержка для стабильности
+    for (int i = 0; i < 4; i++) port_byte_in(ATA_PRIMARY_STATUS);
+}
+
+static void ata_pio_set_lba(u32 lba, u8 drive) {
+    // установочка LBA адреса
+    port_byte_out(ATA_PRIMARY_LBA_LOW, (u8)(lba & 0xFF));
+    port_byte_out(ATA_PRIMARY_LBA_MID, (u8)((lba >> 8) & 0xFF));
+    port_byte_out(ATA_PRIMARY_LBA_HIGH, (u8)((lba >> 16) & 0xFF));
+    port_byte_out(ATA_PRIMARY_DRIVE_SEL, drive | 0x40 | ((lba >> 24) & 0x0F));
+}
+
+int ata_pio_wait() {
+    // ожидаем снятия флага BSY и установки флага DRDY
+    int timeout = 100000; // таймаут для предотвращения зависания
+
+    while (timeout-- > 0) {
+        u8 status = port_byte_in(ATA_PRIMARY_STATUS);
+
+        // коли BSY снят и DRDY установлен - диск готов
+        if (!(status & ATA_SR_BSY) && (status & ATA_SR_DRDY)) {
+            return 0;
+        }
+
+        // произошла ошибка
+        if (status & ATA_SR_ERR) {
+            return -1;
+        }
+    }
+
+    return -2; // таймаут
+}
+
+int ata_pio_identify(u8 drive, ata_disk_info_t* info) {
+    ata_pio_select_drive(drive);
+
+    u8 status = port_byte_in(ATA_PRIMARY_STATUS);
+    if (status == 0xFF) {
+        // нет устройства на этом канале
+        return -3;
+    }
+
+    // ожидаем готовности диска
+    if (ata_pio_wait() != 0) {
+        return -1;
+    }
+
+    // отправляем IDENTIFY
+    port_byte_out(ATA_PRIMARY_CMD, ATA_CMD_IDENTIFY);
+
+    // ждем ответа
+    if (ata_pio_wait() != 0) {
+        return -2;
+    }
+
+    // процесс чтения данных (256 слов = 512 байт)
+    u16 buffer[256];
     for (int i = 0; i < 256; i++) {
-        buffer[i] = port_word_in(ATA_REG_DATA);
+        buffer[i] = port_word_in(ATA_PRIMARY_DATA);
     }
+
+    // анализируем полученные данные
+    info->signature = buffer[0];
+    info->capabilities = buffer[49];
+    info->command_sets = *((u32*)&buffer[83]);
+
+    // получаем модель диска
+    for (int i = 0; i < 20; i++) {
+        info->model[i * 2] = (char)(buffer[27 + i] >> 8);
+        info->model[i * 2 + 1] = (char)(buffer[27 + i] & 0xFF);
+    }
+    info->model[40] = '\0';
+
+    // размер диска в секторах
+    if (info->command_sets & 0x40000000) {
+        // 48-bit LBA
+        info->size = *((u32*)&buffer[100]);
+    } else {
+        // 28-bit LBA
+        info->size = *((u32*)&buffer[60]);
+    }
+
+    // тип диска
+    if (buffer[0] == 0x8489 || buffer[0] == 0x8449) {
+        info->type = ATA_DISK_PATAPI;
+    } else {
+        info->type = ATA_DISK_PATA;
+    }
+
+    return 0;
 }
 
-u32 ata_get_disk_size() {
-    // 1024^2 = 1048576 (1 МиБ)
-    u16 ata_buffer[256];
-    ata_identify();
-    ata_wait();
-    ata_read_buffer(ata_buffer);
-    u32 total_sectors = ((u32)ata_buffer[61] << 16) | ata_buffer[60];
-    return (u32)total_sectors * 512;    // Конвертация в байты
+int ata_pio_read_sectors(u8 drive, u32 lba, u8 num, u16* buffer) {
+    if (num == 0) return 0;
+
+    // выбор диск
+    ata_pio_select_drive(drive);
+
+    // колво количество секторов
+    port_byte_out(ATA_PRIMARY_SECTOR_CNT, num);
+
+    // сетаем LBA адрес
+    ata_pio_set_lba(lba, drive);
+
+    // сендим команду чтения
+    port_byte_out(ATA_PRIMARY_CMD, ATA_CMD_READ_PIO);
+
+    // Читаем сектора
+    for (int sector = 0; sector < num; sector++) {
+        // Ждем готовности данных
+        if (ata_pio_wait() != 0) {
+            return -1;
+        }
+
+        // Читаем сектор (256 слов = 512 байт)
+        for (int i = 0; i < 256; i++) {
+            buffer[sector * 256 + i] = port_word_in(ATA_PRIMARY_DATA);
+        }
+
+        // ждем между секторами
+        for (int i = 0; i < 4; i++) port_byte_in(ATA_PRIMARY_STATUS);
+    }
+
+    return 0;
 }
 
-void ata_read_blocks(u32 block_num, const u8* buffer, u32 count) {
-    ata_read_sectors(block_num * SECTORS_PER_BLOCK, SECTORS_PER_BLOCK * count, buffer);
-}
+int ata_pio_write_sectors(u8 drive, u32 lba, u8 num, u16* buffer) {
+    if (num == 0) return 0;
 
-// неэффективные методы: запись происходит поверх буфера без учета длины
-void ata_write_blocks(u32 block_num, const u8* buffer, u32 count) {
-    ata_write_sectors(block_num * SECTORS_PER_BLOCK, SECTORS_PER_BLOCK * count, buffer);
+    // диск
+    ata_pio_select_drive(drive);
+
+    // количество секторов
+    port_byte_out(ATA_PRIMARY_SECTOR_CNT, num);
+
+    // LBA адрес
+    ata_pio_set_lba(lba, drive);
+
+    // команда записи
+    port_byte_out(ATA_PRIMARY_CMD, ATA_CMD_WRITE_PIO);
+
+    // врайтим сектора
+    for (int sector = 0; sector < num; sector++) {
+        // ждем готовности к приему данных
+        if (ata_pio_wait() != 0) {
+            return -1;
+        }
+
+        // сектор (256 слов = 512 байт)
+        for (int i = 0; i < 256; i++) {
+            port_word_out(ATA_PRIMARY_DATA, buffer[sector * 256 + i]);
+        }
+
+        // оиждаем завершения записи
+        if (ata_pio_wait() != 0) {
+            return -2;
+        }
+
+        port_byte_out(ATA_PRIMARY_CMD, ATA_CMD_CACHE_FLUSH);
+        ata_pio_wait(); //
+    }
+
+    return 0;
 }

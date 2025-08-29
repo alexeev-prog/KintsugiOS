@@ -9,6 +9,7 @@
 
 #include "../cpu/isr.h"
 #include "../drivers/screen.h"
+#include "../drivers/ata_pio.h"
 #include "../kklibc/kklibc.h"
 #include "../kklibc/paging.h"
 #include "sysinfo.h"
@@ -36,7 +37,7 @@ void kmain() {
     detect_memory();
     kprint("Memory Detected\n");
 
-    kprint("ATA PIO in development\n");
+    ata_pio_init();
 
     // Приглашение
     printf("\nKintsugi OS %s (C) 2025\nRepository: " "https://github.com/alexeev-prog/KintsugiOS\n", VERSION);

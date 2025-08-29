@@ -9,6 +9,7 @@ SRC_DIR = src
 BIN_DIR = bin
 DISKIMG_DIR = diskimgs
 DISKIMG_NAME = kintsugi_floppy_i386.img
+HDDIMG_NAME = kintsugi_hdd_i386.img
 
 CFLAGS = -g -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs -Wall -Wextra -ffreestanding -I$(SRC_DIR)/kernel/include
 ASMFLAGS_BIN = -f bin
@@ -57,28 +58,43 @@ $(BIN_DIR)/%.o: $(SRC_DIR)/%.c
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 $(DISKIMG_DIR)/$(DISKIMG_NAME): $(BIN_DIR)/kintsugios.bin
-	@printf "$(BLUE)[DD]   Make IMG  %-50s -> %s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin" "$@"
+	@printf "$(BLUE)[DD]   Make Floppy IMG  %-50s -> %s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin" "$@"
 	@mkdir -p $(DISKIMG_DIR)
 	@dd if=/dev/zero of=$@.tmp bs=1024 count=1440
 	@dd if=$< of=$@.tmp conv=notrunc
 	@mv $@.tmp $@
 
+$(DISKIMG_DIR)/$(HDDIMG_NAME):
+	@printf "$(BLUE)[DD]   Make HDD IMG  %-50s -> %s$(RESET)\n" "empty disk" "$@"
+	@mkdir -p $(DISKIMG_DIR)
+	@dd if=/dev/zero of=$@ bs=512 count=10000  # ~5MB disk
+
 diskimg: $(DISKIMG_DIR)/$(DISKIMG_NAME)
+
+hddimg: $(DISKIMG_DIR)/$(HDDIMG_NAME)
 
 run_bin: $(BIN_DIR)/kintsugios.bin
 	@printf "$(GREEN)[QEMU] Run bin   %-50s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin"
 	@qemu-system-i386 -fda $(BIN_DIR)/kintsugios.bin
 
-run: $(DISKIMG_DIR)/$(DISKIMG_NAME)
+run_fda: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 	@printf "$(GREEN)[QEMU] Run img   %-50s$(RESET)\n" "$<"
 	@qemu-system-i386 -fda $< -boot a -m 16
 
-debug: $(DISKIMG_DIR)/$(DISKIMG_NAME)
+run: $(DISKIMG_DIR)/$(DISKIMG_NAME) $(DISKIMG_DIR)/$(HDDIMG_NAME)
+	@printf "$(GREEN)[QEMU] Run with HDD   %-50s$(RESET)\n" "$<"
+	@qemu-system-i386 -fda $< -hda $(DISKIMG_DIR)/$(HDDIMG_NAME) -boot a -m 16
+
+debug_fda: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 	@printf "$(GREEN)[QEMU] Debug img %-50s$(RESET)\n" "$<"
 	@qemu-system-i386 -fda $< -boot a -s -S -m 16
+
+debug: $(DISKIMG_DIR)/$(DISKIMG_NAME) $(DISKIMG_DIR)/$(HDDIMG_NAME)
+	@printf "$(GREEN)[QEMU] Debug with HDD %-50s$(RESET)\n" "$<"
+	@qemu-system-i386 -fda $< -hda $(DISKIMG_DIR)/$(HDDIMG_NAME) -boot a -s -S -m 16
 
 clean:
 	@printf "$(RED)[RM]   Clean $(BIN_DIR) and $(DISKIMG_DIR)$(RESET)\n"
 	@rm -rf $(BIN_DIR)/* $(DISKIMG_DIR)/*
 
-.PHONY: all diskimg run run_bin debug clean clean_all
+.PHONY: all diskimg hddimg run run_bin run_hdd debug debug_hdd clean
