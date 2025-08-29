@@ -8,8 +8,8 @@
 #include "kernel.h"
 
 #include "../cpu/isr.h"
-#include "../drivers/screen.h"
 #include "../drivers/ata_pio.h"
+#include "../drivers/screen.h"
 #include "../kklibc/kklibc.h"
 #include "../kklibc/paging.h"
 #include "sysinfo.h"

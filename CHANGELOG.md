@@ -1,3 +1,9 @@
+commit 5e4b57522d6fb5611eb7e14bc59f27858b4ec4a3
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Aug 30 04:21:42 2025 +0700
+
+    feat: fully realize ATA PIO driver, add disk img creation in makefile
+
 commit 3a74eb131a365ecca0b4c54689f545a459e6fa39
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Fri Aug 29 22:02:52 2025 +0700

@@ -93,14 +93,9 @@ void port_word_out(u16 port, u16 data) {
 }
 
 void insw(u16 port, void* buffer, u32 count) {
-    __asm__ volatile("cld; rep insw"
-                     : "+D"(buffer), "+c"(count)
-                     : "d"(port)
-                     : "memory");
+    __asm__ volatile("cld; rep insw" : "+D"(buffer), "+c"(count) : "d"(port) : "memory");
 }
 
 void outsw(u16 port, void* buffer, u32 count) {
-    __asm__ volatile("cld; rep outsw"
-                     : "+S"(buffer), "+c"(count)
-                     : "d"(port));
+    __asm__ volatile("cld; rep outsw" : "+S"(buffer), "+c"(count) : "d"(port));
 }

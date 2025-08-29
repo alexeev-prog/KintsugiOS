@@ -6,8 +6,9 @@
  * ---------------------------------------------------------------------------*/
 
 #include "ata_pio.h"
-#include "lowlevel_io.h"
+
 #include "../kklibc/kklibc.h"
+#include "lowlevel_io.h"
 #include "screen.h"
 
 // внутреннее API ядра
@@ -15,7 +16,7 @@ static void ata_pio_select_drive(u8 drive);
 static void ata_pio_set_lba(u32 lba, u8 drive);
 
 // глобал переменные для хранения информации о дисках
-ata_disk_info_t ata_disks[2]; // 0 - master, 1 - slave
+ata_disk_info_t ata_disks[2];    // 0 - master, 1 - slave
 
 // внешнее api ядра
 
@@ -37,8 +38,7 @@ void ata_pio_init() {
         int result = ata_pio_identify(drive, &ata_disks[i]);
 
         if (result == 0) {
-            printf("Drive %d: %s %d MB\n", i, ata_disks[i].model,
-                   (ata_disks[i].size * 512) / (1024 * 1024));
+            printf("Drive %d: %s %d MB\n", i, ata_disks[i].model, (ata_disks[i].size * 512) / (1024 * 1024));
         } else {
             printf("Drive %d: identification failed (error %d)\n", i, result);
         }
@@ -47,9 +47,11 @@ void ata_pio_init() {
 
 static void ata_pio_select_drive(u8 drive) {
     // выюор диска (master/slave) и режима LBA
-    port_byte_out(ATA_PRIMARY_DRIVE_SEL, drive | 0x40); // LBA mode
+    port_byte_out(ATA_PRIMARY_DRIVE_SEL, drive | 0x40);    // LBA mode
     // задержка для стабильности
-    for (int i = 0; i < 4; i++) port_byte_in(ATA_PRIMARY_STATUS);
+    for (int i = 0; i < 4; i++) {
+        port_byte_in(ATA_PRIMARY_STATUS);
+    }
 }
 
 static void ata_pio_set_lba(u32 lba, u8 drive) {
@@ -62,7 +64,7 @@ static void ata_pio_set_lba(u32 lba, u8 drive) {
 
 int ata_pio_wait() {
     // ожидаем снятия флага BSY и установки флага DRDY
-    int timeout = 100000; // таймаут для предотвращения зависания
+    int timeout = 100000;    // таймаут для предотвращения зависания
 
     while (timeout-- > 0) {
         u8 status = port_byte_in(ATA_PRIMARY_STATUS);
@@ -78,7 +80,7 @@ int ata_pio_wait() {
         }
     }
 
-    return -2; // таймаут
+    return -2;    // таймаут
 }
 
 int ata_pio_identify(u8 drive, ata_disk_info_t* info) {
@@ -141,7 +143,9 @@ int ata_pio_identify(u8 drive, ata_disk_info_t* info) {
 }
 
 int ata_pio_read_sectors(u8 drive, u32 lba, u8 num, u16* buffer) {
-    if (num == 0) return 0;
+    if (num == 0) {
+        return 0;
+    }
 
     // выбор диск
     ata_pio_select_drive(drive);
@@ -168,14 +172,18 @@ int ata_pio_read_sectors(u8 drive, u32 lba, u8 num, u16* buffer) {
         }
 
         // ждем между секторами
-        for (int i = 0; i < 4; i++) port_byte_in(ATA_PRIMARY_STATUS);
+        for (int i = 0; i < 4; i++) {
+            port_byte_in(ATA_PRIMARY_STATUS);
+        }
     }
 
     return 0;
 }
 
 int ata_pio_write_sectors(u8 drive, u32 lba, u8 num, u16* buffer) {
-    if (num == 0) return 0;
+    if (num == 0) {
+        return 0;
+    }
 
     // диск
     ata_pio_select_drive(drive);
@@ -207,7 +215,7 @@ int ata_pio_write_sectors(u8 drive, u32 lba, u8 num, u16* buffer) {
         }
 
         port_byte_out(ATA_PRIMARY_CMD, ATA_CMD_CACHE_FLUSH);
-        ata_pio_wait(); //
+        ata_pio_wait();    //
     }
 
     return 0;
