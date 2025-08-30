@@ -55,7 +55,7 @@
 #define ATA_DISK_PATAPI 3
 #define ATA_DISK_SATAPI 4
 
-// Структура для информации о диске
+/* Структура для информации о диске */
 typedef struct {
     u16 type;
     u16 signature;

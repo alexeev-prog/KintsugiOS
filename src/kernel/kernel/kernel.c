@@ -25,17 +25,14 @@ void kmain() {
     clear_screen();
 
     isr_install();
-    kprint("ISR Installed\n");
     irq_install();
-    kprint("IRQ Installed\n");
+    kprint("IRQ&ISR Installed\n");
 
     initialise_paging();
     heap_init();
 
     detect_cpu();
-    kprint("CPU detected\n");
     detect_memory();
-    kprint("Memory Detected\n");
 
     ata_pio_init();
 
@@ -44,6 +41,9 @@ void kmain() {
 
     // Уведомление о старте оболочки командной строки
     kprint("\nKeramika Shell " "Type HELP to view commands\n\n!#> ");
+
+    shell_cursor_offset = get_cursor_offset();
+    shell_prompt_offset = shell_cursor_offset;
 }
 
 char** get_args(char* input) {
@@ -56,7 +56,7 @@ char** get_args(char* input) {
 
         if (arg_counter + 1 > MAX_ARGS + 1) {
             printf_colored("Error when parsing args: %d args exceed the limit %d\n",
-                           RED_ON_BLACK_CLR_CODE,
+                           RED_ON_BLACK,
                            arg_counter + 1,
                            MAX_ARGS + 1);
             break;
@@ -123,7 +123,7 @@ void user_input(char* input) {
     }
 
     if (executed == 0 && strcmp(input, "") != 0) {
-        printf_colored("Invalid command: %s", RED_ON_BLACK_CLR_CODE, input);
+        printf_colored("Invalid command: %s", RED_ON_BLACK, input);
     }
 
     // Вывод строки шелла

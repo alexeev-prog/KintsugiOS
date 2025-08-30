@@ -31,33 +31,6 @@ int get_offset_col(int offset);
  * Если col, row отрицательные, то используем текущий оффсет
  */
 void kprint_at(char* message, int col, int row, int color) {
-    struct {
-        int clrcode;
-        int color;
-    } colors[] = {
-        // структура цветов, clrcode - код цвета для передачи и color - сам цвет
-        {.clrcode = WHITE_ON_BLACK_CLR_CODE, .color = WHITE_ON_BLACK},
-        {.clrcode = BLUE_ON_BLACK_CLR_CODE, .color = BLUE_ON_BLACK},
-        {.clrcode = GREEN_ON_BLACK_CLR_CODE, .color = GREEN_ON_BLACK},
-        {.clrcode = CYAN_ON_BLACK_CLR_CODE, .color = CYAN_ON_BLACK},
-        {.clrcode = RED_ON_BLACK_CLR_CODE, .color = RED_ON_BLACK},
-        {.clrcode = MAGENTA_ON_BLACK_CLR_CODE, .color = MAGENTA_ON_BLACK},
-        {.clrcode = BROWN_ON_BLACK_CLR_CODE, .color = BROWN_ON_BLACK},
-        {.clrcode = LGREY_ON_BLACK_CLR_CODE, .color = LGREY_ON_BLACK},
-        {.clrcode = DGREY_ON_BLACK_CLR_CODE, .color = DGREY_ON_BLACK},
-        {.clrcode = LBLUE_ON_BLACK_CLR_CODE, .color = LBLUE_ON_BLACK},
-        {.clrcode = LGREEN_ON_BLACK_CLR_CODE, .color = LGREEN_ON_BLACK},
-        {.clrcode = LCYAN_ON_BLACK_CLR_CODE, .color = LCYAN_ON_BLACK},
-        {.clrcode = LRED_ON_BLACK_CLR_CODE, .color = LRED_ON_BLACK},
-        {.clrcode = LMAGENTA_ON_BLACK_CLR_CODE, .color = LMAGENTA_ON_BLACK},
-        {.clrcode = YELLOW_ON_BLACK_CLR_CODE, .color = YELLOW_ON_BLACK},
-        {.clrcode = WHITE_ON_BLUE_CLR_CODE, .color = WHITE_ON_BLUE},
-        {.clrcode = WHITE_ON_RED_CLR_CODE, .color = WHITE_ON_RED},
-        {.clrcode = RED_ON_WHITE_CLR_CODE, .color = RED_ON_WHITE},
-        {.clrcode = BLUE_ON_WHITE_CLR_CODE, .color = BLUE_ON_WHITE},
-    };
-
-    const int colors_length = sizeof(colors) / sizeof(colors[0]);
 
     /* Установка курсора и оффсета если если col, row отрицательные */
     int offset;
@@ -71,12 +44,7 @@ void kprint_at(char* message, int col, int row, int color) {
     /* "Прокрутка" сообщения и его вывод */
     int i = 0;
     while (message[i] != 0) {
-        for (int j = 0; j < colors_length; ++j) {
-            if (color == colors[j].clrcode) {
-                offset = print_char(message[i++], col, row, colors[j].color);
-                break;
-            }
-        }
+        offset = print_char(message[i++], col, row, color);
 
         /* Вычисление row/col для следующей итерации */
         row = get_offset_row(offset);
@@ -85,13 +53,13 @@ void kprint_at(char* message, int col, int row, int color) {
 }
 
 void kprint(char* message) {
-    // Вывод текста. Цвет по умолчанию - белый на черном (код 0)
-    kprint_at(message, -1, -1, 0);
+    // Вывод текста. Цвет по умолчанию - белый на черном
+    kprint_at(message, -1, -1, WHITE_ON_BLACK);
 }
 
 void kprintln(char* message) {
-    // Вывод текста. Цвет по умолчанию - белый на черном (код 0)
-    kprint_at(message, -1, -1, 0);
+    // Вывод текста. Цвет по умолчанию - белый на черном
+    kprint_at(message, -1, -1, WHITE_ON_BLACK);
     kprint("\n");
 }
 
@@ -141,10 +109,10 @@ void panic_red_screen(char* title, char* description) {
 
     set_cursor_offset(get_offset(0, 0));
 
-    kprint_colored("KINTSUGIOS KERNEL PANIC RED SCREEN\n\n", WHITE_ON_RED_CLR_CODE);
-    kprint_colored(title, WHITE_ON_RED_CLR_CODE);
-    kprint_colored("\n\n", WHITE_ON_RED_CLR_CODE);
-    kprint_colored(description, WHITE_ON_RED_CLR_CODE);
+    kprint_colored("KINTSUGIOS KERNEL PANIC RED SCREEN\n\n", WHITE_ON_RED);
+    kprint_colored(title, WHITE_ON_RED);
+    kprint_colored("\n\n", WHITE_ON_RED);
+    kprint_colored(description, WHITE_ON_RED);
 
     __asm__ volatile("hlt");
 }

@@ -86,10 +86,10 @@ void shutdown_qemu(char** args) {
 
 void halt_cpu(char** args) {
     halted_cpu_screen_clear();
-    printf_colored("Kintsugi OS %s\n\n", BLUE_ON_WHITE_CLR_CODE, VERSION);
-    kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE_CLR_CODE);
-    kprint_colored("CPU is halted.\n\n", BLUE_ON_WHITE_CLR_CODE);
-    kprint_colored("__asm__ volatile(\"hlt\")", BLUE_ON_WHITE_CLR_CODE);
+    printf_colored("Kintsugi OS %s\n\n", BLUE_ON_WHITE, VERSION);
+    kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE);
+    kprint_colored("CPU is halted.\n\n", BLUE_ON_WHITE);
+    kprint_colored("__asm__ volatile(\"hlt\")", BLUE_ON_WHITE);
 
     __asm__ volatile("hlt");
 }
@@ -103,7 +103,7 @@ void sysinfo_command() {
            info->free_memory / (1024 * 1024),
            info->used_memory / (1024 * 1024));
     printf("Kernel memory: %d KB\n", info->kernel_memory / 1024);
-    printf("Heap size: %d KB\n", info->heap_size / 1024);
+    printf("Heap size: %d KB", info->heap_size / 1024);
 }
 
 void info_command_shell(char** args) {
