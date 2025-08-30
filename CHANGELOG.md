@@ -1,3 +1,9 @@
+commit d4f8cd7751a9a43f36150017d49f70bce8c41f94
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Aug 30 21:29:25 2025 +0700
+
+    fix codestyle and delete unneeded ktests
+
 commit 283db16ed4de3c54976ee6be0d895c03e542cdb7
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Aug 30 21:12:27 2025 +0700
