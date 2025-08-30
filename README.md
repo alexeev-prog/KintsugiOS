@@ -22,7 +22,6 @@
   <img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/docs/pallet-0.png" width="600" alt="">
 </div>
 
-
 Минималистичная x86 операционная система на (N)ASM и C, созданная в образовательных целях для глубокого понимания принципов работы операционных систем.
 
 Текущая нестабильная версия: v0.2.0a

@@ -1,3 +1,9 @@
+commit f606d9e035f81ecbb4d6ee768a1fb791b6f4849e
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Aug 30 21:12:01 2025 +0700
+
+    update ktests functionality, edit color codes system in screen driver
+
 commit e6a423c29ea27250dc937c5d326977797ddb82bf
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Aug 30 04:47:38 2025 +0700
