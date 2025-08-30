@@ -31,7 +31,6 @@ int get_offset_col(int offset);
  * Если col, row отрицательные, то используем текущий оффсет
  */
 void kprint_at(char* message, int col, int row, int color) {
-
     /* Установка курсора и оффсета если если col, row отрицательные */
     int offset;
     if (col >= 0 && row >= 0) {
