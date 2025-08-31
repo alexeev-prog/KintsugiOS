@@ -1,3 +1,9 @@
+commit 7e10152d363ffbde636a316c6da7d99f0257f5ec
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Sep 1 01:11:27 2025 +0700
+
+    small update for util scripts
+
 commit 3f710e02f6bc2fd28d65b73e38dc8061b36d3d2c
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 31 22:32:14 2025 +0700
