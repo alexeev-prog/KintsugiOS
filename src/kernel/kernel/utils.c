@@ -99,9 +99,9 @@ void sysinfo_command() {
 
     printf("CPU: %s, %d core(s)\n", info->cpu_vendor, info->cpu_cores);
     printf("Memory: %d MB total, %d MB free, %d MB used\n",
-           info->total_memory / (1024 * 1024),
-           info->free_memory / (1024 * 1024),
-           info->used_memory / (1024 * 1024));
+           info->total_memory / (1024),
+           info->free_memory / (1024),
+           info->used_memory / (1024));
     printf("Kernel memory: %d KB\n", info->kernel_memory / 1024);
     printf("Heap size: %d KB", info->heap_size / 1024);
 }

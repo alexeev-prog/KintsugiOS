@@ -14,6 +14,8 @@
 #define HEAP_SIZE 0x1000000    // Размер кучи: 1 МБ
 #define BLOCK_SIZE 16    // Минимальный размер блока
 
+extern u32 heap_current_end;
+
 /**
  * @brief Блок памяти
  *

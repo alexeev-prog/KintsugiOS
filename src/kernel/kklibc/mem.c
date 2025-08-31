@@ -8,6 +8,7 @@
 #include "mem.h"
 
 #include "../drivers/screen.h"
+#include "../kernel/sysinfo.h"
 #include "ctypes.h"
 #include "paging.h"
 #include "stdio.h"
@@ -108,6 +109,7 @@ void* kmalloc(u32 size) {
             }
 
             current->is_free = 0;
+            detect_memory();
             return (void*)((u32)current + sizeof(mem_block_t));
         }
         prev = current;
@@ -118,6 +120,7 @@ void* kmalloc(u32 size) {
     // кучу
     printf("No free block found for size %d. Trying to expand heap...\n", size);
     if (expand_heap(size)) {
+        detect_memory();
         // После расширения кучи пробуем аллоцировать снова (рекурсивно)
         return kmalloc(size);
     } else {
@@ -176,10 +179,14 @@ void* krealloc(void* ptr, u32 size) {
 
     // Если не можем расширить, выделяем новый блок и копируем данные
     void* new_ptr = kmalloc(size);
+
     if (new_ptr) {
         memcpy(new_ptr, ptr, block->size);
         kfree(ptr);
     }
+
+    detect_memory();
+
     return new_ptr;
 }
 
@@ -248,6 +255,8 @@ void kfree(void* ptr) {
         prev = current;
         current = current->next;
     }
+
+    detect_memory();
 }
 
 meminfo_t get_meminfo() {

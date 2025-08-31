@@ -152,23 +152,41 @@ void page_fault(registers_t regs) {
     int reserved = regs.err_code & 0x8;    // Перезапись зарезервированных битов?
     int id = regs.err_code & 0x10;    // Вызвано выполнением инструкции?
 
-    // Выводим сообщение об ошибке
-    kprint("Page Fault has occured ( ");
+    char buffer[1024];
+    int offset = 0;
+
+    offset += snprintf(buffer + offset, 1024, "Page Fault has occurred ( ");
+
+    // Добавляем флаги
     if (present) {
-        kprint("present ");
+        offset += snprintf(buffer + offset, sizeof(buffer) - offset, "present ");
     }
     if (rw) {
-        kprint("read-only ");
+        offset += snprintf(buffer + offset, sizeof(buffer) - offset, "read-only ");
     }
     if (us) {
-        kprint("user-mode ");
+        offset += snprintf(buffer + offset, sizeof(buffer) - offset, "user-mode ");
     }
     if (reserved) {
-        kprint("reserved ");
+        offset += snprintf(buffer + offset, sizeof(buffer) - offset, "reserved ");
     }
-    printf(") at %x\n\n", faulting_address);
-    printf("PRESENT: %d | RW: %d | US: %d | RESERVED: %d | ID: %d", present, rw, us, reserved, id);
-    kprint("\n");
+
+    offset += snprintf(buffer + offset, sizeof(buffer) - offset, ") at %d\n", faulting_address);
+
+    offset += snprintf(buffer + offset,
+                       sizeof(buffer) - offset,
+                       "PRESENT: %d | RW: %d | US: %d | RESERVED: %d | ID: %d\n",
+                       present,
+                       rw,
+                       us,
+                       reserved,
+                       id);
+
+    char title_buffer[1024];
+
+    snprintf(title_buffer, 1024, "Page Fault raised at %x", faulting_address);
+
+    panic_red_screen(title_buffer, buffer);
 }
 
 /* Инициализация подсистемы paging */
