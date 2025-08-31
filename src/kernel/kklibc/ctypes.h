@@ -1,3 +1,10 @@
+/*------------------------------------------------------------------------------
+ *  Kintsugi OS KKLIBC source code
+ *  File: kklibc/ctypes.h
+ *  Title: Библиотека для работы с типами C (заголовочный файл)
+ *	Description: null
+ * ----------------------------------------------------------------------------*/
+
 #ifndef CTYPES_H
 #define CTYPES_H
 
@@ -12,6 +19,15 @@ typedef char s8;
 
 #define low_16(address) (u16)((address) & 0xFFFF)
 #define high_16(address) (u16)(((address) >> 16) & 0xFFFF)
+
+#define KB (1024)
+#define MB (1024 * 1024)
+#define GB (1024 * 1024 * 1024)
+#define TB (1024 * 1024 * 1024 * 1024)
+#define PB (1024 * 1024 * 1024 * 1024 * 1024)
+#define EB (1024 * 1024 * 1024 * 1024 * 1024 * 1024)
+#define ZB (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)
+#define YB (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)
 
 int isalnum(int c);
 int isalpha(int c);

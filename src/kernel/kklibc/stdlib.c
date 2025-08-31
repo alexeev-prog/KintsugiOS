@@ -8,7 +8,84 @@
 #include "stdlib.h"
 
 #include "ctypes.h"
+#include "mem.h"
 #include "stdio.h"
+
+/**
+ * @brief      Алгоритм Fuzzy search
+ *
+ * @param[in]  text         Текст
+ * @param[in]  query        Запрос
+ * @param[in]  build_score  Оценка за построение
+ * @param      score        Оценка
+ * @param      score_len    Длина оценка
+ *
+ * @return int Оценка
+ */
+int fuzzy_search(const char* text, const char* query, int build_score, int** score, u32* score_len) {
+    u32 total_score = 0;
+    if (build_score) {    // Build score is an optimization when searching through large database
+        (*score) = (int*)kmalloc(sizeof(int) * strlen(text));
+        memset(*score, 0, sizeof(int) * strlen(text));
+        *score_len = strlen(text);
+    }
+
+    u32 first_character_boosts = 1;
+
+    for (u32 t_idx = 0; t_idx < strlen(text); t_idx++) {
+        char t =
+            tolower(text[t_idx]);    // NOTE(deter0): to lower performs kind of strangely probably due to UTF8
+        for (u32 q_idx = 0; q_idx < strlen(query); q_idx++) {
+            char q = tolower(query[q_idx]);
+
+            if (t == q) {
+                // Start of word awards more but falls off fast
+                if (t_idx == 0 || (t_idx > 0 && isspace(text[t_idx - 1]))) {
+                    int factor = 8 / (first_character_boosts++);
+
+                    if (build_score) {
+                        (*score)[t_idx] += factor;
+                    }
+                    total_score += factor;
+                } else {
+                    if (build_score) {
+                        (*score)[t_idx]++;
+                    }
+                    total_score++;
+                }
+
+                u32 streak = 0;
+                for (u32 s_idx = 1; s_idx < strlen(query) - q_idx; s_idx++) {
+                    char sq = tolower(query[q_idx + s_idx]);
+                    char st = tolower(text[t_idx + s_idx]);
+
+                    if (sq != st) {
+                        break;
+                    }
+                    streak++;
+
+                    // Beginning of string yields few points more; eg -> "Term" :: "Terminus", "Fluent
+                    // Terminal"
+                    if (((float)t_idx / (float)strlen(text)) <= 0.35) {
+                        streak++;
+                    }
+
+                    int factor = streak * 3 / (strlen(query) * 0.2);
+                    if (build_score) {
+                        (*score)[t_idx + s_idx] += factor;
+                    }
+                    total_score += factor;
+                }
+
+                // (N * (N + 1) ) /2
+                // (*score)[t_idx] += (streak * (streak + 1)) / 2;
+                t_idx += streak;
+            }
+        }
+    }
+
+    return total_score;
+}
 
 void booltochar(u8 value, u8* str) {
     if (value) {

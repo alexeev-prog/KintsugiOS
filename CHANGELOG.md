@@ -1,3 +1,9 @@
+commit a894b8a86cfa6d45f0543898f8aaf514107e77b4
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 31 17:40:31 2025 +0700
+
+    update kintsugi kernel libc
+
 commit 2535193c9565f7faff972fd65cee788d23e93431
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 31 17:01:37 2025 +0700
