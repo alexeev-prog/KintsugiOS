@@ -1,3 +1,9 @@
+commit 2535193c9565f7faff972fd65cee788d23e93431
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Aug 31 17:01:37 2025 +0700
+
+    fix memory detecting bugs
+
 commit aeda107e72d32a3816725e69dd97ae9b68454b33
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Aug 31 16:22:17 2025 +0700

@@ -38,3 +38,39 @@ int binary_pow(int b, u32 e) {
     }
     return v;
 }
+
+float calculate_discriminant(float a, float b, float c) {
+    float discriminant = b * b - 4 * a * c;
+
+    return discriminant;
+}
+
+u32 factorial(long n) {
+    if (n == 0) {
+        return 1;
+    }
+
+    return (unsigned)n * factorial(n - 1);
+}
+
+u32 cfactorial_sum(char num_chars[]) {
+    u32 fact_num;
+    u32 sum = 0;
+
+    for (int i = 0; num_chars[i]; i++) {
+        int ith_num = num_chars[i] - '0';
+        fact_num = factorial(ith_num);
+        sum = sum + fact_num;
+    }
+    return sum;
+}
+
+u32 ifactorial_sum(long nums[], int size) {
+    u32 fact_num;
+    u32 sum = 0;
+    for (int i = 0; i < size; i++) {
+        fact_num = factorial(nums[i]);
+        sum += fact_num;
+    }
+    return sum;
+}
