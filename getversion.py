@@ -5,7 +5,7 @@ import re
 
 class GitVersion:
     def __init__(self):
-        self._default_version = "0.1.0"
+        self._default_version = "0.1.0a"
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
     @property
@@ -15,7 +15,7 @@ class GitVersion:
 
     @property
     def version(self):
-        version = f"{self.tag[1:]}.{self.build}"
+        version = f"{self.tag[1:]}-{self.build}"
 
         if version == ".":
             return self._default_version
