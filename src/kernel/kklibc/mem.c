@@ -39,13 +39,11 @@ void heap_init() {
 }
 
 int expand_heap(u32 size) {
-    // Выравниваем размер вверх до границы страницы
     u32 num_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
     u32 expand_size = num_pages * PAGE_SIZE;
 
     printf("Expanding heap by %d bytes (%d pages)\n", expand_size, num_pages);
 
-    // Мы будем расширять кучу начиная с адреса heap_current_end
     u32 virtual_address = heap_current_end;
 
     for (u32 i = 0; i < num_pages; i++) {
@@ -56,23 +54,19 @@ int expand_heap(u32 size) {
             return 0;
         }
 
-        // Выделяем фрейм для страницы (с флагами ядра и записи)
         alloc_frame(page, 0, 1);
 
         // Обновляем виртуальный адрес для следующей страницы
         virtual_address += PAGE_SIZE;
     }
 
-    // Теперь нам нужно добавить новую область памяти в список свободных блоков
     mem_block_t* new_block = (mem_block_t*)heap_current_end;
-    new_block->size = expand_size - sizeof(mem_block_t);    // Учитываем заголовок
+    new_block->size = expand_size - sizeof(mem_block_t);
     new_block->is_free = 1;
-    new_block->next = free_blocks;    // Добавляем в начало списка
+    new_block->next = free_blocks;
 
-    // Обновляем глобальный список свободных блоков
     free_blocks = new_block;
 
-    // Обновляем текущий конец кучи
     heap_current_end += expand_size;
 
     printf("Heap expanded successfully. New end: %x\n", heap_current_end);
@@ -80,7 +74,6 @@ int expand_heap(u32 size) {
 }
 
 void* kmalloc(u32 size) {
-    // Выравниваем размер до границы макроса BLOCK_SIZE
     if (size % BLOCK_SIZE != 0) {
         size += BLOCK_SIZE - (size % BLOCK_SIZE);
     }
@@ -90,16 +83,10 @@ void* kmalloc(u32 size) {
 
     while (current) {
         if (current->is_free && current->size >= size) {
-            // Нашли подходящий свободный блок: размер текущего больше чем размер
-            // выделяемой памяти плюс размер структуры блока памяти и плюс размер
-            // самого блока
             if (current->size > size + sizeof(mem_block_t) + BLOCK_SIZE) {
-                // Можем разделить блок
-                mem_block_t* new_block =
-                    (mem_block_t*)((u32)current + sizeof(mem_block_t) + size);    // поинтер на новый блок
-                new_block->size = current->size - size
-                    - sizeof(mem_block_t);    // размер текущего - выделяемый - размер структуры
-                new_block->is_free = 1;    // свободен
+                mem_block_t* new_block = (mem_block_t*)((u32)current + sizeof(mem_block_t) + size);
+                new_block->size = current->size - size - sizeof(mem_block_t);
+                new_block->is_free = 1;
                 new_block->next = current->next;
 
                 current->size = size;

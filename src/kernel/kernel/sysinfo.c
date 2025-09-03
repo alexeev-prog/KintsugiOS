@@ -30,8 +30,7 @@ void detect_cpu(void) {
 void detect_memory() {
     // используем битовую карту фреймов из пейджинга для определения памяти
     sys_info.total_memory = nframes * PAGE_SIZE;
-    sys_info.free_memory = 0;
-    sys_info.used_memory = 0;
+    meminfo_t info = get_meminfo();
 
     // подсчет свободных фреймов
     for (u32 i = 0; i < nframes; i++) {
@@ -40,7 +39,9 @@ void detect_memory() {
         }
     }
 
-    sys_info.used_memory = sys_info.total_memory - sys_info.free_memory;
+    sys_info.free_memory = info.total_free;
+    sys_info.used_memory = info.total_used;
+
     sys_info.kernel_memory = free_mem_addr - HEAP_START;
     sys_info.heap_size = heap_current_end - HEAP_START;    // динамик размер кучи
 }
