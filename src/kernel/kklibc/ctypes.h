@@ -5,8 +5,8 @@
  *	Description: null
  * ----------------------------------------------------------------------------*/
 
-#ifndef CTYPES_H
-#define CTYPES_H
+#ifndef KKLIBC_CTYPES_H
+#define KKLIBC_CTYPES_H
 
 typedef unsigned int u32;
 typedef int s32;

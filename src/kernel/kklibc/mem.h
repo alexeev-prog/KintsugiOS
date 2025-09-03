@@ -5,8 +5,8 @@
  *	Description: null
  * ----------------------------------------------------------------------------*/
 
-#ifndef MEM_H
-#define MEM_H
+#ifndef KKLIBC_MEM_H
+#define KKLIBC_MEM_H
 
 #include "ctypes.h"
 

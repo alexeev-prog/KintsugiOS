@@ -4,8 +4,8 @@
  *  Title: Набор математических функций и алгоритмов (заголовчный файл)
  *	Description: null
  * ----------------------------------------------------------------------------*/
-#ifndef MATH_H
-#define MATH_H
+#ifndef KKLIBC_MATH_H
+#define KKLIBC_MATH_H
 
 #include "ctypes.h"
 

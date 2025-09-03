@@ -6,8 +6,8 @@
  *               Определяет функции для работы со строками, памятью,
  *               преобразованиями и управления системой.
  * ---------------------------------------------------------------------------*/
-#ifndef STDLIB_H
-#define STDLIB_H
+#ifndef KKLIBC_STDLIB_H
+#define KKLIBC_STDLIB_H
 
 #include "ctypes.h"
 #include "stdio.h"

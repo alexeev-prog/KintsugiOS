@@ -1,5 +1,5 @@
-#ifndef PAGING_H
-#define PAGING_H
+#ifndef KKLIBC_PAGING_H
+#define KKLIBC_PAGING_H
 
 #include "../cpu/isr.h"
 #include "ctypes.h"

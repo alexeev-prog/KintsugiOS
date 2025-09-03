@@ -5,8 +5,8 @@
  *	Description: null
  * ----------------------------------------------------------------------------*/
 
-#ifndef LIBC_STDIO_H
-#define LIBC_STDIO_H
+#ifndef KKLIBC_STDIO_H
+#define KKLIBC_STDIO_H
 
 #include "../drivers/screen.h"
 
@@ -44,4 +44,4 @@ void printf_colored(char* fmt, int color, ...);
  **/
 void printf_at(char* fmt, int col, int row, int color, ...);
 
-#endif    // LIBC_STDIO_H
+#endif    // KKLIBC_STDIO_H
