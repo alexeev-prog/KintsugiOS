@@ -28,6 +28,10 @@ void heap_init() {
 }
 
 int expand_heap(u32 size) {
+    if (HEAP_START + size > HEAP_START + HEAP_SIZE) {
+        return 0;
+    }
+
     u32 num_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
     u32 expand_size = num_pages * PAGE_SIZE;
 
@@ -56,7 +60,8 @@ int expand_heap(u32 size) {
 }
 
 void* kmalloc(u32 size) {
-    if (size == 0) {
+    if (HEAP_START + size > HEAP_START + HEAP_SIZE) {
+        panic_red_screen("Memory Error", "Heap overflow");
         return NULL;
     }
 
@@ -158,10 +163,13 @@ void kfree(void* ptr) {
     mem_block_t* prev = NULL;
 
     while (current) {
-        if (current->is_free && current->next == block) {
+        if (current->is_free && (u32)current + sizeof(mem_block_t) + current->size == (u32)block) {
             current->size += sizeof(mem_block_t) + block->size;
-            current->next = block->next;
-            break;
+            if (block->next && block->next->is_free) {
+                current->size += sizeof(mem_block_t) + block->next->size;
+                current->next = block->next->next;
+            }
+            return;
         }
         prev = current;
         current = current->next;

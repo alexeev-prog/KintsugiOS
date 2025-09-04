@@ -26,7 +26,6 @@ void detect_memory() {
     meminfo_t info = get_meminfo();
     sys_info.total_memory = nframes * PAGE_SIZE;
 
-    // Улучшенный подсчет используемой памяти через фреймы
     u32 used_frames = 0;
     for (u32 i = 0; i < nframes; i++) {
         if (test_frame(i * PAGE_SIZE)) {

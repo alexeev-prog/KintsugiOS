@@ -1,3 +1,9 @@
+commit 5a4b8669db2a956a70c60ea9cd800ad03056739b
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Thu Sep 4 20:59:32 2025 +0700
+
+    try fix memory bugs
+
 commit 76a1964f51c14ff66c3d76090ae331b540758049
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Sep 4 00:11:38 2025 +0700

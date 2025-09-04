@@ -31,7 +31,7 @@ extern u32 free_mem_addr;
 u32 pkmalloc_internal(u32 sz, int align, u32* phys) {
     if (align == 1 && (free_mem_addr & 0xFFFFF000)) {
         free_mem_addr &= 0xFFFFF000;
-        free_mem_addr += 0x1000;
+        free_mem_addr += PAGE_SIZE;
     }
 
     if (phys) {
@@ -65,7 +65,7 @@ u32 pkmalloc(u32 sz) {
 
 /* Установка бита фрейма как занятого */
 static void set_frame(u32 frame_addr) {
-    u32 frame = frame_addr / 0x1000;
+    u32 frame = frame_addr / PAGE_SIZE;
     u32 idx = INDEX_FROM_BIT(frame);
     u32 off = OFFSET_FROM_BIT(frame);
     frames[idx] |= (0x1 << off);
@@ -73,7 +73,7 @@ static void set_frame(u32 frame_addr) {
 
 /* Очистка бита фрейма как свободного */
 static void clear_frame(u32 frame_addr) {
-    u32 frame = frame_addr / 0x1000;
+    u32 frame = frame_addr / PAGE_SIZE;
     u32 idx = INDEX_FROM_BIT(frame);
     u32 off = OFFSET_FROM_BIT(frame);
     frames[idx] &= ~(0x1 << off);
@@ -81,7 +81,7 @@ static void clear_frame(u32 frame_addr) {
 
 /* Проверка занятости фрейма */
 u32 test_frame(u32 frame_addr) {
-    u32 frame = frame_addr / 0x1000;
+    u32 frame = frame_addr / PAGE_SIZE;
     u32 idx = INDEX_FROM_BIT(frame);
     u32 off = OFFSET_FROM_BIT(frame);
     return (frames[idx] & (0x1 << off));
@@ -169,7 +169,7 @@ void page_fault(registers_t regs) {
 /* Инициализация подсистемы paging */
 void initialise_paging() {
     u32 mem_end_page = 0x1000000;
-    nframes = mem_end_page / 0x1000;
+    nframes = mem_end_page / PAGE_SIZE;
     frames = (u32*)pkmalloc(INDEX_FROM_BIT(nframes) * 4);
     memset(frames, 0, INDEX_FROM_BIT(nframes) * 4);
 
@@ -180,7 +180,7 @@ void initialise_paging() {
     int i = 0;
     while (i < free_mem_addr) {
         alloc_frame(get_page(i, 1, kernel_directory), 0, 0);
-        i += 0x1000;
+        i += PAGE_SIZE;
     }
 
     register_interrupt_handler(14, page_fault);
@@ -199,7 +199,7 @@ void switch_page_directory(page_directory_t* dir) {
 
 /* Получение страницы по адресу */
 page_t* get_page(u32 address, int make, page_directory_t* dir) {
-    address /= 0x1000;
+    address /= PAGE_SIZE;
     u32 table_idx = address / 1024;
 
     if (dir->tables[table_idx]) {
