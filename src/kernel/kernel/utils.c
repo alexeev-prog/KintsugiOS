@@ -39,7 +39,7 @@ void binary_pow_command(char** args) {
     printf("%d ** %d = %d", b, e, powered);
 }
 
-void rand_comamnd(char** args) {
+void rand_command(char** args) {
     if (!args[0]) {
         kprint("rand usage: rand <seed>");
         return;
@@ -103,7 +103,10 @@ void sysinfo_command() {
            info->free_memory / KB,
            info->used_memory / KB);
     printf("Kernel memory: %d KB\n", info->kernel_memory / KB);
-    printf("Heap size: %d KB", info->heap_size / KB);
+    printf("Heap size: %d KB, used: %d KB, free: %d KB\n",
+           info->heap_size / KB,
+           info->heap_used / KB,
+           info->heap_free / KB);
 }
 
 void info_command_shell(char** args) {

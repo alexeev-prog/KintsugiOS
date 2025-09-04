@@ -21,7 +21,7 @@ void binary_pow_command(char** args);
  *
  * @param args аргументы
  **/
-void rand_comamnd(char** args);
+void rand_command(char** args);
 
 /**
  * @brief Команда обертка шелла для генерации случайного числа в диапазоне

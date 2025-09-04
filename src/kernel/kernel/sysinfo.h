@@ -13,6 +13,8 @@ typedef struct {
     u32 used_memory;
     u32 kernel_memory;
     u32 heap_size;
+    u32 heap_used;
+    u32 heap_free;
     u32 cpu_speed;    // в MHz
     char cpu_vendor[13];
     u8 cpu_cores;

@@ -7,6 +7,14 @@
 
 #include "ctypes.h"
 
+#include "stdlib.h"
+
+void panic_assert(const char* file, u32 line, const char* desc) {
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "Assertion failed: %s, file %s, line %d", desc, file, line);
+    panic_red_screen("Kernel Panic", buffer);
+}
+
 /**
  * @brief Классификация буквенно-цифровых символов
  *

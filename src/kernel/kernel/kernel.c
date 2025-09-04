@@ -90,7 +90,7 @@ void user_input(char* input) {
         {.text = "echo", .hint = "Echo an text", .command = &echo_command},
         {.text = "sleep", .hint = "Wait time. Usage: sleep <ms>", .command = &sleep_command},
         {.text = "reboot", .hint = "Reboot system", .command = &reboot_command},
-        {.text = "rand", .hint = "Gen random num. Usage: rand <seed>", .command = &rand_comamnd},
+        {.text = "rand", .hint = "Gen random num. Usage: rand <seed>", .command = &rand_command},
         {.text = "randrange",
          .hint = "Get random num from range. Usage: randrange <seed> <min> <max>",
          .command = &rand_range_command},
