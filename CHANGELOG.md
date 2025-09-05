@@ -1,3 +1,9 @@
+commit 9669aa8b39860b80667131153c9c86efd247c2e9
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Sep 6 01:18:18 2025 +0700
+
+    update makefile
+
 commit e5938af8bbd46f55f02675b3a8472222fed177ab
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Thu Sep 4 21:13:39 2025 +0700

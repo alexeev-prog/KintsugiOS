@@ -19,7 +19,7 @@ def find_source_files(root_dir, ignore_dirs):
 
 def format_files(files, clang_format, style):
     global count
-    
+
     for file in files:
         try:
             cmd = [clang_format, "-i", "--style", style, file]
