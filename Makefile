@@ -10,6 +10,11 @@ BIN_DIR = bin
 DISKIMG_DIR = diskimgs
 DISKIMG_NAME = kintsugi_floppy_i386.img
 HDDIMG_NAME = kintsugi_hdd_i386.img
+ISO_NAME = KintsugiOS.iso
+
+# Tools for ISO creation
+MKISOFS = genisoimage
+XORRISO = xorriso
 
 CFLAGS = -g -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs -Wall -Wextra -ffreestanding -I$(SRC_DIR)/kernel/include
 ASMFLAGS_BIN = -f bin
@@ -69,9 +74,25 @@ $(DISKIMG_DIR)/$(HDDIMG_NAME):
 	@mkdir -p $(DISKIMG_DIR)
 	@dd if=/dev/zero of=$@ bs=512 count=10000  # ~5MB disk
 
+check-iso-tools:
+	@if ! command -v $(MKISOFS) >/dev/null 2>&1 && ! command -v $(XORRISO) >/dev/null 2>&1; then \
+		echo "Error: Neither genisoimage nor xorriso found. Install one of them to create ISO."; \
+		exit 1; \
+	fi
+
+$(DISKIMG_DIR)/$(ISO_NAME): $(DISKIMG_DIR)/$(DISKIMG_NAME) check-iso-tools
+	@printf "$(BLUE)[ISO]  Creating ISO image %-50s -> %s$(RESET)\n" "$(DISKIMG_DIR)/$(DISKIMG_NAME)" "$@"
+	@if command -v $(MKISOFS) >/dev/null 2>&1; then \
+		$(MKISOFS) -quiet -V 'KINTSUGI_OS' -input-charset iso8859-1 -o $@ -b $(DISKIMG_NAME) -hide boot.catalog -boot-load-size 4 -no-emul-boot $(DISKIMG_DIR); \
+	elif command -v $(XORRISO) >/dev/null 2>&1; then \
+		$(XORRISO) -as mkisofs -b $(DISKIMG_NAME) -o $@ $(DISKIMG_DIR); \
+	fi
+
 diskimg: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 
 hddimg: $(DISKIMG_DIR)/$(HDDIMG_NAME)
+
+iso: $(DISKIMG_DIR)/$(ISO_NAME)
 
 run_bin: $(BIN_DIR)/kintsugios.bin
 	@printf "$(GREEN)[QEMU] Run bin   %-50s$(RESET)\n" "$(BIN_DIR)/kintsugios.bin"
@@ -85,6 +106,10 @@ run: $(DISKIMG_DIR)/$(DISKIMG_NAME) $(DISKIMG_DIR)/$(HDDIMG_NAME)
 	@printf "$(GREEN)[QEMU] Run with HDD   %-50s$(RESET)\n" "$<"
 	@qemu-system-i386 -fda $< -hda $(DISKIMG_DIR)/$(HDDIMG_NAME) -boot a -m 16
 
+run_iso: $(DISKIMG_DIR)/$(ISO_NAME) $(DISKIMG_DIR)/$(HDDIMG_NAME)
+	@printf "$(GREEN)[QEMU] Run ISO   %-50s$(RESET)\n" "$<"
+	@qemu-system-i386 -hda ${DISKIMG_DIR}/$(HDDIMG_NAME) -cdrom $< -boot d -m 16
+
 debug_fda: $(DISKIMG_DIR)/$(DISKIMG_NAME)
 	@printf "$(GREEN)[QEMU] Debug img %-50s$(RESET)\n" "$<"
 	@qemu-system-i386 -fda $< -boot a -s -S -m 16
@@ -93,8 +118,12 @@ debug: $(DISKIMG_DIR)/$(DISKIMG_NAME) $(DISKIMG_DIR)/$(HDDIMG_NAME)
 	@printf "$(GREEN)[QEMU] Debug with HDD %-50s$(RESET)\n" "$<"
 	@qemu-system-i386 -fda $< -hda $(DISKIMG_DIR)/$(HDDIMG_NAME) -boot a -s -S -m 16
 
+debug_iso: $(DISKIMG_DIR)/$(ISO_NAME)
+	@printf "$(GREEN)[QEMU] Debug ISO %-50s$(RESET)\n" "$<"
+	@qemu-system-i386 -cdrom $< -boot d -s -S -m 16
+
 clean:
 	@printf "$(RED)[RM]   Clean $(BIN_DIR) and $(DISKIMG_DIR)$(RESET)\n"
 	@rm -rf $(BIN_DIR)/* $(DISKIMG_DIR)/*
 
-.PHONY: all diskimg hddimg run run_bin run_hdd debug debug_hdd clean
+.PHONY: all diskimg hddimg iso run run_bin run_fda run_iso debug debug_fda debug_iso clean check-iso-tools
