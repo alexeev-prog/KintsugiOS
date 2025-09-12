@@ -23,7 +23,6 @@ LDFLAGS = -Ttext 0x1000 --oformat binary
 
 KERNEL_ENTRY = $(BIN_DIR)/bootloader/kernel_entry.o
 INTERRUPT_OBJ = $(BIN_DIR)/kernel/cpu/interrupt.o
-PAGING_OBJ = $(BIN_DIR)/kernel/paging_asm.o
 
 C_SOURCES = $(shell find $(SRC_DIR) -name '*.c')
 C_OBJS = $(C_SOURCES:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
