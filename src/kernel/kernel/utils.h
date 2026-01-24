@@ -3,13 +3,6 @@
 #define UTILS_H
 
 /**
- * @brief Команда обертка шелла для алгоритма фибоначчи
- *
- * @param args аргументы
- **/
-void fibonacci_command(char** args);
-
-/**
  * @brief Команда обертка шелла для бинарного возведения в степень
  *
  * @param args аргументы

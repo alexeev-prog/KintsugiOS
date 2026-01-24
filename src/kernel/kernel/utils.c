@@ -12,19 +12,6 @@
 #include "../kklibc/kklibc.h"
 #include "sysinfo.h"
 
-void fibonacci_command(char** args) {
-    if (!args[0]) {
-        kprint("fib usage: fib <num>");
-        return;
-    }
-
-    int num = strtoint(args[0]);
-
-    u32 fib = fibonacci(num);
-
-    printf("fib(%d) = %d", num, fib);
-}
-
 void binary_pow_command(char** args) {
     if (!args[0] || !args[1]) {
         kprint("binpow usage: binpow <base> <exponent>");

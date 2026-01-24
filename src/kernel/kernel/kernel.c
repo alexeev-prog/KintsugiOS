@@ -78,8 +78,6 @@ void user_input(char* input) {
         char *text, *hint;
         void (*command)(char**);
     } commands[] = {
-        //   Команда            		Подсказка для команды
-        //   Указатель до функции
         {.text = "end", .hint = "HALT CPU", .command = &halt_cpu},
         {.text = "clear", .hint = "Clear screen", .command = &clear_screen_command},
         {.text = "qemushutdown", .hint = "Shutdown QEMU", .command = &shutdown_qemu},
@@ -94,7 +92,6 @@ void user_input(char* input) {
         {.text = "randrange",
          .hint = "Get random num from range. Usage: randrange <seed> <min> <max>",
          .command = &rand_range_command},
-        {.text = "fib", .hint = "Fibonacci. Usage: fib <num>", .command = &fibonacci_command},
         {.text = "binpow",
          .hint = "Binary power. Usage: binpow <base> <exponent>",
          .command = &binary_pow_command},

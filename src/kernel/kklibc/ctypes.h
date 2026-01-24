@@ -31,7 +31,11 @@ typedef char s8;
 #define ZB (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)
 #define YB (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)
 
-#define ASSERT(b) ((b) ? (void)0 : panic_assert(__FILE__, __LINE__, #b))
+#define ASSERT(b) \
+    do { \
+        if (!(b)) \
+            panic_assert(__FILE__, __LINE__, #b); \
+    } while (0)
 
 void panic_assert(const char* file, u32 line, const char* desc);
 
