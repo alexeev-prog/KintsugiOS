@@ -13,12 +13,12 @@ isr_common_stub:
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
-	
+
     ; 2. Call C handler
 	call isr_handler
-	
+
     ; 3. Restore state
-	pop eax 
+	pop eax
 	mov ds, ax
 	mov es, ax
 	mov fs, ax
@@ -28,10 +28,10 @@ isr_common_stub:
 	sti
 	iret ; pops 5 things at once: CS, EIP, EFLAGS, SS, and ESP
 
-; Common IRQ code. Identical to ISR code except for the 'call' 
+; Common IRQ code. Identical to ISR code except for the 'call'
 ; and the 'pop ebx'
 irq_common_stub:
-    pusha 
+    pusha
     mov ax, ds
     push eax
     mov ax, 0x10
@@ -48,8 +48,8 @@ irq_common_stub:
     popa
     add esp, 8
     sti
-    iret 
-	
+    iret
+
 ; We don't get information about which interrupt was caller
 ; when the handler is run, so we will need to have a different handler
 ; for every interrupt.
@@ -422,4 +422,3 @@ irq15:
 	push byte 15
 	push byte 47
 	jmp irq_common_stub
-

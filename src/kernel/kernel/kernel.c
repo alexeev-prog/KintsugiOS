@@ -11,7 +11,6 @@
 #include "../drivers/ata_pio.h"
 #include "../drivers/screen.h"
 #include "../kklibc/kklibc.h"
-#include "../kklibc/paging.h"
 #include "sysinfo.h"
 #include "utils.h"
 
@@ -28,7 +27,6 @@ void kmain() {
     irq_install();
     kprint("IRQ&ISR Installed\n");
 
-    initialise_paging();
     heap_init();
 
     detect_cpu();
@@ -36,10 +34,8 @@ void kmain() {
 
     ata_pio_init();
 
-    // Приглашение
     printf("\nKintsugi OS %s (C) 2025\nRepository: " "https://github.com/alexeev-prog/KintsugiOS\n", VERSION);
 
-    // Уведомление о старте оболочки командной строки
     kprint("\nKeramika Shell " "Type HELP to view commands\n\n!#> ");
 
     shell_cursor_offset = get_cursor_offset();
@@ -72,8 +68,6 @@ char** get_args(char* input) {
 }
 
 void user_input(char* input) {
-    // Массив структур команд, состоящий из самой команды, подсказки и указателя
-    // до void-функции
     struct {
         char *text, *hint;
         void (*command)(char**);

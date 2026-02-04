@@ -1,7 +1,6 @@
 #include "sysinfo.h"
 
 #include "../kklibc/mem.h"
-#include "../kklibc/paging.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
 
@@ -24,20 +23,12 @@ void detect_cpu(void) {
 
 void detect_memory() {
     meminfo_t info = get_meminfo();
-    sys_info.total_memory = nframes * PAGE_SIZE;
+    sys_info.total_memory = HEAP_START + HEAP_SIZE;
+    sys_info.used_memory = info.total_used + (HEAP_START - 0x1000);
+    sys_info.free_memory = info.total_free;
 
-    u32 used_frames = 0;
-    for (u32 i = 0; i < nframes; i++) {
-        if (test_frame(i * PAGE_SIZE)) {
-            used_frames++;
-        }
-    }
-    sys_info.used_memory = used_frames * PAGE_SIZE;
-    sys_info.free_memory = sys_info.total_memory - sys_info.used_memory;
-
-    // Получение информации о heap из менеджера памяти
-    sys_info.kernel_memory = free_mem_addr - HEAP_START;
-    sys_info.heap_size = heap_current_end - HEAP_START;
+    sys_info.kernel_memory = HEAP_START - 0x1000;
+    sys_info.heap_size = info.heap_size;
     sys_info.heap_used = info.total_used;
     sys_info.heap_free = info.total_free;
 }

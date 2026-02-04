@@ -52,7 +52,6 @@ int isspace(int c);
 int isupper(int c);
 int isxdigit(int c);
 
-// 7.4.2 Character case mapping functions
 int tolower(int c);
 int toupper(int c);
 

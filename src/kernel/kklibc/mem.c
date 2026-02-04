@@ -10,7 +10,6 @@
 #include "../drivers/screen.h"
 #include "../kernel/sysinfo.h"
 #include "ctypes.h"
-#include "paging.h"
 #include "stdio.h"
 #include "stdlib.h"
 
@@ -18,7 +17,7 @@ u32 free_mem_addr = HEAP_START;
 static mem_block_t* free_blocks = NULL;
 u32 heap_current_end = HEAP_START + HEAP_SIZE;
 
-// Инициализация памяти heap
+// инициализация кучи
 void heap_init() {
     free_blocks = (mem_block_t*)HEAP_START;
     free_blocks->size = HEAP_SIZE - sizeof(mem_block_t);
@@ -28,26 +27,11 @@ void heap_init() {
 }
 
 int expand_heap(u32 size) {
-    if (HEAP_START + size > HEAP_START + HEAP_SIZE) {
+    if (heap_current_end + size > HEAP_START + HEAP_SIZE) {
         return 0;
     }
 
-    u32 num_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
-    u32 expand_size = num_pages * PAGE_SIZE;
-
-    u32 virtual_address = heap_current_end;
-    for (u32 i = 0; i < num_pages; i++) {
-        page_t* page = get_page(virtual_address, 1, kernel_directory);
-        if (!page) {
-            panic_red_screen("Expand Heap Error", "Failed to get page for heap expansion");
-            return 0;
-        }
-
-        if (!page->present) {
-            alloc_frame(page, 0, 1);
-        }
-        virtual_address += PAGE_SIZE;
-    }
+    u32 expand_size = size;
 
     mem_block_t* new_block = (mem_block_t*)heap_current_end;
     new_block->size = expand_size - sizeof(mem_block_t);
@@ -65,7 +49,7 @@ void* kmalloc(u32 size) {
         return NULL;
     }
 
-    // Выравнивание размера
+    // выравниваем
     size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
 
     mem_block_t* current = free_blocks;
@@ -85,7 +69,7 @@ void* kmalloc(u32 size) {
     }
 
     if (best_fit) {
-        // Разделение блока если достаточно места
+        // сплиттим блог если достаточно места
         if (best_fit->size > size + sizeof(mem_block_t) + BLOCK_SIZE) {
             mem_block_t* new_block = (mem_block_t*)((u32)best_fit + sizeof(mem_block_t) + size);
             new_block->size = best_fit->size - size - sizeof(mem_block_t);
@@ -100,7 +84,7 @@ void* kmalloc(u32 size) {
         return (void*)((u32)best_fit + sizeof(mem_block_t));
     }
 
-    // Расширение heap при необходимости
+    // расширяем кучу если нужно
     if (expand_heap(size)) {
         return kmalloc(size);
     }
@@ -120,7 +104,7 @@ void* krealloc(void* ptr, u32 size) {
 
     mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
     if (block->size >= size) {
-        // Уменьшение блока при необходимости
+        // уменьшение блока при необходимости
         if (block->size - size >= sizeof(mem_block_t) + BLOCK_SIZE) {
             mem_block_t* new_block = (mem_block_t*)((u32)block + sizeof(mem_block_t) + size);
             new_block->size = block->size - size - sizeof(mem_block_t);
@@ -131,7 +115,7 @@ void* krealloc(void* ptr, u32 size) {
         return ptr;
     }
 
-    // Выделение нового блока и копирование данных
+    // выделяем нового блока и копипастим данных
     void* new_ptr = kmalloc(size);
     if (new_ptr) {
         memcpy(new_ptr, ptr, block->size);
@@ -158,7 +142,7 @@ void kfree(void* ptr) {
         block->next = block->next->next;
     }
 
-    // Объединение с предыдущим свободным блоком
+    // объединение с предыдущим свободным блоком
     mem_block_t* current = free_blocks;
     mem_block_t* prev = NULL;
 
