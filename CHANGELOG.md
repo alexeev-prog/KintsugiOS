@@ -1,3 +1,9 @@
+commit a4720f1c30fe1784b02ed1289ec8ffd76c9148fc
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Wed Feb 4 20:23:55 2026 +0700
+
+    remove deprecated paging from memory system, fix bugs
+
 commit 69326fd80d839039e6592fa9566f87f31fb786c7
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Jan 24 21:39:36 2026 +0700
