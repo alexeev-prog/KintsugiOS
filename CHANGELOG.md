@@ -1,3 +1,9 @@
+commit 7104d72733c07ec0806dc54d9344eb072b68fa7e
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Wed Feb 4 21:27:29 2026 +0700
+
+    fix memory management, add memblock guards, improve formatting functions
+
 commit 87719f548722d156655298d8bf6dcc48b325e5bc
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Wed Feb 4 20:31:52 2026 +0700
