@@ -1,3 +1,9 @@
+commit c88267af8780001e3f4ebeb448cedb2f1b638e7d
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Wed Feb 4 20:28:16 2026 +0700
+
+    release v0.3.0a
+
 commit a4720f1c30fe1784b02ed1289ec8ffd76c9148fc
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Wed Feb 4 20:23:55 2026 +0700
