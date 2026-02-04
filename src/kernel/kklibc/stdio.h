@@ -16,6 +16,8 @@ typedef char* va_list;
 #define va_arg(ap, type) (*(type*)((ap += sizeof(type)) - sizeof(type)))
 #define va_end(ap) (ap = (va_list)0)
 
+unsigned int format_string_core(char* buf, unsigned int size, char* fmt, va_list args);
+
 /**
  * @brief Стандартный форматированный вывод
  *

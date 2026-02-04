@@ -49,8 +49,8 @@ void* kmalloc(u32 size) {
         return NULL;
     }
 
-    // выравниваем
-    size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
+    u32 total_size = size + 2 * GUARD_SIZE;
+    u32 aligned_size = (total_size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
 
     mem_block_t* current = free_blocks;
     mem_block_t* prev = NULL;
@@ -81,7 +81,24 @@ void* kmalloc(u32 size) {
         }
 
         best_fit->is_free = 0;
-        return (void*)((u32)best_fit + sizeof(mem_block_t));
+
+        u32* guard_start = (u32*)((u32)best_fit + sizeof(mem_block_t));
+
+        for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
+            guard_start[i] = MAGIC_NUMBER;
+        }
+
+        void* user_ptr = (void*)((u32)guard_start + GUARD_SIZE);
+
+        u32 user_data_size = aligned_size - 2 * GUARD_SIZE;
+
+        u32 block_end = (u32)best_fit + sizeof(mem_block_t) + best_fit->size;
+        u32* guard_end = (u32*)(block_end - GUARD_SIZE);
+        for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
+            guard_end[i] = MAGIC_NUMBER;
+        }
+
+        return user_ptr;
     }
 
     // расширяем кучу если нужно
@@ -129,20 +146,50 @@ void kfree(void* ptr) {
         return;
     }
 
-    mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
+    u32* guard_start = (u32*)((u32)ptr - GUARD_SIZE);
+
+    mem_block_t* block = (mem_block_t*)((u32)guard_start - sizeof(mem_block_t));
+
+    for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
+        if (guard_start[i] != MAGIC_NUMBER) {
+            printf_panic_screen("Memory Corruption",
+                                "Start guard corrupted at offset %d\n" "Block: 0x%x, User ptr: 0x%x",
+                                i * sizeof(u32),
+                                (u32)block,
+                                (u32)ptr);
+        }
+    }
+
+    u32 user_data_size = block->size - 2 * GUARD_SIZE;
+
+    u32 block_end = (u32)block + sizeof(mem_block_t) + block->size;
+    u32* guard_end = (u32*)(block_end - GUARD_SIZE);
+    for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
+        if (guard_end[i] != MAGIC_NUMBER) {
+            printf_panic_screen("Memory Corruption",
+                                "End guard corrupted at offset %d\n" "Block: 0x%x, User ptr: 0x%x",
+                                i * sizeof(u32),
+                                (u32)block,
+                                (u32)ptr);
+        }
+    }
+
     if (block->is_free) {
         return;
     }
 
+    for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
+        guard_start[i] = 0;
+        guard_end[i] = 0;
+    }
+
     block->is_free = 1;
 
-    // Объединение с последующим свободным блоком
     if (block->next && block->next->is_free) {
         block->size += sizeof(mem_block_t) + block->next->size;
         block->next = block->next->next;
     }
 
-    // объединение с предыдущим свободным блоком
     mem_block_t* current = free_blocks;
     mem_block_t* prev = NULL;
 

@@ -1,3 +1,9 @@
+commit 87719f548722d156655298d8bf6dcc48b325e5bc
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Wed Feb 4 20:31:52 2026 +0700
+
+    update gallery image screenshot
+
 commit 564c40656b63bf78a74f3693647576d6c067c205
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Wed Feb 4 20:30:15 2026 +0700

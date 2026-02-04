@@ -116,6 +116,17 @@ void panic_red_screen(char* title, char* description) {
     __asm__ volatile("hlt");
 }
 
+void printf_panic_screen(char* title, const char* reason_fmt, ...) {
+    char description[256];
+    va_list args;
+
+    va_start(args, reason_fmt);
+    vsnprintf(description, sizeof(description), reason_fmt, args);
+    va_end(args);
+
+    panic_red_screen(title, description);
+}
+
 /**********************************************************
  * Приватные функции ядра                                 *
  **********************************************************/

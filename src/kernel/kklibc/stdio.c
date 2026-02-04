@@ -13,55 +13,181 @@
 #define PRINTF_BUF_SIZE 1024
 static char printf_buf[PRINTF_BUF_SIZE];
 
-static void format_string(char* buf, char* fmt, va_list args) {
-    char* ptr = buf;
-    char* s;
-    int num;
+unsigned int format_string_core(char* buf, unsigned int size, char* fmt, va_list args) {
+    unsigned int i = 0;
     char num_buf[32];
-    char c;
+    const char* s;
 
-    while (*fmt) {
+    while (*fmt && (size == 0 || i < size - 1)) {
         if (*fmt != '%') {
-            *ptr++ = *fmt++;
+            buf[i++] = *fmt++;
             continue;
         }
 
         fmt++;
+
+        int width = 0;
+        int zero_pad = 0;
+        int hex_prefix = 0;
+
+        while (*fmt >= '0' && *fmt <= '9') {
+            width = width * 10 + (*fmt - '0');
+            fmt++;
+        }
+
+        if (width > 0 && fmt[0] == '0' && fmt[1] == 'x') {
+            zero_pad = 1;
+            hex_prefix = 1;
+            fmt += 2;
+        }
+
         switch (*fmt) {
-            case 'd':
-                num = va_arg(args, int);
-                int_to_ascii(num, num_buf);
-                s = num_buf;
-                while (*s) {
-                    *ptr++ = *s++;
+            case 'd': {
+                int num = va_arg(args, int);
+                int negative = 0;
+                unsigned int unum;
+
+                if (num < 0) {
+                    negative = 1;
+                    unum = (unsigned int)(-num);
+                } else {
+                    unum = (unsigned int)num;
+                }
+
+                int digits = 0;
+                do {
+                    num_buf[digits++] = '0' + (unum % 10);
+                    unum /= 10;
+                } while (unum > 0);
+
+                if (negative) {
+                    num_buf[digits++] = '-';
+                }
+
+                if (width > digits) {
+                    int padding = width - digits;
+                    while (padding-- > 0 && (size == 0 || i < size - 1)) {
+                        buf[i++] = ' ';
+                    }
+                }
+
+                while (digits-- > 0 && (size == 0 || i < size - 1)) {
+                    buf[i++] = num_buf[digits];
                 }
                 break;
-            case 'x':
-                num = va_arg(args, int);
-                hex_to_ascii(num, num_buf);
-                s = num_buf;
-                while (*s) {
-                    *ptr++ = *s++;
+            }
+
+            case 'x': {
+                unsigned int num = va_arg(args, unsigned int);
+                const char* hex_digits = "0123456789abcdef";
+
+                if (hex_prefix) {
+                    if (size == 0 || i < size - 1) {
+                        buf[i++] = '0';
+                    }
+                    if (size == 0 || i < size - 1) {
+                        buf[i++] = 'x';
+                    }
+                }
+
+                int digits = 0;
+                do {
+                    num_buf[digits++] = hex_digits[num & 0xF];
+                    num >>= 4;
+                } while (num > 0);
+
+                if (width > digits) {
+                    int padding = width - digits;
+                    while (padding-- > 0 && (size == 0 || i < size - 1)) {
+                        buf[i++] = zero_pad ? '0' : ' ';
+                    }
+                }
+
+                while (digits-- > 0 && (size == 0 || i < size - 1)) {
+                    buf[i++] = num_buf[digits];
                 }
                 break;
-            case 's':
+            }
+
+            case 's': {
                 s = va_arg(args, char*);
-                while (*s) {
-                    *ptr++ = *s++;
+                if (!s) {
+                    s = "(null)";
+                }
+
+                int len = 0;
+                const char* p = s;
+                while (*p++) {
+                    len++;
+                }
+
+                if (width > len) {
+                    int padding = width - len;
+                    while (padding-- > 0 && (size == 0 || i < size - 1)) {
+                        buf[i++] = ' ';
+                    }
+                }
+
+                while (*s && (size == 0 || i < size - 1)) {
+                    buf[i++] = *s++;
                 }
                 break;
-            case 'c':
-                c = (char)va_arg(args, int);
-                *ptr++ = c;
+            }
+
+            case 'c': {
+                char c = (char)va_arg(args, int);
+                if (size == 0 || i < size - 1) {
+                    buf[i++] = c;
+                }
                 break;
-            default:
-                *ptr++ = '%';
-                *ptr++ = *fmt;
+            }
+
+            case 'u': {
+                unsigned int num = va_arg(args, unsigned int);
+
+                int digits = 0;
+                do {
+                    num_buf[digits++] = '0' + (num % 10);
+                    num /= 10;
+                } while (num > 0);
+
+                if (width > digits) {
+                    int padding = width - digits;
+                    while (padding-- > 0 && (size == 0 || i < size - 1)) {
+                        buf[i++] = ' ';
+                    }
+                }
+
+                while (digits-- > 0 && (size == 0 || i < size - 1)) {
+                    buf[i++] = num_buf[digits];
+                }
                 break;
+            }
+
+            default: {
+                if (size == 0 || i < size - 1) {
+                    buf[i++] = '%';
+                }
+                if (size == 0 || i < size - 1) {
+                    buf[i++] = *fmt;
+                }
+                break;
+            }
         }
         fmt++;
     }
-    *ptr = '\0';
+
+    if (size == 0 || i < size) {
+        buf[i] = '\0';
+    } else if (size > 0) {
+        buf[size - 1] = '\0';
+    }
+
+    return i;
+}
+
+static void format_string(char* buf, char* fmt, va_list args) {
+    format_string_core(buf, 0, fmt, args);
 }
 
 void printf(char* fmt, ...) {

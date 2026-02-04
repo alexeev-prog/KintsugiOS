@@ -520,67 +520,8 @@ char* strstr(const char* haystack, const char* needle) {
     return NULL;
 }
 
-// Вспомогательная функция для форматирования строки с ограничением размера
-int vsnprintf(char* buf, unsigned int size, const char* fmt, va_list args) {
-    unsigned int i = 0;
-    char num_buf[32];
-    char c;
-    const char* s;
-
-    while (*fmt && i < size - 1) {
-        if (*fmt != '%') {
-            buf[i++] = *fmt++;
-            continue;
-        }
-
-        fmt++;
-        switch (*fmt) {
-            case 'd': {
-                int num = va_arg(args, int);
-                int_to_ascii(num, num_buf);
-                s = num_buf;
-                while (*s && i < size - 1) {
-                    buf[i++] = *s++;
-                }
-                break;
-            }
-            case 'x': {
-                int num = va_arg(args, int);
-                hex_to_ascii(num, num_buf);
-                s = num_buf;
-                while (*s && i < size - 1) {
-                    buf[i++] = *s++;
-                }
-                break;
-            }
-            case 's': {
-                s = va_arg(args, char*);
-                while (*s && i < size - 1) {
-                    buf[i++] = *s++;
-                }
-                break;
-            }
-            case 'c': {
-                c = (char)va_arg(args, int);
-                if (i < size - 1) {
-                    buf[i++] = c;
-                }
-                break;
-            }
-            default: {
-                if (i < size - 1) {
-                    buf[i++] = '%';
-                }
-                if (i < size - 1) {
-                    buf[i++] = *fmt;
-                }
-                break;
-            }
-        }
-        fmt++;
-    }
-    buf[i] = '\0';
-    return i;
+unsigned int vsnprintf(char* buf, unsigned int size, const char* fmt, va_list args) {
+    return format_string_core(buf, size, fmt, args);
 }
 
 // Реализация sprintf

@@ -326,7 +326,7 @@ int snprintf(char* buf, unsigned int size, const char* fmt, ...);
  *         (без учета завершающего нуля). Если возвращаемое значение >= size,
  *         произошло усечение.
  */
-int vsnprintf(char* buf, unsigned int size, const char* fmt, va_list args);
+unsigned int vsnprintf(char* buf, unsigned int size, const char* fmt, va_list args);
 
 /*******************************************************************************
  * Управление системой

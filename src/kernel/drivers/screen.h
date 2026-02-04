@@ -142,4 +142,6 @@ void kprint_backspace();
  **/
 void panic_red_screen(char* title, char* description);
 
+void printf_panic_screen(char* title, const char* reason_fmt, ...);
+
 #endif
