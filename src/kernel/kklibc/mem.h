@@ -41,6 +41,10 @@ typedef struct meminfo {
     u32 total_used;
     u32 total_free;
     u32 block_count;
+    u32 alloc_count;
+    u32 free_count;
+    u32 max_used;
+    u32 leak_count;
 } meminfo_t;
 
 /**

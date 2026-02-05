@@ -17,6 +17,8 @@ u32 free_mem_addr = HEAP_START;
 static mem_block_t* free_blocks = NULL;
 u32 heap_current_end = HEAP_START + HEAP_SIZE;
 
+static meminfo_t stats;
+
 // инициализация кучи
 void heap_init() {
     free_blocks = (mem_block_t*)HEAP_START;
@@ -24,6 +26,11 @@ void heap_init() {
     free_blocks->next = NULL;
     free_blocks->is_free = 1;
     heap_current_end = HEAP_START + HEAP_SIZE;
+
+    stats.alloc_count = 0;
+    stats.free_count = 0;
+    stats.max_used = 0;
+    stats.leak_count = 0;
 }
 
 int expand_heap(u32 size) {
@@ -97,6 +104,8 @@ void* kmalloc(u32 size) {
         for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
             guard_end[i] = MAGIC_NUMBER;
         }
+
+        stats.alloc_count++;
 
         return user_ptr;
     }
@@ -185,6 +194,8 @@ void kfree(void* ptr) {
 
     block->is_free = 1;
 
+    stats.free_count++;
+
     if (block->next && block->next->is_free) {
         block->size += sizeof(mem_block_t) + block->next->size;
         block->next = block->next->next;
@@ -208,11 +219,11 @@ void kfree(void* ptr) {
 }
 
 meminfo_t get_meminfo() {
-    meminfo_t meminfo;
     mem_block_t* current = free_blocks;
     u32 total_used = 0;
     u32 total_free = 0;
     u32 block_count = 0;
+    u32 used_blocks = 0;
 
     while (current) {
         block_count++;
@@ -220,20 +231,23 @@ meminfo_t get_meminfo() {
             total_free += current->size;
         } else {
             total_used += current->size;
+            used_blocks++;
         }
         current = current->next;
     }
 
-    meminfo.heap_start = HEAP_START;
-    meminfo.heap_size = heap_current_end - HEAP_START;
-    meminfo.heap_current_end = heap_current_end;
-    meminfo.block_size = BLOCK_SIZE;
-    meminfo.free_blocks = free_blocks;
-    meminfo.total_used = total_used;
-    meminfo.total_free = total_free;
-    meminfo.block_count = block_count;
+    stats.total_used = total_used;
+    stats.total_free = total_free;
+    stats.block_count = block_count;
+    stats.leak_count = used_blocks;
 
-    return meminfo;
+    stats.heap_start = HEAP_START;
+    stats.heap_size = heap_current_end - HEAP_START;
+    stats.heap_current_end = heap_current_end;
+    stats.block_size = BLOCK_SIZE;
+    stats.free_blocks = free_blocks;
+
+    return stats;
 }
 
 void kmemdump() {
@@ -241,16 +255,19 @@ void kmemdump() {
     mem_block_t* current = info.free_blocks;
     u32 counter = 0;
 
+    printf("\nHeap: 0x%x - 0x%x (%d bytes)\n",
+           HEAP_START,
+           info.heap_current_end,
+           info.heap_current_end - HEAP_START);
+    printf("Block size: %d bytes, Guard: %d bytes\n", info.block_size, GUARD_SIZE);
     printf(
-        "Heap: %x - %x (%d bytes)\n", HEAP_START, info.heap_current_end, info.heap_current_end - HEAP_START);
-    printf("Block size: %d bytes\n", info.block_size);
-    printf("Total: USED=%d bytes, FREE=%d bytes, in %d blocks\n",
-           info.total_used,
-           info.total_free,
-           info.block_count);
+        "Allocations: %d, Frees: %d, Leaks: %d blocks\n", info.alloc_count, info.free_count, info.leak_count);
+    printf(
+        "Max used: %d bytes, Current: USED=%d, FREE=%d\n", info.max_used, info.total_used, info.total_free);
+    printf("Total blocks: %d\n", info.block_count);
 
     while (current) {
-        printf("Block %d: %x, Size=%d, %s\n",
+        printf("Block %d: 0x%x, Size=%d, %s",
                counter++,
                (u32)current,
                current->size,

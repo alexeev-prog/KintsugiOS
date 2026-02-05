@@ -62,8 +62,6 @@ char** get_args(char* input) {
         arg_counter++;
     }
 
-    kfree(token);
-
     return args;
 }
 
