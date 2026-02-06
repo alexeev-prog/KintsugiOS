@@ -2,6 +2,9 @@ CompileFlags:
   Add:
     - "-xc"
     - "-std=c11"
+    - "-Wall"
+    - "-Wextra"
+    - "-Wpedantic"
     - "-I./include/"
     - "-I/include/"
     - "-I./source/"
@@ -15,3 +18,33 @@ CompileFlags:
     - "-nostartfiles"
     - "-nodefaultlibs"
   CompilationDatabase: build/dev
+Index:
+  Background: Build
+  Threads: 0
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+ClangTidy:
+  Add:
+    - bugprone-*
+    - cert-*
+    - clang-analyzer-*
+    - misc-*
+    - performance-*
+    - portability-*
+    - readability-*
+  Remove:
+    - cppcoreguidelines-*
+    - modernize-*
+    - google-*
+    - hicpp-*
+Hover:
+  ShowAKA: false
+Completion:
+  IncludeSnippets: true
+InlayHints:
+  Enabled: true
+  ParameterNames: true
+  DeducedTypes: true
+Format:
+  Style: file

@@ -31,15 +31,15 @@ static int ctrl_pressed = 0;
 static int alt_pressed = 0;
 
 // Таблицы символов для разных состояний
-const char sc_ascii_lower[] = {'?', '?', '1', '2', '3', '4', '5', '6', '7', '8', '9',  '0', '-', '=',  '?',
-                               '?', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p',  '[', ']', '?',  '?',
-                               'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', '?', '\\', 'z',
-                               'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', '?', '?',  '?', ' '};
+const char sc_ascii_lower[] = { '?', '?', '1', '2', '3', '4', '5', '6', '7', '8', '9',  '0', '-', '=',  '?',
+                                '?', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p',  '[', ']', '?',  '?',
+                                'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', '?', '\\', 'z',
+                                'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', '?', '?',  '?', ' ' };
 
-const char sc_ascii_upper[] = {'?', '?', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '?',
-                               '?', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '?', '?',
-                               'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', '?', '|', 'Z',
-                               'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', '?', '?', '?', ' '};
+const char sc_ascii_upper[] = { '?', '?', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '?',
+                                '?', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '?', '?',
+                                'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', '?', '|', 'Z',
+                                'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', '?', '?', '?', ' ' };
 
 static void keyboard_callback(registers_t regs) {
     u8 scancode = port_byte_in(0x60);
@@ -62,8 +62,7 @@ static void keyboard_callback(registers_t regs) {
         }
     }
     // Обработка нажатия клавиш
-    else
-    {
+    else {
         switch (scancode) {
             case 0x2A:    // Left Shift
             case 0x36:    // Right Shift
@@ -118,7 +117,7 @@ static void keyboard_callback(registers_t regs) {
                 } else {
                     if (strlen(key_buffer) < sizeof(key_buffer) - 1) {
                         append(key_buffer, letter);
-                        char str[2] = {letter, '\0'};
+                        char str[2] = { letter, '\0' };
                         kprint(str);
                     }
                 }

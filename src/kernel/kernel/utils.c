@@ -85,15 +85,17 @@ void sysinfo_command() {
     system_info_t* info = get_system_info();
 
     printf("CPU: %s, %d core(s)\n", info->cpu_vendor, info->cpu_cores);
-    printf("Memory: %d KB total, %d KB free, %d KB used\n",
-           info->total_memory / KB,
-           info->free_memory / KB,
-           info->used_memory / KB);
+    printf(
+        "Memory: %d KB total, %d KB free, %d KB used\n",
+        info->total_memory / KB,
+        info->free_memory / KB,
+        info->used_memory / KB);
     printf("Kernel memory: %d KB\n", info->kernel_memory / KB);
-    printf("Heap size: %d KB, used: %d KB, free: %d KB\n",
-           info->heap_size / KB,
-           info->heap_used / KB,
-           info->heap_free / KB);
+    printf(
+        "Heap size: %d KB, used: %d KB, free: %d KB\n",
+        info->heap_size / KB,
+        info->heap_used / KB,
+        info->heap_free / KB);
 }
 
 void info_command_shell(char** args) {

@@ -51,10 +51,11 @@ char** get_args(char* input) {
         token = strtok(NULL, " ");
 
         if (arg_counter + 1 > MAX_ARGS + 1) {
-            printf_colored("Error when parsing args: %d args exceed the limit %d\n",
-                           RED_ON_BLACK,
-                           arg_counter + 1,
-                           MAX_ARGS + 1);
+            printf_colored(
+                "Error when parsing args: %d args exceed the limit %d\n",
+                RED_ON_BLACK,
+                arg_counter + 1,
+                MAX_ARGS + 1);
             break;
         }
 
@@ -70,23 +71,23 @@ void user_input(char* input) {
         char *text, *hint;
         void (*command)(char**);
     } commands[] = {
-        {.text = "end", .hint = "HALT CPU", .command = &halt_cpu},
-        {.text = "clear", .hint = "Clear screen", .command = &clear_screen_command},
-        {.text = "qemushutdown", .hint = "Shutdown QEMU", .command = &shutdown_qemu},
-        {.text = "info", .hint = "Get info", .command = &info_command_shell},
-        {.text = "memdump", .hint = "Dump memory", .command = &mem_dump},
-        {.text = "malloc", .hint = "Alloc memory. Usage: malloc <size>", .command = &kmalloc_command},
-        {.text = "free", .hint = "Free memory. Usage: free <address>", .command = &free_command},
-        {.text = "echo", .hint = "Echo an text", .command = &echo_command},
-        {.text = "sleep", .hint = "Wait time. Usage: sleep <ms>", .command = &sleep_command},
-        {.text = "reboot", .hint = "Reboot system", .command = &reboot_command},
-        {.text = "rand", .hint = "Gen random num. Usage: rand <seed>", .command = &rand_command},
-        {.text = "randrange",
+        { .text = "end",          .hint = "HALT CPU",                              .command = &halt_cpu             },
+        { .text = "clear",        .hint = "Clear screen",                          .command = &clear_screen_command },
+        { .text = "qemushutdown", .hint = "Shutdown QEMU",                         .command = &shutdown_qemu        },
+        { .text = "info",         .hint = "Get info",                              .command = &info_command_shell   },
+        { .text = "memdump",      .hint = "Dump memory",                           .command = &mem_dump             },
+        { .text = "malloc",       .hint = "Alloc memory. Usage: malloc <size>",    .command = &kmalloc_command      },
+        { .text = "free",         .hint = "Free memory. Usage: free <address>",    .command = &free_command         },
+        { .text = "echo",         .hint = "Echo an text",                          .command = &echo_command         },
+        { .text = "sleep",        .hint = "Wait time. Usage: sleep <ms>",          .command = &sleep_command        },
+        { .text = "reboot",       .hint = "Reboot system",                         .command = &reboot_command       },
+        { .text = "rand",         .hint = "Gen random num. Usage: rand <seed>",    .command = &rand_command         },
+        { .text = "randrange",
          .hint = "Get random num from range. Usage: randrange <seed> <min> <max>",
-         .command = &rand_range_command},
-        {.text = "binpow",
+         .command = &rand_range_command                                                                             },
+        { .text = "binpow",
          .hint = "Binary power. Usage: binpow <base> <exponent>",
-         .command = &binary_pow_command},
+         .command = &binary_pow_command                                                                             },
     };
 
     int executed = 0;

@@ -161,11 +161,12 @@ void kfree(void* ptr) {
 
     for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
         if (guard_start[i] != MAGIC_NUMBER) {
-            printf_panic_screen("Memory Corruption",
-                                "Start guard corrupted at offset %d\n" "Block: 0x%x, User ptr: 0x%x",
-                                i * sizeof(u32),
-                                (u32)block,
-                                (u32)ptr);
+            printf_panic_screen(
+                "Memory Corruption",
+                "Start guard corrupted at offset %d\n" "Block: 0x%x, User ptr: 0x%x",
+                i * sizeof(u32),
+                (u32)block,
+                (u32)ptr);
         }
     }
 
@@ -175,11 +176,12 @@ void kfree(void* ptr) {
     u32* guard_end = (u32*)(block_end - GUARD_SIZE);
     for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
         if (guard_end[i] != MAGIC_NUMBER) {
-            printf_panic_screen("Memory Corruption",
-                                "End guard corrupted at offset %d\n" "Block: 0x%x, User ptr: 0x%x",
-                                i * sizeof(u32),
-                                (u32)block,
-                                (u32)ptr);
+            printf_panic_screen(
+                "Memory Corruption",
+                "End guard corrupted at offset %d\n" "Block: 0x%x, User ptr: 0x%x",
+                i * sizeof(u32),
+                (u32)block,
+                (u32)ptr);
         }
     }
 
@@ -255,10 +257,11 @@ void kmemdump() {
     mem_block_t* current = info.free_blocks;
     u32 counter = 0;
 
-    printf("\nHeap: 0x%x - 0x%x (%d bytes)\n",
-           HEAP_START,
-           info.heap_current_end,
-           info.heap_current_end - HEAP_START);
+    printf(
+        "\nHeap: 0x%x - 0x%x (%d bytes)\n",
+        HEAP_START,
+        info.heap_current_end,
+        info.heap_current_end - HEAP_START);
     printf("Block size: %d bytes, Guard: %d bytes\n", info.block_size, GUARD_SIZE);
     printf(
         "Allocations: %d, Frees: %d, Leaks: %d blocks\n", info.alloc_count, info.free_count, info.leak_count);
@@ -267,11 +270,12 @@ void kmemdump() {
     printf("Total blocks: %d\n", info.block_count);
 
     while (current) {
-        printf("Block %d: 0x%x, Size=%d, %s",
-               counter++,
-               (u32)current,
-               current->size,
-               current->is_free ? "FREE" : "USED");
+        printf(
+            "Block %d: 0x%x, Size=%d, %s",
+            counter++,
+            (u32)current,
+            current->size,
+            current->is_free ? "FREE" : "USED");
         current = current->next;
     }
 }
