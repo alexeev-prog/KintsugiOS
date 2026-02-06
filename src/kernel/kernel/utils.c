@@ -134,7 +134,7 @@ void free_command(char** args) {
 
     u32 addr = hex_strtoint(addr_str);
     kfree((void*)addr);
-    printf("Freed memory at %x", addr);
+    printf("Freed memory at 0x%x", addr);
 }
 
 void kmalloc_command(char** args) {

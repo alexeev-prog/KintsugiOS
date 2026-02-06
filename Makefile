@@ -39,6 +39,7 @@ RESET=\033[0m
 all: $(BIN_DIR)/kintsugios.bin
 
 $(BIN_DIR)/kintsugios.bin: $(BIN_DIR)/bootsector.bin $(BIN_DIR)/kernel.bin
+	@python getversion.py __update_version
 	@printf "$(BLUE)[CAT]  Cat    %s %-42s -> %s$(RESET)\n" "bootsector" "kernel" "$(BIN_DIR)/kintsugios.bin"
 	@cat $^ > $@
 

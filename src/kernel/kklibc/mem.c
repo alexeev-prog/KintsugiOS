@@ -271,7 +271,7 @@ void kmemdump() {
 
     while (current) {
         printf(
-            "Block %d: 0x%x, Size=%d, %s",
+            "Block %d: 0x%x, Size=%d, %s\n",
             counter++,
             (u32)current,
             current->size,
