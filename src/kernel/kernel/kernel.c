@@ -10,6 +10,7 @@
 #include "../cpu/isr.h"
 #include "../drivers/ata_pio.h"
 #include "../drivers/screen.h"
+#include "../fs/fat12.h"
 #include "../kklibc/kklibc.h"
 #include "sysinfo.h"
 #include "utils.h"
@@ -33,6 +34,7 @@ void kmain() {
     detect_memory();
 
     ata_pio_init();
+    fat12_init();
 
     printf("\nKintsugi OS %s (C) 2025\nRepository: " "https://github.com/alexeev-prog/KintsugiOS\n", VERSION);
 
@@ -71,23 +73,27 @@ void user_input(char* input) {
         char *text, *hint;
         void (*command)(char**);
     } commands[] = {
-        { .text = "end",          .hint = "HALT CPU",                              .command = &halt_cpu             },
-        { .text = "clear",        .hint = "Clear screen",                          .command = &clear_screen_command },
-        { .text = "qemushutdown", .hint = "Shutdown QEMU",                         .command = &shutdown_qemu        },
-        { .text = "info",         .hint = "Get info",                              .command = &info_command_shell   },
-        { .text = "memdump",      .hint = "Dump memory",                           .command = &mem_dump             },
-        { .text = "malloc",       .hint = "Alloc memory. Usage: malloc <size>",    .command = &kmalloc_command      },
-        { .text = "free",         .hint = "Free memory. Usage: free <address>",    .command = &free_command         },
-        { .text = "echo",         .hint = "Echo an text",                          .command = &echo_command         },
-        { .text = "sleep",        .hint = "Wait time. Usage: sleep <ms>",          .command = &sleep_command        },
-        { .text = "reboot",       .hint = "Reboot system",                         .command = &reboot_command       },
-        { .text = "rand",         .hint = "Gen random num. Usage: rand <seed>",    .command = &rand_command         },
+        { .text = "end",          .hint = "HALT CPU",                              .command = &halt_cpu                 },
+        { .text = "clear",        .hint = "Clear screen",                          .command = &clear_screen_command     },
+        { .text = "qemushutdown", .hint = "Shutdown QEMU",                         .command = &shutdown_qemu            },
+        { .text = "info",         .hint = "Get info",                              .command = &info_command_shell       },
+        { .text = "memdump",      .hint = "Dump memory",                           .command = &mem_dump                 },
+        { .text = "malloc",       .hint = "Alloc memory. Usage: malloc <size>",    .command = &kmalloc_command          },
+        { .text = "free",         .hint = "Free memory. Usage: free <address>",    .command = &free_command             },
+        { .text = "echo",         .hint = "Echo an text",                          .command = &echo_command             },
+        { .text = "sleep",        .hint = "Wait time. Usage: sleep <ms>",          .command = &sleep_command            },
+        { .text = "reboot",       .hint = "Reboot system",                         .command = &reboot_command           },
+        { .text = "rand",         .hint = "Gen random num. Usage: rand <seed>",    .command = &rand_command             },
         { .text = "randrange",
          .hint = "Get random num from range. Usage: randrange <seed> <min> <max>",
-         .command = &rand_range_command                                                                             },
+         .command = &rand_range_command                                                                                 },
         { .text = "binpow",
          .hint = "Binary power. Usage: binpow <base> <exponent>",
-         .command = &binary_pow_command                                                                             },
+         .command = &binary_pow_command                                                                                 },
+        { .text = "ls",           .hint = "List files",                            .command = &ls_command               },
+        { .text = "cat",          .hint = "Show file content",                     .command = &cat_command              },
+        { .text = "load",         .hint = "Load file to memory",                   .command = &load_command             },
+        { .text = "fat12info",    .hint = "Print fat12 fs info",                   .command = &print_fat12_info_command }
     };
 
     int executed = 0;
@@ -107,7 +113,7 @@ void user_input(char* input) {
     if (strcmp(input, "help") == 0) {
         kprintln("Keramika Shell Help");
         for (int i = 0; i < commands_length; ++i) {
-            printf("%s - %s\n", commands[i].text, commands[i].hint);
+            printf("%-12s - %s\n", commands[i].text, commands[i].hint);
         }
         executed = 1;
     }

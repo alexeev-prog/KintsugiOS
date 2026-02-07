@@ -9,7 +9,13 @@
 
 #include "../cpu/ports.h"
 #include "../drivers/screen.h"
+#include "../fs/fat12.h"
+#include "../kklibc/ctypes.h"
 #include "../kklibc/kklibc.h"
+#include "../kklibc/math.h"
+#include "../kklibc/mem.h"
+#include "../kklibc/stdio.h"
+#include "../kklibc/stdlib.h"
 #include "sysinfo.h"
 
 void binary_pow_command(char** args) {
@@ -150,4 +156,77 @@ void kmalloc_command(char** args) {
     hex_to_ascii((int)ptr, buf1);
 
     printf("Allocate %d bytes.\nPointer: %s", size, buf1);
+}
+
+void ls_command(char** args) {
+    fat12_list_root();
+}
+
+void cat_command(char** args) {
+    if (!args[0]) {
+        kprint("Usage: cat <filename>\n");
+        return;
+    }
+
+    fat12_dir_entry_t entry;
+    if (!fat12_find_file(args[0], &entry)) {
+        printf("File not found: %s\n", args[0]);
+        return;
+    }
+
+    u8* buffer = (u8*)kmalloc(entry.file_size + 1);
+    if (!buffer) {
+        return;
+    }
+
+    if (fat12_read_file(args[0], buffer) == 0) {
+        buffer[entry.file_size] = '\0';
+        printf("%s", buffer);
+    }
+
+    kfree(buffer);
+}
+
+void print_fat12_info_command(char** args) {
+    print_fat12_info();
+}
+
+void load_command(char** args) {
+    if (!args[0]) {
+        kprint("Usage: load <filename> <address>\n");
+        return;
+    }
+
+    fat12_dir_entry_t entry;
+    if (!fat12_find_file(args[0], &entry)) {
+        printf("File not found: %s\n", args[0]);
+        return;
+    }
+
+    printf("File size: %d bytes\n", entry.file_size);
+
+    // Ограничим размер
+    if (entry.file_size > 8192) {
+        printf("File too large (max 8KB)\n");
+        return;
+    }
+
+    u32 address = 0x100000;
+    if (args[1]) {
+        address = hex_strtoint(args[1]);
+    }
+
+    u8* buffer = (u8*)kmalloc(entry.file_size);
+    if (!buffer) {
+        printf("No memory for file (%d bytes needed)\n", entry.file_size);
+        kmemdump();
+        return;
+    }
+
+    if (fat12_read_file(args[0], buffer) == 0) {
+        memcpy((void*)address, buffer, entry.file_size);
+        printf("Loaded to 0x%x\n", address);
+    }
+
+    kfree(buffer);
 }

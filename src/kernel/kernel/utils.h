@@ -93,4 +93,12 @@ void echo_command(char** args);
  **/
 void free_command(char** args);
 
+void ls_command(char** args);
+
+void cat_command(char** args);
+
+void load_command(char** args);
+
+void print_fat12_info_command(char** args);
+
 #endif

@@ -1,3 +1,9 @@
+commit 4be2426c4766dc7e3df71e460d7ad43666fb7070
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Feb 7 04:36:13 2026 +0700
+
+    update UI bug with memdump and update makefile
+
 commit d0ac308e868f722be545e65ab63e2b974873a3bc
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Feb 7 04:22:11 2026 +0700

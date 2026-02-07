@@ -51,21 +51,21 @@ int expand_heap(u32 size) {
 }
 
 void* kmalloc(u32 size) {
-    if (HEAP_START + size > HEAP_START + HEAP_SIZE) {
-        panic_red_screen("Memory Error", "Heap overflow");
+    if (size == 0) {
         return NULL;
     }
 
-    u32 total_size = size + 2 * GUARD_SIZE;
-    u32 aligned_size = (total_size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
+    // Выравниваем размер
+    u32 aligned_size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
 
     mem_block_t* current = free_blocks;
     mem_block_t* prev = NULL;
     mem_block_t* best_fit = NULL;
     mem_block_t* best_fit_prev = NULL;
 
+    // Ищем лучший подходящий блок
     while (current) {
-        if (current->is_free && current->size >= size) {
+        if (current->is_free && current->size >= aligned_size) {
             if (!best_fit || current->size < best_fit->size) {
                 best_fit = current;
                 best_fit_prev = prev;
@@ -76,46 +76,46 @@ void* kmalloc(u32 size) {
     }
 
     if (best_fit) {
-        // сплиттим блог если достаточно места
-        if (best_fit->size > size + sizeof(mem_block_t) + BLOCK_SIZE) {
-            mem_block_t* new_block = (mem_block_t*)((u32)best_fit + sizeof(mem_block_t) + size);
-            new_block->size = best_fit->size - size - sizeof(mem_block_t);
+        // Разделяем блок, если достаточно места
+        if (best_fit->size > aligned_size + sizeof(mem_block_t) + BLOCK_SIZE) {
+            mem_block_t* new_block = (mem_block_t*)((u32)best_fit + sizeof(mem_block_t) + aligned_size);
+            new_block->size = best_fit->size - aligned_size - sizeof(mem_block_t);
             new_block->is_free = 1;
             new_block->next = best_fit->next;
 
-            best_fit->size = size;
+            best_fit->size = aligned_size;
             best_fit->next = new_block;
         }
 
         best_fit->is_free = 0;
 
-        u32* guard_start = (u32*)((u32)best_fit + sizeof(mem_block_t));
-
-        for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
-            guard_start[i] = MAGIC_NUMBER;
-        }
-
-        void* user_ptr = (void*)((u32)guard_start + GUARD_SIZE);
-
-        u32 user_data_size = aligned_size - 2 * GUARD_SIZE;
-
-        u32 block_end = (u32)best_fit + sizeof(mem_block_t) + best_fit->size;
-        u32* guard_end = (u32*)(block_end - GUARD_SIZE);
-        for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
-            guard_end[i] = MAGIC_NUMBER;
-        }
+        // НЕТ GUARD БАЙТОВ - пропускаем
+        void* user_ptr = (void*)((u32)best_fit + sizeof(mem_block_t));
 
         stats.alloc_count++;
+        stats.total_used += best_fit->size;
+        if (stats.total_used > stats.max_used) {
+            stats.max_used = stats.total_used;
+        }
+
+        // Отладочный вывод
+        // printf("[kmalloc] Allocated %d bytes at 0x%x (block: 0x%x)\n",
+        //        aligned_size, (u32)user_ptr, (u32)best_fit);
 
         return user_ptr;
     }
 
-    // расширяем кучу если нужно
-    if (expand_heap(size)) {
+    // Пробуем расширить кучу
+    if (expand_heap(aligned_size + sizeof(mem_block_t))) {
         return kmalloc(size);
     }
 
-    panic_red_screen("Memory Error", "Out of memory");
+    printf("ERROR: Out of memory! Requested: %d bytes\n", size);
+    kmemdump();    // Покажем состояние памяти
+
+    __asm__ volatile("hlt");
+
+    // panic_red_screen("Memory Error", "Out of memory");
     return NULL;
 }
 
@@ -155,64 +155,45 @@ void kfree(void* ptr) {
         return;
     }
 
-    u32* guard_start = (u32*)((u32)ptr - GUARD_SIZE);
+    mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
 
-    mem_block_t* block = (mem_block_t*)((u32)guard_start - sizeof(mem_block_t));
-
-    for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
-        if (guard_start[i] != MAGIC_NUMBER) {
-            printf_panic_screen(
-                "Memory Corruption",
-                "Start guard corrupted at offset %d\n" "Block: 0x%x, User ptr: 0x%x",
-                i * sizeof(u32),
-                (u32)block,
-                (u32)ptr);
-        }
-    }
-
-    u32 user_data_size = block->size - 2 * GUARD_SIZE;
-
-    u32 block_end = (u32)block + sizeof(mem_block_t) + block->size;
-    u32* guard_end = (u32*)(block_end - GUARD_SIZE);
-    for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
-        if (guard_end[i] != MAGIC_NUMBER) {
-            printf_panic_screen(
-                "Memory Corruption",
-                "End guard corrupted at offset %d\n" "Block: 0x%x, User ptr: 0x%x",
-                i * sizeof(u32),
-                (u32)block,
-                (u32)ptr);
-        }
-    }
-
-    if (block->is_free) {
+    // Проверяем базовую валидность
+    if ((u32)block < HEAP_START || (u32)block >= heap_current_end) {
+        printf("ERROR: Invalid free pointer: 0x%x\n", (u32)ptr);
         return;
     }
 
-    for (int i = 0; i < GUARD_SIZE / sizeof(u32); i++) {
-        guard_start[i] = 0;
-        guard_end[i] = 0;
+    if (block->is_free) {
+        printf("WARNING: Double free at 0x%x\n", (u32)ptr);
+        return;
     }
 
+    // Освобождаем
     block->is_free = 1;
-
     stats.free_count++;
+    stats.total_used -= block->size;
 
+    // printf("[kfree] Freed %d bytes at 0x%x (block: 0x%x)\n",
+    //        block->size, (u32)ptr, (u32)block);
+
+    // Сливаем с соседними свободными блоками
+    // Слияние с следующим блоком
     if (block->next && block->next->is_free) {
         block->size += sizeof(mem_block_t) + block->next->size;
         block->next = block->next->next;
+        // printf("[kfree] Merged with next block\n");
     }
 
+    // Слияние с предыдущим блоком (нужно найти в списке)
     mem_block_t* current = free_blocks;
     mem_block_t* prev = NULL;
 
     while (current) {
         if (current->is_free && (u32)current + sizeof(mem_block_t) + current->size == (u32)block) {
+            // Текущий блок свободен и примыкает к нашему блоку
             current->size += sizeof(mem_block_t) + block->size;
-            if (block->next && block->next->is_free) {
-                current->size += sizeof(mem_block_t) + block->next->size;
-                current->next = block->next->next;
-            }
+            current->next = block->next;
+            // printf("[kfree] Merged with previous block\n");
             return;
         }
         prev = current;
@@ -262,7 +243,7 @@ void kmemdump() {
         HEAP_START,
         info.heap_current_end,
         info.heap_current_end - HEAP_START);
-    printf("Block size: %d bytes, Guard: %d bytes\n", info.block_size, GUARD_SIZE);
+    printf("Block size: %d bytes\n", info.block_size);
     printf(
         "Allocations: %d, Frees: %d, Leaks: %d blocks\n", info.alloc_count, info.free_count, info.leak_count);
     printf(
@@ -277,6 +258,25 @@ void kmemdump() {
             current->size,
             current->is_free ? "FREE" : "USED");
         current = current->next;
+    }
+}
+
+void kmemcheck(void* ptr) {
+    if (!ptr) {
+        printf("kmemcheck: NULL pointer\n");
+        return;
+    }
+
+    mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
+
+    printf("kmemcheck for 0x%x:\n", (u32)ptr);
+    printf("  Block at: 0x%x\n", (u32)block);
+    printf("  Block size: %d\n", block->size);
+    printf("  Block free: %s\n", block->is_free ? "yes" : "no");
+    printf("  Heap range: 0x%x - 0x%x\n", HEAP_START, heap_current_end);
+
+    if ((u32)block < HEAP_START || (u32)block >= heap_current_end) {
+        printf("  ERROR: Block outside heap!\n");
     }
 }
 

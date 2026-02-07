@@ -12,8 +12,7 @@
 
 #define HEAP_START 0x100000    // начинаем кучу с 1 МБ (выше ядра)
 #define HEAP_SIZE 0x1000000    // размер кучи: 16 МБ
-#define BLOCK_SIZE 16    // Минимальный размер блока
-#define GUARD_SIZE 8
+#define BLOCK_SIZE 16
 #define MAGIC_NUMBER 0xDEADBEEF
 
 extern u32 heap_current_end;
@@ -73,6 +72,10 @@ int expand_heap(u32 size);
  *
  **/
 void heap_init();
+
+void* kmalloc_aligned(u32 size, u32 alignment);
+
+void kfree_aligned(void* ptr);
 
 /**
  * @brief Аллокация памяти
