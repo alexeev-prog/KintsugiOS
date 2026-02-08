@@ -1,24 +1,46 @@
+/*------------------------------------------------------------------------------
+ *  Kintsugi OS FileSystems source code
+ *  File: fs/fat12.c
+ *  Title: Заголовочный файл fat12.c
+ *  Last Change Date: 30 October 2023, 12:28 (UTC)
+ *  Author: alexeev-prog
+ *  License: GNU GPL v3
+ * ------------------------------------------------------------------------------
+ *	Description: Файл исходного кода файловой системы Fat12
+ * ----------------------------------------------------------------------------*/
+
 #include "fat12.h"
 
 #include "../drivers/ata_pio.h"
+#include "../drivers/screen.h"
 #include "../kklibc/mem.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
 
+// TODO: Сейчас Fat12 в режиме ReadOnly, реализовать Read+Write
+
 static fat12_context_t ctx;
 static fat12_boot_sector_t boot_sector;
+
+void fat12_cleanup(void) {
+    if (ctx.fat_buffer) {
+        kfree(ctx.fat_buffer);
+        ctx.fat_buffer = NULL;
+        ctx.fat_buffer_loaded = 0;
+    }
+}
 
 void fat12_init(void) {
     printf("Initializing FAT12...\n");
 
     if (ata_pio_read_sectors(ATA_MASTER, 0, 1, (u16*)&boot_sector) != 0) {
-        printf("Cannot read boot sector!\n");
+        printf_colored("Cannot read boot sector!\n", RED_ON_BLACK);
         return;
     }
 
     u16* sig = (u16*)((u8*)&boot_sector + 510);
     if (*sig != 0xAA55) {
-        printf("Invalid boot signature\n");
+        printf_colored("Invalid boot signature\n", RED_ON_BLACK);
         return;
     }
 
@@ -31,6 +53,9 @@ void fat12_init(void) {
 
     u32 total_data_sectors = boot_sector.total_sectors - ctx.data_start_sector;
     ctx.total_clusters = total_data_sectors / boot_sector.sectors_per_cluster;
+
+    ctx.fat_buffer = NULL;
+    ctx.fat_buffer_loaded = 0;
 
     printf(
         "FAT12 loaded: sectors %d-%d (size: %d sectors)\n",
@@ -118,8 +143,6 @@ void fat12_list_root(void) {
 }
 
 static u16 fat12_get_fat_entry(u32 cluster) {
-    static u8* fat_buffer = NULL;
-
     if (cluster < 2) {
         return 0xFFF;
     }
@@ -128,20 +151,22 @@ static u16 fat12_get_fat_entry(u32 cluster) {
         return 0xFFF;
     }
 
-    if (!fat_buffer) {
+    if (!ctx.fat_buffer_loaded) {
         u32 fat_size = ctx.fat_size_sectors * 512;
-        fat_buffer = (u8*)kmalloc(fat_size);
+        ctx.fat_buffer = (u8*)kmalloc(fat_size);
 
-        if (!fat_buffer) {
+        if (!ctx.fat_buffer) {
             return 0xFFF;
         }
 
-        if (ata_pio_read_sectors(ATA_MASTER, ctx.fat_start_sector, ctx.fat_size_sectors, (u16*)fat_buffer)
+        if (ata_pio_read_sectors(ATA_MASTER, ctx.fat_start_sector, ctx.fat_size_sectors, (u16*)ctx.fat_buffer)
             != 0) {
-            kfree(fat_buffer);
-            fat_buffer = NULL;
+            kfree(ctx.fat_buffer);
+            ctx.fat_buffer = NULL;
             return 0xFFF;
         }
+
+        ctx.fat_buffer_loaded = 1;
     }
 
     u32 offset = cluster * 3 / 2;
@@ -151,7 +176,7 @@ static u16 fat12_get_fat_entry(u32 cluster) {
         return 0xFFF;
     }
 
-    u16 entry = *((u16*)(fat_buffer + offset));
+    u16 entry = *((u16*)(ctx.fat_buffer + offset));
 
     if (cluster & 1) {
         entry >>= 4;
@@ -159,7 +184,6 @@ static u16 fat12_get_fat_entry(u32 cluster) {
         entry &= 0x0FFF;
     }
 
-    // Проверяем специальные значения
     if (entry >= 0xFF8) {
         return 0xFFF;
     }
@@ -234,7 +258,7 @@ int fat12_find_file(const char* filename, fat12_dir_entry_t* result) {
 int fat12_read_file(const char* filename, u8* buffer) {
     fat12_dir_entry_t entry;
     if (!fat12_find_file(filename, &entry)) {
-        printf("File not found: %s\n", filename);
+        printf_colored("File not found: %s\n", RED_ON_BLACK, filename);
         return -1;
     }
 
@@ -251,7 +275,7 @@ int fat12_read_file(const char* filename, u8* buffer) {
         u32 sector = ctx.data_start_sector + (current_cluster - 2) * sectors_per_cluster;
 
         if (ata_pio_read_sectors(ATA_MASTER, sector, sectors_per_cluster, (u16*)(buffer + bytes_read)) != 0) {
-            printf("Read error at cluster %d\n", current_cluster);
+            printf_colored("Read error at cluster %d\n", RED_ON_BLACK, current_cluster);
             return -1;
         }
 
@@ -264,7 +288,7 @@ int fat12_read_file(const char* filename, u8* buffer) {
         u16 next_cluster = fat12_get_fat_entry(current_cluster);
 
         if (next_cluster == 0) {
-            printf("Invalid cluster chain\n");
+            printf_colored("Invalid cluster chain\n", RED_ON_BLACK);
             return -1;
         }
 

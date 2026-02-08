@@ -126,7 +126,7 @@ $(TEST_FILES_DIR)/TEST.TXT:
 
 $(TEST_FILES_DIR)/README.TXT:
 	@mkdir -p $(TEST_FILES_DIR)
-	@echo "KintsugiOS FAT12 Test" > $@
+	@echo "KintsugiOS" > $@
 	@echo "====================" >> $@
 	@echo "" >> $@
 	@echo "This is a test file on the FAT12 HDD." >> $@

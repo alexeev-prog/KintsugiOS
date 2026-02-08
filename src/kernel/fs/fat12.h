@@ -1,60 +1,124 @@
+/*------------------------------------------------------------------------------
+ *  Kintsugi OS FileSystems source code
+ *  File: fs/fat12.h
+ *  Title: Заголовочный файл fat12.h
+ *  Last Change Date: 30 October 2023, 12:28 (UTC)
+ *  Author: alexeev-prog
+ *  License: GNU GPL v3
+ * ------------------------------------------------------------------------------
+ *	Description: Заголовочный файл файловой системы Fat12
+ * ----------------------------------------------------------------------------*/
+
 #ifndef FS_FAT12_H
 #define FS_FAT12_H
 
 #include "../kklibc/ctypes.h"
 
+/**
+ * @brief Структура загрузочного сектора FAT12
+ * @details Содержит все параметры файловой системы из BPB и расширенного BPB
+ */
 typedef struct {
-    u8 jmp[3];
-    char oem[8];
-    u16 bytes_per_sector;
-    u8 sectors_per_cluster;
-    u16 reserved_sectors;
-    u8 fat_count;
-    u16 root_entries;
-    u16 total_sectors;
-    u8 media_type;
-    u16 sectors_per_fat;
-    u16 sectors_per_track;
-    u16 head_count;
-    u32 hidden_sectors;
-    u32 large_sector_count;
+    u8 jmp[3];                 /**< Инструкция перехода к коду загрузчика */
+    char oem[8];               /**< Идентификатор OEM производителя */
+    u16 bytes_per_sector;      /**< Байт на сектор (обычно 512) */
+    u8 sectors_per_cluster;    /**< Секторов на кластер */
+    u16 reserved_sectors;      /**< Количество зарезервированных секторов */
+    u8 fat_count;              /**< Количество таблиц FAT (обычно 2) */
+    u16 root_entries;          /**< Максимальное количество записей в корневом каталоге */
+    u16 total_sectors;         /**< Общее количество секторов (если ≤ 65535) */
+    u8 media_type;             /**< Тип носителя (0xF0 - гибкий, 0xF8 - жёсткий) */
+    u16 sectors_per_fat;       /**< Секторов на одну таблицу FAT */
+    u16 sectors_per_track;     /**< Секторов на дорожку */
+    u16 head_count;            /**< Количество головок */
+    u32 hidden_sectors;        /**< Скрытые сектора перед разделом */
+    u32 large_sector_count;    /**< Общее количество секторов (если > 65535) */
 
     // расширенный BPB
-    u8 drive_number;
-    u8 reserved;
-    u8 boot_signature;
-    u32 volume_id;
-    char volume_label[11];
-    char fs_type[8];
+    u8 drive_number;           /**< Номер диска в BIOS */
+    u8 reserved;               /**< Зарезервировано */
+    u8 boot_signature;         /**< Сигнатура расширенного BPB (0x29) */
+    u32 volume_id;             /**< Уникальный идентификатор тома */
+    char volume_label[11];     /**< Метка тома (8.3 формат) */
+    char fs_type[8];           /**< Тип файловой системы ("FAT12   ") */
 } __attribute__((packed)) fat12_boot_sector_t;
 
-// запись в директории
+/**
+ * @brief Структура записи в каталоге FAT12
+ * @description Представляет файл или подкаталог в каталоге FAT12
+ */
 typedef struct {
-    char filename[8];
-    char extension[3];
-    u8 attributes;
-    u8 reserved[10];
-    u16 time_created;
-    u16 date_created;
-    u16 first_cluster;
-    u32 file_size;
+    char filename[8];          /**< Имя файла (без расширения, дополненное пробелами) */
+    char extension[3];         /**< Расширение файла (дополненное пробелами) */
+    u8 attributes;             /**< Атрибуты файла (битовое поле) */
+    u8 reserved[10];           /**< Зарезервировано (нули) */
+    u16 time_created;          /**< Время создания (часы:5, минуты:6, секунды/2:5) */
+    u16 date_created;          /**< Дата создания (год-1980:7, месяц:4, день:5) */
+    u16 first_cluster;         /**< Номер первого кластера файла */
+    u32 file_size;             /**< Размер файла в байтах */
 } __attribute__((packed)) fat12_dir_entry_t;
 
-// контекст FAT12 (отвечает за хранение вычисленных значений)
+/**
+ * @brief Контекст работы с FAT12
+ * @details Хранит вычисленные смещения и буферы для работы с файловой системой
+ */
 typedef struct {
-    u32 fat_start_sector;
-    u32 fat_size_sectors;
-    u32 root_dir_start_sector;
-    u32 root_dir_size_sectors;
-    u32 data_start_sector;
-    u32 total_clusters;
+    u32 fat_start_sector;      /**< Начальный сектор первой таблицы FAT */
+    u32 fat_size_sectors;      /**< Размер одной таблицы FAT в секторах */
+    u32 root_dir_start_sector; /**< Начальный сектор корневого каталога */
+    u32 root_dir_size_sectors; /**< Размер корневого каталога в секторах */
+    u32 data_start_sector;     /**< Начальный сектор области данных */
+    u32 total_clusters;        /**< Общее количество кластеров в области данных */
+    u8* fat_buffer;            /**< Буфер для загруженной таблицы FAT */
+    u32 fat_buffer_loaded;     /**< Флаг загрузки таблицы FAT (0/1) */
 } fat12_context_t;
 
+/**
+ * @brief Инициализация подсистемы FAT12
+ * @details Загружает загрузочный сектор и вычисляет параметры файловой системы
+ */
 void fat12_init(void);
+
+/**
+ * @brief Чтение загрузочного сектора FAT12
+ * @param[out] boot Указатель на структуру для сохранения данных
+ * @return 0 при успехе, -1 при ошибке чтения
+ */
 int fat12_read_boot_sector(fat12_boot_sector_t* boot);
+
+/**
+ * @brief Поиск файла в корневом каталоге
+ * @param[in] filename Имя файла в формате "NAME    EXT" (8.3, в верхнем регистре)
+ * @param[out] result Указатель на структуру для сохранения найденной записи
+ * @return 0 если файл найден, -1 если не найден
+ */
 int fat12_find_file(const char* filename, fat12_dir_entry_t* result);
+
+/**
+ * @brief Вывод содержимого корневого каталога
+ * @details Выводит список файлов и подкаталогов в корневом каталоге
+ */
 void fat12_list_root(void);
+
+/**
+ * @brief Чтение содержимого файла в буфер
+ * @param[in] filename Имя файла для чтения (формат 8.3)
+ * @param[out] buffer Буфер для сохранения данных файла
+ * @return Размер прочитанных данных в байтах при успехе, -1 при ошибке
+ * @warning Буфер должен быть достаточного размера для размещения файла
+ */
 int fat12_read_file(const char* filename, u8* buffer);
+
+/**
+ * @brief Вывод информации о файловой системе FAT12
+ * @details Отображает параметры из загрузочного сектора и вычисленные смещения
+ */
 void print_fat12_info(void);
+
+/**
+ * @brief Очистка ресурсов подсистемы FAT12
+ * @details Освобождает буферы и сбрасывает состояние контекста
+ */
+void fat12_cleanup(void);
 
 #endif

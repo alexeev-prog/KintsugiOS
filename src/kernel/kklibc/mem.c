@@ -52,10 +52,10 @@ int expand_heap(u32 size) {
 
 void* kmalloc(u32 size) {
     if (size == 0) {
+        printf("WARNING: kmalloc called with size 0\n");
         return NULL;
     }
 
-    // Выравниваем размер
     u32 aligned_size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
 
     mem_block_t* current = free_blocks;
@@ -63,7 +63,6 @@ void* kmalloc(u32 size) {
     mem_block_t* best_fit = NULL;
     mem_block_t* best_fit_prev = NULL;
 
-    // Ищем лучший подходящий блок
     while (current) {
         if (current->is_free && current->size >= aligned_size) {
             if (!best_fit || current->size < best_fit->size) {
@@ -76,7 +75,12 @@ void* kmalloc(u32 size) {
     }
 
     if (best_fit) {
-        // Разделяем блок, если достаточно места
+        if (best_fit_prev) {
+            best_fit_prev->next = best_fit->next;
+        } else {
+            free_blocks = best_fit->next;
+        }
+
         if (best_fit->size > aligned_size + sizeof(mem_block_t) + BLOCK_SIZE) {
             mem_block_t* new_block = (mem_block_t*)((u32)best_fit + sizeof(mem_block_t) + aligned_size);
             new_block->size = best_fit->size - aligned_size - sizeof(mem_block_t);
@@ -85,11 +89,16 @@ void* kmalloc(u32 size) {
 
             best_fit->size = aligned_size;
             best_fit->next = new_block;
+
+            if (best_fit_prev) {
+                best_fit_prev->next = new_block;
+            } else {
+                free_blocks = new_block;
+            }
         }
 
         best_fit->is_free = 0;
 
-        // НЕТ GUARD БАЙТОВ - пропускаем
         void* user_ptr = (void*)((u32)best_fit + sizeof(mem_block_t));
 
         stats.alloc_count++;
@@ -98,24 +107,18 @@ void* kmalloc(u32 size) {
             stats.max_used = stats.total_used;
         }
 
-        // Отладочный вывод
-        // printf("[kmalloc] Allocated %d bytes at 0x%x (block: 0x%x)\n",
-        //        aligned_size, (u32)user_ptr, (u32)best_fit);
-
         return user_ptr;
     }
 
-    // Пробуем расширить кучу
     if (expand_heap(aligned_size + sizeof(mem_block_t))) {
         return kmalloc(size);
     }
 
-    printf("ERROR: Out of memory! Requested: %d bytes\n", size);
-    kmemdump();    // Покажем состояние памяти
+    printf("ERROR: Out of memory! Requested: %d (aligned: %d)\n", size, aligned_size);
+    kmemdump();
 
     __asm__ volatile("hlt");
 
-    // panic_red_screen("Memory Error", "Out of memory");
     return NULL;
 }
 

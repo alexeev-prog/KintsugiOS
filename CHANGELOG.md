@@ -1,3 +1,9 @@
+commit 0d5b0a94bd9f773cf2113ba76c88cb9465b77d17
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Feb 7 15:33:50 2026 +0700
+
+    create basic fat12 FS (read-only root), remove guard from memory management
+
 commit 4be2426c4766dc7e3df71e460d7ad43666fb7070
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Feb 7 04:36:13 2026 +0700

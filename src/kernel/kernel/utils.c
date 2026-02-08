@@ -160,6 +160,7 @@ void kmalloc_command(char** args) {
 
 void ls_command(char** args) {
     fat12_list_root();
+    fat12_cleanup();
 }
 
 void cat_command(char** args) {
@@ -185,6 +186,7 @@ void cat_command(char** args) {
     }
 
     kfree(buffer);
+    fat12_cleanup();
 }
 
 void print_fat12_info_command(char** args) {
@@ -205,12 +207,6 @@ void load_command(char** args) {
 
     printf("File size: %d bytes\n", entry.file_size);
 
-    // Ограничим размер
-    if (entry.file_size > 8192) {
-        printf("File too large (max 8KB)\n");
-        return;
-    }
-
     u32 address = 0x100000;
     if (args[1]) {
         address = hex_strtoint(args[1]);
@@ -229,4 +225,5 @@ void load_command(char** args) {
     }
 
     kfree(buffer);
+    fat12_cleanup();
 }

@@ -11,7 +11,7 @@
 #include "ctypes.h"
 
 #define HEAP_START 0x100000    // начинаем кучу с 1 МБ (выше ядра)
-#define HEAP_SIZE 0x1000000    // размер кучи: 16 МБ
+#define HEAP_SIZE 0x2000000
 #define BLOCK_SIZE 16
 #define MAGIC_NUMBER 0xDEADBEEF
 
