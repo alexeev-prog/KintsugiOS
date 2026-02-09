@@ -1,3 +1,9 @@
+commit 88857627fa38095275cd92352038d99a6e325a43
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Feb 9 07:00:24 2026 +0700
+
+    create logical terminal screen and support scrolling, fix 54-sectors error, fix FS
+
 commit c9d2bc3d3d99a196c42dbee0672a5855035c7a58
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Feb 8 21:22:36 2026 +0700

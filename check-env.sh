@@ -76,6 +76,8 @@ echo "Utilities:"
 check_tool "GDB" "gdb --version"
 check_tool "MTools" "mtools --version"
 check_tool "Xorriso" "xorriso --version"
+check_tool "Python 3" "python3 --version"
+check_tool "Make" "make --version"
 
 # Summary
 echo
