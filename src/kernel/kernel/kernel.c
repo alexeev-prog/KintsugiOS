@@ -10,6 +10,8 @@
 #include "../cpu/isr.h"
 #include "../drivers/ata_pio.h"
 #include "../drivers/screen.h"
+#include "../drivers/screen_output_switch.h"
+#include "../drivers/terminal.h"
 #include "../fs/fat12.h"
 #include "../kklibc/kklibc.h"
 #include "sysinfo.h"
@@ -21,8 +23,9 @@ int shell_cursor_offset = 0;
 int shell_prompt_offset = 0;
 
 void kmain() {
-    // Запускаемая функция ядра //
-    clear_screen();
+    // clear_screen();
+
+    kprint("Launch Kintsugi OS Kernel...\n");
 
     isr_install();
     irq_install();
@@ -36,9 +39,18 @@ void kmain() {
     ata_pio_init();
     fat12_init();
 
+    kprint("\nEnter to continue . . . ");
+
+    char answer[1];
+    read_line(answer, sizeof(answer));
+
+    terminal_init();
+    output_set_mode(OUTPUT_MODE_TERMINAL);
+    terminal_refresh();
+
     printf("\nKintsugi OS %s (C) 2025\nRepository: " "https://github.com/alexeev-prog/KintsugiOS\n", VERSION);
 
-    kprint("\nKeramika Shell " "Type HELP to view commands\n\n!#> ");
+    kprint("Keramika Shell " "Type HELP to view commands\n\n!#> ");
 
     shell_cursor_offset = get_cursor_offset();
     shell_prompt_offset = shell_cursor_offset;

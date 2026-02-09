@@ -10,7 +10,7 @@
 
 #include "ctypes.h"
 
-#define HEAP_START 0x100000    // начинаем кучу с 1 МБ (выше ядра)
+#define HEAP_START 0x200000
 #define HEAP_SIZE 0x2000000
 #define BLOCK_SIZE 16
 #define MAGIC_NUMBER 0xDEADBEEF
@@ -25,7 +25,7 @@ typedef struct mem_block {
     u32 size;
     struct mem_block* next;
     u8 is_free;
-} mem_block_t;
+} __attribute__((packed)) mem_block_t;
 
 /**
  * @brief Структура информации о памяти

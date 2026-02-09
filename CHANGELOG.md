@@ -1,3 +1,9 @@
+commit c9d2bc3d3d99a196c42dbee0672a5855035c7a58
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Feb 8 21:22:36 2026 +0700
+
+    fix memory leaking in kmalloc; fix bugs in fat12 fs
+
 commit 0d5b0a94bd9f773cf2113ba76c88cb9465b77d17
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sat Feb 7 15:33:50 2026 +0700

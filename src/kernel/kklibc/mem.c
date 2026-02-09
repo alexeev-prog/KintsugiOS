@@ -31,6 +31,8 @@ void heap_init() {
     stats.free_count = 0;
     stats.max_used = 0;
     stats.leak_count = 0;
+
+    // printf("Heap initialized at 0x%x with size: %d bytes\n", HEAP_START, HEAP_SIZE);
 }
 
 int expand_heap(u32 size) {
@@ -205,21 +207,26 @@ void kfree(void* ptr) {
 }
 
 meminfo_t get_meminfo() {
+    u32 current_addr = HEAP_START;
     mem_block_t* current = free_blocks;
+    u32 heap_end = heap_current_end;
     u32 total_used = 0;
     u32 total_free = 0;
     u32 block_count = 0;
     u32 used_blocks = 0;
 
-    while (current) {
+    while (current_addr < heap_end) {
+        mem_block_t* block = (mem_block_t*)current_addr;
         block_count++;
-        if (current->is_free) {
-            total_free += current->size;
+
+        if (block->is_free) {
+            total_free += block->size;
         } else {
-            total_used += current->size;
+            total_used += block->size;
             used_blocks++;
         }
-        current = current->next;
+
+        current_addr += sizeof(mem_block_t) + block->size;
     }
 
     stats.total_used = total_used;
@@ -238,7 +245,7 @@ meminfo_t get_meminfo() {
 
 void kmemdump() {
     meminfo_t info = get_meminfo();
-    mem_block_t* current = info.free_blocks;
+    u32 current_addr = HEAP_START;
     u32 counter = 0;
 
     printf(
@@ -253,14 +260,18 @@ void kmemdump() {
         "Max used: %d bytes, Current: USED=%d, FREE=%d\n", info.max_used, info.total_used, info.total_free);
     printf("Total blocks: %d\n", info.block_count);
 
-    while (current) {
+    while (current_addr < info.heap_current_end) {
+        mem_block_t* block = (mem_block_t*)current_addr;
+
         printf(
-            "Block %d: 0x%x, Size=%d, %s\n",
+            "Block %d: header=0x%x (pointer 0x%x), Size=%d, %s\n",
             counter++,
-            (u32)current,
-            current->size,
-            current->is_free ? "FREE" : "USED");
-        current = current->next;
+            (u32)block,
+            (u32)block + sizeof(mem_block_t),
+            block->size,
+            block->is_free ? "FREE" : "USED");
+
+        current_addr += sizeof(mem_block_t) + block->size;
     }
 }
 

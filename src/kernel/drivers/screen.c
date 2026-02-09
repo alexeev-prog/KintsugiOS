@@ -2,9 +2,8 @@
  *  Kintsugi OS Drivers source code
  *  File: drivers/screen.c
  *  Title: Функции работы с экраном
- *  Last Change Date: 30 October 2023, 12:28 (UTC)
  *  Author: alexeev-prog
- *  License: GNU GPL v3
+ *  License: MIT License
  * ------------------------------------------------------------------------------
  *	Description: null
  * ----------------------------------------------------------------------------*/
@@ -14,17 +13,15 @@
 #include "../kklibc/ctypes.h"
 #include "../kklibc/stdlib.h"
 #include "lowlevel_io.h"
+#include "screen_output_switch.h"
+#ifdef TERMINAL_DRIVER_ENABLED
+#    include "terminal.h"
+#endif
 
-/* Декларирования частных функций */
-void set_cursor_offset(int offset);
-int print_char(char c, int col, int row, char attr);
-int get_offset(int col, int row);
-int get_offset_row(int offset);
-int get_offset_col(int offset);
-
-/**********************************************************
- * Публичные функции API ядра                             *
- **********************************************************/
+#define INPUT_BUFFER_SIZE 256
+static char input_buffer[INPUT_BUFFER_SIZE];
+static int input_buffer_pos = 0;
+static int input_ready = 0;
 
 /**
  * Вывод сообщения в специфической локации
@@ -51,29 +48,76 @@ void kprint_at(char* message, int col, int row, int color) {
     }
 }
 
+void kprint_at_pos(int col, int row, char c, char attr) {
+    if (col < 0 || col >= MAX_COLS || row < 0 || row >= MAX_ROWS) {
+        return;
+    }
+
+    if (col >= 0 && col < MAX_COLS && row >= 0 && row < MAX_ROWS) {
+        u8* vidmem = (u8*)VIDEO_ADDRESS;
+        int offset = get_offset(col, row);
+        vidmem[offset] = c;
+        vidmem[offset + 1] = attr;
+    }
+}
+
 void kprint(char* message) {
-    // Вывод текста. Цвет по умолчанию - белый на черном
-    kprint_at(message, -1, -1, WHITE_ON_BLACK);
+    if (IS_TERMINAL_MODE()) {
+        terminal_print(message);
+    } else {
+        _screen_kprint(message);
+    }
 }
 
 void kprintln(char* message) {
-    // Вывод текста. Цвет по умолчанию - белый на черном
-    kprint_at(message, -1, -1, WHITE_ON_BLACK);
+    kprint(message);
     kprint("\n");
 }
 
 void kprintln_colored(char* message, int color) {
-    /* Цветной вывод текста. Принимает также, в отличии от kprint, код цвета.*/
-    kprint_at(message, -1, -1, color);
+    kprint_colored(message, color);
     kprint("\n");
 }
 
 void kprint_colored(char* message, int color) {
-    /* Цветной вывод текста. Принимает также, в отличии от kprint, код цвета.*/
+    if (IS_TERMINAL_MODE()) {
+        terminal_print_colored(message, color);
+    } else {
+        _screen_kprint_colored(message, color);
+    }
+}
+
+void kprint_backspace(void) {
+    if (IS_TERMINAL_MODE()) {
+        terminal_handle_backspace();
+    } else {
+        _screen_kprint_backspace();
+    }
+}
+
+void _screen_kprint(char* message) {
+    // Вывод текста. Цвет по умолчанию - белый на черном
+    kprint_at(message, -1, -1, WHITE_ON_BLACK);
+}
+
+void _screen_kprintln(char* message) {
+    // Вывод текста. Цвет по умолчанию - белый на черном
+    kprint_at(message, -1, -1, WHITE_ON_BLACK);
+    _screen_kprint("\n");
+}
+
+void _screen_kprintln_colored(char* message, int color) {
+    /* Цветной вывод текста. Принимает также, в отличии от _screen_kprint, код цвета.*/
+    kprint_at(message, -1, -1, color);
+    _screen_kprint("\n");
+}
+
+void _screen_kprint_colored(char* message, int color) {
+    /* Цветной вывод текста. Принимает также, в отличии от _screen_kprint, код цвета.*/
     kprint_at(message, -1, -1, color);
 }
 
-void kprint_backspace() {
+void _screen_kprint_backspace() {
     int offset = get_cursor_offset() - 2;
     int row = get_offset_row(offset);
     int col = get_offset_col(offset);
@@ -108,10 +152,10 @@ void panic_red_screen(char* title, char* description) {
 
     set_cursor_offset(get_offset(0, 0));
 
-    kprint_colored("KINTSUGIOS KERNEL PANIC RED SCREEN\n\n", WHITE_ON_RED);
-    kprint_colored(title, WHITE_ON_RED);
-    kprint_colored("\n\n", WHITE_ON_RED);
-    kprint_colored(description, WHITE_ON_RED);
+    _screen_kprint_colored("KINTSUGIOS KERNEL PANIC RED SCREEN\n\n", WHITE_ON_RED);
+    _screen_kprint_colored(title, WHITE_ON_RED);
+    _screen_kprint_colored("\n\n", WHITE_ON_RED);
+    _screen_kprint_colored(description, WHITE_ON_RED);
 
     __asm__ volatile("hlt");
 }
@@ -126,10 +170,6 @@ void printf_panic_screen(char* title, const char* reason_fmt, ...) {
 
     panic_red_screen(title, description);
 }
-
-/**********************************************************
- * Приватные функции ядра                                 *
- **********************************************************/
 
 /**
  * Функции вывода строки для ядра, использующие видео-память
@@ -215,6 +255,12 @@ void set_cursor_offset(int offset) {
 }
 
 void clear_screen() {
+    if (IS_TERMINAL_MODE()) {
+        terminal_clear();
+        terminal_refresh();
+        return;
+    }
+
     int screen_size = MAX_COLS * MAX_ROWS;
     int i;
     u8* screen = (u8*)VIDEO_ADDRESS;
@@ -236,4 +282,74 @@ int get_offset_row(int offset) {
 
 int get_offset_col(int offset) {
     return (offset - (get_offset_row(offset) * 2 * MAX_COLS)) / 2;
+}
+
+void handle_input_char(char c) {
+    if (input_ready) {
+        return;
+    }
+
+    if (c == '\n' || c == '\r') {
+        kprint("\n");
+        input_buffer[input_buffer_pos] = '\0';
+        input_ready = 1;
+    } else if (c == 0x08 || c == 0x7F) {
+        if (input_buffer_pos > 0) {
+            input_buffer_pos--;
+            kprint_backspace();
+        }
+    } else if (c >= 32 && c < 127) {    // Печатные символы
+        if (input_buffer_pos < INPUT_BUFFER_SIZE - 1) {
+            input_buffer[input_buffer_pos++] = c;
+            char str[2] = { c, '\0' };
+            kprint(str);
+        }
+    }
+}
+
+int read_line(char* buffer, int max_len) {
+    input_buffer_pos = 0;
+    input_ready = 0;
+
+    while (!input_ready) {
+        __asm__ volatile("hlt");
+    }
+
+    int len = strlen(input_buffer);
+    if (len >= max_len) {
+        len = max_len - 1;
+    }
+
+    strncpy(buffer, input_buffer, len);
+    buffer[len] = '\0';
+
+    return len;
+}
+
+int read_line_with_prompt(const char* prompt, char* buffer, int max_len) {
+    kprint(prompt);
+    return read_line(buffer, max_len);
+}
+
+char* get_input_buffer(void) {
+    return input_buffer;
+}
+
+void clear_input_buffer(void) {
+    input_buffer[0] = '\0';
+    input_buffer_pos = 0;
+    input_ready = 0;
+}
+
+int has_input_ready(void) {
+    return input_ready;
+}
+
+char* take_input(void) {
+    if (!input_ready) {
+        return NULL;
+    }
+
+    input_ready = 0;
+    return input_buffer;
 }

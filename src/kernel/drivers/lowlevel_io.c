@@ -2,6 +2,9 @@
  *  Kintsugi OS Drivers source code
  *  File: kernel/drivers/lowlevel_io.c
  *  Title:	Низкоуровневые I/O функции для работы с девайсами
+ *  Author: alexeev-prog
+ *  License: MIT License
+ * ------------------------------------------------------------------------------
  *	Description:
  *		Обычно есть два способа взаимодействовать с hardware -
  *memory-mapped I/O и I/O ports. Если девайс использует memory-mapped I/O, то

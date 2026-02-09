@@ -153,9 +153,11 @@ void kmalloc_command(char** args) {
     void* ptr = (void*)kmalloc(size);
 
     char buf1[32] = "";
+    char buf2[32] = "";
     hex_to_ascii((int)ptr, buf1);
+    hex_to_ascii((int)ptr - sizeof(mem_block_t), buf2);
 
-    printf("Allocate %d bytes.\nPointer: %s", size, buf1);
+    printf("Allocate %d bytes.\nPointer: %s (block header at %s)\n", size, buf1, buf2);
 }
 
 void ls_command(char** args) {

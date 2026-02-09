@@ -37,7 +37,7 @@ puts_chars_pm:
 puts_chars_pm_loop:
 							; Помним, что AX (2б) = AH(1б) и AL(1б)
 	mov al, [ebx]			; Сохраняем символ из EBX в AL
-	mov ah, WHITE_ON_BLUE	; Устанавливаем цвет символов в AH
+	mov ah, WHITE_ON_BLACK	; Устанавливаем цвет символов в AH
 							; таким образом AX получается равен символу + цвету
 
 	cmp al, 0				; if (AL == 0), т.е. если конец массива, то

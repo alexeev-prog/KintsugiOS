@@ -2,6 +2,9 @@
  *  Kintsugi OS Drivers source code
  *  File: kernel/drivers/ata_pio.h
  *  Title: Заголовочный файл драйвера ATA PIO
+ *  Author: alexeev-prog
+ *  License: MIT License
+ * ------------------------------------------------------------------------------
  *  Description: Драйвер для работы с жесткими дисками через PIO mode.
  * ---------------------------------------------------------------------------*/
 

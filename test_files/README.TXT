@@ -1,4 +1,4 @@
-KintsugiOS FAT12 Test
+KintsugiOS
 ====================
 
 This is a test file on the FAT12 HDD.

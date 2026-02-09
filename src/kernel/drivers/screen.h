@@ -2,9 +2,8 @@
  *  Kintsugi OS Drivers source code
  *  File: drivers/screen.h
  *  Title: Заголовочный файл screen.c
- *  Last Change Date: 30 October 2023, 12:28 (UTC)
  *  Author: alexeev-prog
- *  License: GNU GPL v3
+ *  License: MIT License
  * ------------------------------------------------------------------------------
  *	Description: null
  * ----------------------------------------------------------------------------*/
@@ -14,6 +13,8 @@
 
 // Подключаем типы из CPU
 #include "../kklibc/ctypes.h"
+#include "screen_output_switch.h"
+#include "terminal.h"
 
 #define VIDEO_ADDRESS 0xb8000    // Видео-адрес
 #define MAX_ROWS 25    // Максимальное кол-во линий
@@ -66,6 +67,42 @@ void clear_screen();
  **/
 void halted_cpu_screen_clear();
 
+void kprint(char* message);
+void kprintln(char* message);
+void kprintln_colored(char* message, int color);
+void kprint_colored(char* message, int color);
+void kprint_backspace(void);
+
+void handle_input_char(char c);
+
+/**
+ * @brief Чтение строки с клавиатуры с экрана
+ * @param buffer Буфер для строки
+ * @param max_len Максимальная длина (включая нулевой символ)
+ * @return Длина введенной строки (без нулевого символа)
+ */
+int read_line(char* buffer, int max_len);
+
+/**
+ * @brief Вывести приглашение и прочитать строку
+ * @param prompt Приглашение (например, "Enter name: ")
+ * @param buffer Буфер для строки
+ * @param max_len Максимальная длина
+ * @return Длина введенной строки
+ */
+int read_line_with_prompt(const char* prompt, char* buffer, int max_len);
+
+/**
+ * @brief Получить текущий буфер ввода (для шелла)
+ * @return Указатель на буфер ввода
+ */
+char* get_input_buffer(void);
+
+/**
+ * @brief Очистить буфер ввода
+ */
+void clear_input_buffer(void);
+
 /**
  * @brief Вывод текста в определенном месте
  *
@@ -81,14 +118,14 @@ void kprint_at(char* message, int col, int row, int color);
  *
  * @param message сообщение
  **/
-void kprint(char* message);
+void _screen_kprint(char* message);
 
 /**
  * @brief Вывод текста с новой строкой
  *
  * @param message сообщение
  **/
-void kprintln(char* message);
+void _screen_kprintln(char* message);
 
 /**
  * @brief Цветной вывод с новой строкой
@@ -96,7 +133,7 @@ void kprintln(char* message);
  * @param message сообщение
  * @param color цвет
  **/
-void kprintln_colored(char* message, int color);
+void _screen_kprintln_colored(char* message, int color);
 
 /**
  * @brief Цветной вывод
@@ -104,13 +141,13 @@ void kprintln_colored(char* message, int color);
  * @param message сообщение
  * @param color цвет
  **/
-void kprint_colored(char* message, int color);
+void _screen_kprint_colored(char* message, int color);
 
 /**
  * @brief Вывод символа backspace
  *
  **/
-void kprint_backspace();
+void _screen_kprint_backspace();
 
 /**
  * @brief Красный экран для паники ядра
@@ -121,5 +158,20 @@ void kprint_backspace();
 void panic_red_screen(char* title, char* description);
 
 void printf_panic_screen(char* title, const char* reason_fmt, ...);
+
+void set_cursor_offset(int offset);
+int print_char(char c, int col, int row, char attr);
+int get_offset(int col, int row);
+int get_offset_row(int offset);
+int get_offset_col(int offset);
+
+/**
+ * @brief Вывод символа в определенной позиции
+ * @param col колонка
+ * @param row строка
+ * @param c символ
+ * @param attr атрибуты (цвет)
+ */
+void kprint_at_pos(int col, int row, char c, char attr);
 
 #endif

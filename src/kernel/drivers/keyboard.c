@@ -2,6 +2,9 @@
  *  Kintsugi OS Drivers source code
  *  File: kernel/drivers/keyboard.c
  *  Title: Функции работы с клавиатурой
+ *  Author: alexeev-prog
+ *  License: MIT License
+ * ------------------------------------------------------------------------------
  *	Description: null
  * ----------------------------------------------------------------------------*/
 
@@ -13,6 +16,7 @@
 #include "../kklibc/stdlib.h"
 #include "lowlevel_io.h"
 #include "screen.h"
+#include "terminal.h"
 
 #define BACKSPACE 0x0E
 #define ENTER 0x1C
@@ -52,7 +56,7 @@ static void keyboard_callback(registers_t regs) {
             case 0x2A:    // Left Shift
             case 0x36:    // Right Shift
                 shift_pressed = 0;
-                break;
+                return;
             case 0x1D:    // Ctrl
                 ctrl_pressed = 0;
                 break;
@@ -76,6 +80,25 @@ static void keyboard_callback(registers_t regs) {
                 break;
             case 0x3A:    // Caps Lock
                 caps_lock = !caps_lock;
+                break;
+            case 0x48:    // Стрелка вверх
+                if (shift_pressed) {
+                    // Shift+Вверх - прокрутка терминала
+                    terminal_handle_arrow_up();
+                } else {
+                    // Просто стрелка вверх - история команд
+                    // TODO: реализовать историю
+                }
+                break;
+
+            case 0x50:    // Стрелка вниз
+                if (shift_pressed) {
+                    // Shift+Вниз - прокрутка терминала
+                    terminal_handle_arrow_down();
+                } else {
+                    // Просто стрелка вниз - история команд
+                    // TODO: реализовать историю
+                }
                 break;
             default:
                 if (scancode > SC_MAX) {
@@ -110,15 +133,24 @@ static void keyboard_callback(registers_t regs) {
                     }
                     backspace(key_buffer);
                     kprint_backspace();
+
+                    /* Также обрабатываем для общего ввода */
+                    handle_input_char(0x08);
                 } else if (scancode == ENTER) {
                     kprint("\n");
                     user_input(key_buffer);
                     key_buffer[0] = '\0';
+
+                    /* Также обрабатываем для общего ввода */
+                    handle_input_char('\n');
                 } else {
                     if (strlen(key_buffer) < sizeof(key_buffer) - 1) {
                         append(key_buffer, letter);
                         char str[2] = { letter, '\0' };
                         kprint(str);
+
+                        /* Также обрабатываем для общего ввода */
+                        handle_input_char(letter);
                     }
                 }
                 break;

@@ -7,7 +7,7 @@
 
 [org 0x7c00]
 
-KERNEL_OFFSET equ 0x1000	; Смещение в памяти, из которого мы загрузим ядро
+KERNEL_OFFSET equ 0x007e00	; Смещение в памяти, из которого мы загрузим ядро
 
 	mov [BOOT_DRIVE], dl	; BIOS хранит наш загрузочный диск в формате DL, поэтому
 							; лучше запомнить это на будущее. (Помните об этом
@@ -37,7 +37,7 @@ load_kernel:
 							; Устанавливаем параметры для функции disk_load:
 	mov bx, KERNEL_OFFSET	; Загрузим данные в место памяти
 							; смещению KERNEL_OFFSET
-	mov dh, 54				; Загрузим много секторов для ядра.
+	mov dh, 55				; Загрузим много секторов для ядра.
 	mov dl, [BOOT_DRIVE]	; Загрузим данные из BOOT_DRIVE (Возвращаем BOOT_DRIVE)
 	call disk_load			; Вызываем функцию disk_load
 	ret
@@ -52,9 +52,9 @@ BEGIN_PM:
 
 
 BOOT_DRIVE:			db 0
-MSG_REAL_MODE:		db "Start KintsugiOS into Real Mode", 0 							; [Старт] 16 битный реальный режим
-MSG_PROT_MODE:		db "Success KintsugiOS into Prot Mode", 0        					; [Успех] 32 битный защищенный режим
-MSG_LOAD_KERNEL:	db "Load KintsugiOS Kernel with Video Memory", 0 					; [Загрузка] ядра с видео памятью
+MSG_REAL_MODE:		db "Start RMx16", 0 							; [Старт] 16 битный реальный режим
+MSG_PROT_MODE:		db "Start PMx32", 0        					; [Успех] 32 битный защищенный режим
+MSG_LOAD_KERNEL:	db "Start Kernel", 0 					; [Загрузка] ядра с видео памятью
 
 times 510-($-$$) db 0
 dw 0xaa55

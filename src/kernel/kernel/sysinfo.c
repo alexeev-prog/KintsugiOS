@@ -19,6 +19,7 @@ void detect_cpu(void) {
 
     __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
     sys_info.cpu_cores = 1;
+    printf("CPU detected: %s\n", vendor);
 }
 
 void detect_memory() {
@@ -31,6 +32,12 @@ void detect_memory() {
     sys_info.heap_size = info.heap_size;
     sys_info.heap_used = info.total_used;
     sys_info.heap_free = info.total_free;
+
+    printf(
+        "Memory detected: total=%d; used=%d; free=%d\n",
+        HEAP_START + HEAP_SIZE,
+        info.total_used + (HEAP_START - 0x1000),
+        info.total_free);
 }
 
 system_info_t* get_system_info() {

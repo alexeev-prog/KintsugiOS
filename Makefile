@@ -13,16 +13,18 @@ HDDIMG_NAME = kintsugi_hdd_i386.img
 FAT12_HDD_NAME = kintsugi_fat12_hdd.img
 ISO_NAME = KintsugiOS.iso
 
-FAT12_TEST_FILES = test_files/TEST.TXT test_files/README.TXT test_files/HELLO.TXT
+FAT12_TEST_FILES = test_files/README.TXT
 TEST_FILES_DIR = test_files
 
 MKISOFS = genisoimage
 XORRISO = xorriso
 
+KERNEL_OFFSET = 0x007e00
+
 CFLAGS = -g -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs -Wall -Wextra -ffreestanding -I$(SRC_DIR)/kernel/include
 ASMFLAGS_BIN = -f bin
 ASMFLAGS_ELF = -f elf
-LDFLAGS = -Ttext 0x1000 --oformat binary
+LDFLAGS = -Ttext $(KERNEL_OFFSET) --oformat binary
 
 KERNEL_ENTRY = $(BIN_DIR)/bootloader/kernel_entry.o
 INTERRUPT_OBJ = $(BIN_DIR)/kernel/cpu/interrupt.o
@@ -205,7 +207,7 @@ run_fat12: $(DISKIMG_DIR)/$(DISKIMG_NAME) $(DISKIMG_DIR)/$(FAT12_HDD_NAME)
 		-boot a \
 		-m 16 \
 		-display sdl \
-		-name "KintsugiOS FAT12 Test"
+		-name "KintsugiOS"
 
 run_iso: $(DISKIMG_DIR)/$(ISO_NAME) $(DISKIMG_DIR)/$(HDDIMG_NAME)
 	@printf "$(GREEN)[QEMU] Run ISO   %-50s$(RESET)\n" "$<"

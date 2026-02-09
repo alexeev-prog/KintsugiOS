@@ -8,6 +8,8 @@
 #include "stdio.h"
 
 #include "../drivers/screen.h"
+#include "../drivers/screen_output_switch.h"
+#include "../drivers/terminal.h"
 #include "stdlib.h"
 
 #define PRINTF_BUF_SIZE 1024
@@ -287,7 +289,12 @@ void printf(char* fmt, ...) {
     va_start(args, fmt);
     format_string(printf_buf, fmt, args);
     va_end(args);
-    kprint(printf_buf);
+
+    if (IS_TERMINAL_MODE()) {
+        terminal_print(printf_buf);
+    } else {
+        kprint(printf_buf);
+    }
 }
 
 void printf_colored(char* fmt, int color, ...) {
@@ -295,7 +302,12 @@ void printf_colored(char* fmt, int color, ...) {
     va_start(args, color);
     format_string(printf_buf, fmt, args);
     va_end(args);
-    kprint_colored(printf_buf, color);
+
+    if (IS_TERMINAL_MODE()) {
+        terminal_print_colored(printf_buf, color);
+    } else {
+        kprint_colored(printf_buf, color);
+    }
 }
 
 void printf_at(char* fmt, int col, int row, int color, ...) {
@@ -303,5 +315,10 @@ void printf_at(char* fmt, int col, int row, int color, ...) {
     va_start(args, color);
     format_string(printf_buf, fmt, args);
     va_end(args);
-    kprint_at(printf_buf, col, row, color);
+
+    if (IS_TERMINAL_MODE()) {
+        terminal_print_at(printf_buf, col, row, color);
+    } else {
+        kprint_at(printf_buf, col, row, color);
+    }
 }

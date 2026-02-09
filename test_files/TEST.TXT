@@ -1,3 +1,0 @@
-Hello from KintsugiOS FAT12 Filesystem!
-This file was read from the HDD using ATA PIO driver.
-If you see this, your FAT12 implementation works!

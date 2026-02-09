@@ -2,7 +2,11 @@
  *  Kintsugi OS Drivers source code
  *  File: kernel/drivers/lowlevel_io.h
  *  Title: Заголовочный файл для drivers/lowlevel_io.c
- */
+ *  Author: alexeev-prog
+ *  License: MIT License
+ * ------------------------------------------------------------------------------
+ *	Description: null
+ * ----------------------------------------------------------------------------*/
 
 #include "../kklibc/ctypes.h"
 

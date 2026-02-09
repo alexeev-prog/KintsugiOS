@@ -2,6 +2,9 @@
  *  Kintsugi OS Drivers source code
  *  File: kernel/drivers/ata_pio.c
  *  Title: Драйвер ATA PIO
+ *  Author: alexeev-prog
+ *  License: MIT License
+ * ------------------------------------------------------------------------------
  *  Description: Реализация драйвера для работы с жесткими дисками
  * через PIO mode. ATA PIO (Programmed input/output - программный ввод/вывод) -
  * это режим в интерфейсе ATA, который определяет скорость обмена данными
@@ -36,8 +39,6 @@ ata_disk_info_t ata_disks[2];    // 0 - master, 1 - slave
 // внешнее api ядра
 
 void ata_pio_init() {
-    kprint("Initializing ATA PIO driver...\n");
-
     for (int i = 0; i < 2; i++) {
         // Если все ОК, то при запуске в QEMU мы увидим мастер драйв и не увидим slave-драйв.
         u8 drive = (i == 0) ? ATA_MASTER : ATA_SLAVE;
@@ -104,11 +105,9 @@ int ata_pio_identify(u8 drive, ata_disk_info_t* info) {
 
     u8 status = port_byte_in(ATA_PRIMARY_STATUS);
     if (status == 0xFF) {
-        // нет устройства на этом канале
         return -3;
     }
 
-    // ожидаем готовности диска
     if (ata_pio_wait() != 0) {
         return -1;
     }
@@ -116,7 +115,6 @@ int ata_pio_identify(u8 drive, ata_disk_info_t* info) {
     // отправляем IDENTIFY
     port_byte_out(ATA_PRIMARY_CMD, ATA_CMD_IDENTIFY);
 
-    // ждем ответа
     if (ata_pio_wait() != 0) {
         return -2;
     }
@@ -166,7 +164,6 @@ int ata_pio_read_sectors(u8 drive, u32 lba, u8 num, u16* buffer) {
     // выбор диск
     ata_pio_select_drive(drive);
 
-    // колво количество секторов
     port_byte_out(ATA_PRIMARY_SECTOR_CNT, num);
 
     // сетаем LBA адрес
