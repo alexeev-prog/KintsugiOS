@@ -31,7 +31,9 @@ KintsugiOS — это минималистичная x86 операционна�
 
 > Также я занимаюсь [переводом OSDEV-Notes](https://github.com/alexeev-prog/Osdev-Notes-RU)
 
-<img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/gallery/image.png" width="600" alt="">
+<div align="center">
+  <img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/gallery/image.png" width="600" alt="">
+</div>
 
 ## Особенности
 
