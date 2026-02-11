@@ -121,4 +121,32 @@ void print_fat12_info(void);
  */
 void fat12_cleanup(void);
 
+/* -------------------------------------------------------------------------- */
+/* НОВЫЕ ФУНКЦИИ ДЛЯ ЗАПИСИ                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @brief Создание пустого файла
+ * @param[in] filename Имя файла (формат 8.3)
+ * @return 0 при успехе, -1 при ошибке
+ */
+int fat12_create_file(const char* filename);
+
+/**
+ * @brief Удаление файла
+ * @param[in] filename Имя файла (формат 8.3)
+ * @return 0 при успехе, -1 при ошибке
+ */
+int fat12_delete_file(const char* filename);
+
+/**
+ * @brief Запись данных в файл
+ * @details Если файл существует - перезаписывает его, если нет - создает новый
+ * @param[in] filename Имя файла (формат 8.3)
+ * @param[in] data Данные для записи
+ * @param[in] size Размер данных в байтах
+ * @return 0 при успехе, -1 при ошибке
+ */
+int fat12_write_file(const char* filename, u8* data, u32 size);
+
 #endif

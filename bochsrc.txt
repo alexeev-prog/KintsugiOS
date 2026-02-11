@@ -1,0 +1,6 @@
+megs: 32
+ata0-master: type=disk, path=diskimgs/kintsugi_floppy_i386.img, mode=flat, cylinders=80, heads=2, spt=18
+boot: disk
+log: bochs.log
+mouse: enabled=0
+display_library: x

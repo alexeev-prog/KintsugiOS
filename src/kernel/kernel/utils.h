@@ -1,4 +1,3 @@
-
 #ifndef UTILS_H
 #define UTILS_H
 
@@ -100,5 +99,30 @@ void cat_command(char** args);
 void load_command(char** args);
 
 void print_fat12_info_command(char** args);
+
+/* -------------------------------------------------------------------------- */
+/* НОВЫЕ КОМАНДЫ ДЛЯ РАБОТЫ С ФАЙЛАМИ                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @brief Команда создания пустого файла
+ *
+ * @param args аргументы
+ **/
+void create_command(char** args);
+
+/**
+ * @brief Команда удаления файла
+ *
+ * @param args аргументы
+ **/
+void delete_command(char** args);
+
+/**
+ * @brief Команда записи в файл
+ *
+ * @param args аргументы
+ **/
+void write_command(char** args);
 
 #endif

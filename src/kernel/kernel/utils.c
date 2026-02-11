@@ -229,3 +229,72 @@ void load_command(char** args) {
     kfree(buffer);
     fat12_cleanup();
 }
+
+/* -------------------------------------------------------------------------- */
+/* НОВЫЕ КОМАНДЫ ДЛЯ РАБОТЫ С ФАЙЛАМИ FAT12                                  */
+/* -------------------------------------------------------------------------- */
+
+void create_command(char** args) {
+    if (!args[0]) {
+        kprint("Usage: create <filename>\n");
+        return;
+    }
+
+    if (fat12_create_file(args[0]) == 0) {
+        printf("File created: %s\n", args[0]);
+    } else {
+        printf("Failed to create file: %s\n", args[0]);
+    }
+
+    fat12_cleanup();
+}
+
+void delete_command(char** args) {
+    if (!args[0]) {
+        kprint("Usage: del <filename>\n");
+        return;
+    }
+
+    if (fat12_delete_file(args[0]) == 0) {
+        printf("File deleted: %s\n", args[0]);
+    } else {
+        printf("Failed to delete file: %s\n", args[0]);
+    }
+
+    fat12_cleanup();
+}
+
+void write_command(char** args) {
+    if (!args[0] || !args[1]) {
+        kprint("Usage: write <filename> <text>\n");
+        return;
+    }
+
+    // Объединяем все аргументы после имени файла в один текст
+    char* text = args[1];
+    // Если есть больше аргументов, объединяем их
+    for (int i = 2; args[i] != NULL; i++) {
+        // Нужно будет сделать более сложную конкатенацию, но пока просто
+        printf("Note: Only first word written, multi-word not implemented yet\n");
+        break;
+    }
+
+    u32 size = strlen(text);
+    u8* buffer = (u8*)kmalloc(size);
+
+    if (!buffer) {
+        printf("No memory for write buffer\n");
+        return;
+    }
+
+    memcpy(buffer, text, size);
+
+    if (fat12_write_file(args[0], buffer, size) == 0) {
+        printf("Written %d bytes to: %s\n", size, args[0]);
+    } else {
+        printf("Failed to write to file: %s\n", args[0]);
+    }
+
+    kfree(buffer);
+    fat12_cleanup();
+}

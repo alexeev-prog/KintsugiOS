@@ -57,3 +57,4 @@ toolchain/
 bin/
 diskimgs/
 .vscode/
+bochs.log

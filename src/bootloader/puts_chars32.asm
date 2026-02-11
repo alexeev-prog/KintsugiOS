@@ -26,9 +26,6 @@ VIDEO_MEMORY equ 0xb8000	; = адрес начала памяти VGA
 ;;  > 0x0f - белый на черном
 ;;  > 0x1f - белый на синем
 WHITE_ON_BLACK equ 0x0f
-WHITE_ON_BLUE equ 0x1F
-WHITE_ON_GREEN equ 0x2F
-WHITE_ON_RED equ 0x4F
 
 puts_chars_pm:
 	pusha

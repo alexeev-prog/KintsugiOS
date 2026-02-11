@@ -105,7 +105,14 @@ void user_input(char* input) {
         { .text = "ls",           .hint = "List files",                            .command = &ls_command               },
         { .text = "cat",          .hint = "Show file content",                     .command = &cat_command              },
         { .text = "load",         .hint = "Load file to memory",                   .command = &load_command             },
-        { .text = "fat12info",    .hint = "Print fat12 fs info",                   .command = &print_fat12_info_command }
+        { .text = "fat12info",    .hint = "Print fat12 fs info",                   .command = &print_fat12_info_command },
+        { .text = "create",
+         .hint = "Create empty file. Usage: create <filename>",
+         .command = &create_command                                                                                     },
+        { .text = "del",          .hint = "Delete file. Usage: del <filename>",    .command = &delete_command           },
+        { .text = "write",
+         .hint = "Write to file. Usage: write <filename> <text>",
+         .command = &write_command                                                                                      }
     };
 
     int executed = 0;
