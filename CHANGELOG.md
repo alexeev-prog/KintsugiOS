@@ -1,3 +1,9 @@
+commit 26e720bee2948a12eed3335c7dbd4e3154444cad
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Wed Feb 11 20:48:42 2026 +0700
+
+    add create/del/write command to fat12
+
 commit 414aadbaec93429310aaaf82f817278453a4ab0e
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Feb 9 07:20:03 2026 +0700
