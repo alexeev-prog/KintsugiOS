@@ -19,6 +19,14 @@
 
 #define MAX_ARGS 32
 
+// Limine requests (must be in .limine_reqs section)
+__attribute__((used, section(".limine_reqs"))) volatile struct {
+    uint64_t id;
+    uint64_t revision;
+    uint64_t response;
+} limine_bootloader_info_request = { .id = 0xf55038b8e2a120e8,    // LIMINE_BOOTLOADER_INFO_REQUEST
+                                     .revision = 0 };
+
 int shell_cursor_offset = 0;
 int shell_prompt_offset = 0;
 
