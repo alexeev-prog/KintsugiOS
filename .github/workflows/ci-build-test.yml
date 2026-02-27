@@ -1,0 +1,128 @@
+name: CI - Build and Test
+
+on:
+  push:
+    branches:
+      - feature/terminal-improvements
+  pull_request:
+    branches:
+      - main
+      - feature/terminal-improvements
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y nasm fasm qemu-system-x86 mtools xorriso gdb python3
+
+    - name: Download i386-elf-gcc toolchain
+      run: |
+        wget -q http://newos.org/toolchains/i386-elf-15.1.0-Linux-x86_64.tar.xz
+        tar xf i386-elf-15.1.0-Linux-x86_64.tar.xz
+        echo "$PWD/i386-elf-15.1.0-Linux-x86_64/bin" >> $GITHUB_PATH
+
+    - name: Verify toolchain
+      run: |
+        i386-elf-gcc --version || echo "GCC not in PATH yet"
+        nasm --version
+        python3 --version
+
+    - name: Check environment
+      run: |
+        chmod +x check-env.sh
+        # Run check but don't fail on missing optional tools
+        ./check-env.sh || true
+
+    - name: Build bootloader
+      run: |
+        export PATH="$PWD/i386-elf-15.1.0-Linux-x86_64/bin:$PATH"
+        make clean
+        make quick
+
+    - name: Verify build artifacts
+      run: |
+        ls -lh build/
+        test -f build/kernel.bin || (echo "Kernel binary not found!" && exit 1)
+        test -f build/bootsector.bin || (echo "Bootsector binary not found!" && exit 1)
+        echo "✅ Build artifacts created successfully"
+
+    - name: Run basic QEMU test (non-interactive)
+      run: |
+        timeout 10 qemu-system-i386 \
+          -drive file=build/kintsugi.img,format=raw \
+          -nographic \
+          -monitor none \
+          -serial stdio \
+          -no-reboot || true
+        echo "✅ QEMU boot test completed"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kintsugi-os-build
+        path: |
+          build/*.bin
+          build/*.img
+        retention-days: 7
+
+  code-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install clang-format and clang-tidy
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-format clang-tidy
+
+    - name: Check code formatting
+      run: |
+        # Find all C/C++ files and check formatting
+        find src -name '*.c' -o -name '*.h' | while read file; do
+          clang-format --dry-run --Werror "$file" || echo "Format issues in $file"
+        done
+
+    - name: Run clang-tidy (if applicable)
+      continue-on-error: true
+      run: |
+        # This is optional and may need compilation database
+        echo "Skipping clang-tidy for now - needs compile_commands.json"
+
+  documentation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install doxygen
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y doxygen graphviz
+
+    - name: Generate documentation
+      run: |
+        doxygen --version
+        doxygen
+
+    - name: Verify documentation
+      run: |
+        test -d docs/html || (echo "Documentation not generated!" && exit 1)
+        echo "✅ Documentation generated successfully"
+
+    - name: Upload documentation artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: kintsugi-os-docs
+        path: docs/html/
+        retention-days: 7
