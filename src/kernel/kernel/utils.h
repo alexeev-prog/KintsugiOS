@@ -125,4 +125,15 @@ void delete_command(char** args);
  **/
 void write_command(char** args);
 
+/**
+ * @brief Команда просмотра истории команд
+ *
+ * Использование:
+ *   history        - показать всю историю
+ *   history -c     - очистить историю
+ *
+ * @param args аргументы
+ **/
+void history_command(char** args);
+
 #endif

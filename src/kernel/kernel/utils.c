@@ -8,6 +8,7 @@
 #include "utils.h"
 
 #include "../cpu/ports.h"
+#include "../drivers/history.h"
 #include "../drivers/screen.h"
 #include "../fs/fat12.h"
 #include "../kklibc/ctypes.h"
@@ -297,4 +298,26 @@ void write_command(char** args) {
 
     kfree(buffer);
     fat12_cleanup();
+}
+
+/* -------------------------------------------------------------------------- */
+/* КОМАНДА ИСТОРИИ                                                          */
+/* -------------------------------------------------------------------------- */
+
+void history_command(char** args) {
+    /* Проверяем аргументы */
+    if (args[0] != NULL) {
+        if (strcmp(args[0], "-c") == 0 || strcmp(args[0], "--clear") == 0) {
+            history_clear();
+            kprint("Command history cleared\n");
+            return;
+        } else {
+            printf("Unknown option: %s\n", args[0]);
+            kprint("Usage: history [-c | --clear]\n");
+            return;
+        }
+    }
+
+    /* Без аргументов — печатаем всю историю */
+    history_print();
 }

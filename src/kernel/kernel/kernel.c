@@ -9,6 +9,7 @@
 
 #include "../cpu/isr.h"
 #include "../drivers/ata_pio.h"
+#include "../drivers/history.h"
 #include "../drivers/screen.h"
 #include "../drivers/screen_output_switch.h"
 #include "../drivers/terminal.h"
@@ -38,6 +39,10 @@ void kmain() {
 
     ata_pio_init();
     fat12_init();
+
+    /* Инициализация истории команд */
+    history_init();
+    kprint("Command history initialized\n");
 
     kprint("\nEnter to continue . . . ");
 
@@ -112,7 +117,8 @@ void user_input(char* input) {
         { .text = "del",          .hint = "Delete file. Usage: del <filename>",    .command = &delete_command           },
         { .text = "write",
          .hint = "Write to file. Usage: write <filename> <text>",
-         .command = &write_command                                                                                      }
+         .command = &write_command                                                                                      },
+        { .text = "history",      .hint = "Show command history. -c to clear",     .command = &history_command          }
     };
 
     int executed = 0;
