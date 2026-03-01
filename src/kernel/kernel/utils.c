@@ -8,7 +8,9 @@
 #include "utils.h"
 
 #include "../cpu/ports.h"
+#include "../drivers/history.h"
 #include "../drivers/screen.h"
+#include "../drivers/theme.h"
 #include "../fs/fat12.h"
 #include "../kklibc/ctypes.h"
 #include "../kklibc/kklibc.h"
@@ -297,4 +299,75 @@ void write_command(char** args) {
 
     kfree(buffer);
     fat12_cleanup();
+}
+
+/* -------------------------------------------------------------------------- */
+/* КОМАНДА ИСТОРИИ                                                          */
+/* -------------------------------------------------------------------------- */
+
+void history_command(char** args) {
+    /* Проверяем аргументы */
+    if (args[0] != NULL) {
+        if (strcmp(args[0], "-c") == 0 || strcmp(args[0], "--clear") == 0) {
+            history_clear();
+            kprint("Command history cleared\n");
+            return;
+        } else {
+            printf("Unknown option: %s\n", args[0]);
+            kprint("Usage: history [-c | --clear]\n");
+            return;
+        }
+    }
+
+    /* Без аргументов — печатаем всю историю */
+    history_print();
+}
+
+/* -------------------------------------------------------------------------- */
+/* КОМАНДА ТЕМ                                                                */
+/* -------------------------------------------------------------------------- */
+
+void theme_command(char** args) {
+    /* Проверяем подкоманды */
+    if (!args[0]) {
+        printf("Usage: theme <list|set> [id]\n");
+        printf("  theme list        - Show all available themes\n");
+        printf("  theme set <id>    - Set theme by ID (0-%d)\n", THEME_COUNT - 1);
+        return;
+    }
+
+    /* Subcommand: list */
+    if (strcmp(args[0], "list") == 0) {
+        theme_list_all();
+        return;
+    }
+
+    /* Subcommand: set */
+    if (strcmp(args[0], "set") == 0) {
+        if (!args[1]) {
+            printf("Error: Missing theme ID\n");
+            printf("Usage: theme set <id>\n");
+            printf("Run 'theme list' to see available themes\n");
+            return;
+        }
+
+        int id = strtoint(args[1]);
+
+        if (id < 0 || id >= THEME_COUNT) {
+            printf("Error: Invalid theme ID %d\n", id);
+            printf("Valid range: 0-%d\n", THEME_COUNT - 1);
+            return;
+        }
+
+        if (theme_set((theme_id_t)id) == 0) {
+            printf("Theme changed to '%s'\n", theme_get_name((theme_id_t)id));
+        } else {
+            printf("Failed to set theme\n");
+        }
+        return;
+    }
+
+    /* Неизвестная подкоманда */
+    printf("Unknown subcommand: %s\n", args[0]);
+    printf("Usage: theme <list|set> [id]\n");
 }
