@@ -136,4 +136,15 @@ void write_command(char** args);
  **/
 void history_command(char** args);
 
+/**
+ * @brief Команда управления темами терминала
+ *
+ * Использование:
+ *   theme list        - показать все доступные темы
+ *   theme set <id>    - установить тему по ID
+ *
+ * @param args аргументы
+ **/
+void theme_command(char** args);
+
 #endif

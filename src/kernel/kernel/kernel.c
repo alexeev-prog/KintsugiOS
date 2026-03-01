@@ -13,6 +13,7 @@
 #include "../drivers/screen.h"
 #include "../drivers/screen_output_switch.h"
 #include "../drivers/terminal.h"
+#include "../drivers/theme.h"
 #include "../fs/fat12.h"
 #include "../kklibc/kklibc.h"
 #include "sysinfo.h"
@@ -43,6 +44,10 @@ void kmain() {
     /* Инициализация истории команд */
     history_init();
     kprint("Command history initialized\n");
+
+    /* Инициализация системы тем */
+    theme_init();
+    kprint("Theme system initialized\n");
 
     kprint("\nEnter to continue . . . ");
 
@@ -118,7 +123,8 @@ void user_input(char* input) {
         { .text = "write",
          .hint = "Write to file. Usage: write <filename> <text>",
          .command = &write_command                                                                                      },
-        { .text = "history",      .hint = "Show command history. -c to clear",     .command = &history_command          }
+        { .text = "history",      .hint = "Show command history. -c to clear",     .command = &history_command          },
+        { .text = "theme",        .hint = "Manage themes. list|set <id>",          .command = &theme_command            }
     };
 
     int executed = 0;
