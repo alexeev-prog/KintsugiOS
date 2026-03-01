@@ -14,6 +14,7 @@
 #include "../kernel/kernel.h"
 #include "../kklibc/function.h"
 #include "../kklibc/stdlib.h"
+#include "history.h"
 #include "lowlevel_io.h"
 #include "screen.h"
 #include "terminal.h"
@@ -44,6 +45,42 @@ const char sc_ascii_upper[] = { '?', '?', '!', '@', '#', '$', '%', '^', '&', '*'
                                 '?', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '?', '?',
                                 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', '?', '|', 'Z',
                                 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', '?', '?', '?', ' ' };
+
+/**
+ * @brief Очистить текущую строку ввода от промпта до конца
+ */
+static void clear_input_line(void) {
+    int current_offset = get_cursor_offset();
+    int chars_to_clear = (current_offset - shell_prompt_offset) / 2;
+
+    /* Возвращаемся к позиции промпта */
+    set_cursor_offset(shell_prompt_offset);
+
+    /* Заполняем пробелами до конца старой строки */
+    for (int i = 0; i < chars_to_clear; i++) {
+        kprint(" ");
+    }
+
+    /* Возвращаем курсор обратно к промпту */
+    set_cursor_offset(shell_prompt_offset);
+}
+
+/**
+ * @brief Заменить содержимое key_buffer и отобразить на экране
+ *
+ * @param new_text Новая строка для отображения
+ */
+static void replace_input_line(const char *new_text) {
+    /* Очищаем визуально */
+    clear_input_line();
+
+    /* Копируем новую строку в буфер */
+    strncpy(key_buffer, new_text, sizeof(key_buffer) - 1);
+    key_buffer[sizeof(key_buffer) - 1] = '\0';
+
+    /* Отображаем на экране */
+    kprint(key_buffer);
+}
 
 static void keyboard_callback(registers_t regs) {
     u8 scancode = port_byte_in(0x60);
@@ -86,8 +123,11 @@ static void keyboard_callback(registers_t regs) {
                     // Shift+Вверх - прокрутка терминала
                     terminal_handle_arrow_up();
                 } else {
-                    // Просто стрелка вверх - история команд
-                    // TODO: реализовать историю
+                    // Навигация по истории команд
+                    const char *history_line = history_up(key_buffer);
+                    if (history_line) {
+                        replace_input_line(history_line);
+                    }
                 }
                 break;
 
@@ -96,8 +136,11 @@ static void keyboard_callback(registers_t regs) {
                     // Shift+Вниз - прокрутка терминала
                     terminal_handle_arrow_down();
                 } else {
-                    // Просто стрелка вниз - история команд
-                    // TODO: реализовать историю
+                    // Навигация по истории команд
+                    const char *history_line = history_down();
+                    if (history_line) {
+                        replace_input_line(history_line);
+                    }
                 }
                 break;
             default:
@@ -122,6 +165,7 @@ static void keyboard_callback(registers_t regs) {
                         kprint("^C");
                         // todo: обрывание процесса
                         key_buffer[0] = '\0';
+                        history_reset_navigation();
                         return;
                     }
                 }
@@ -138,8 +182,18 @@ static void keyboard_callback(registers_t regs) {
                     handle_input_char(0x08);
                 } else if (scancode == ENTER) {
                     kprint("\n");
+
+                    /* Добавляем команду в историю (если не пустая) */
+                    if (strlen(key_buffer) > 0) {
+                        history_add(key_buffer);
+                    }
+
+                    /* Выполняем команду */
                     user_input(key_buffer);
                     key_buffer[0] = '\0';
+
+                    /* Сбрасываем навигацию по истории */
+                    history_reset_navigation();
 
                     /* Также обрабатываем для общего ввода */
                     handle_input_char('\n');
