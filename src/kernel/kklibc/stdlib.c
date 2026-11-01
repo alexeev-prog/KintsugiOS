@@ -7,10 +7,10 @@
 
 #include "stdlib.h"
 
+#include "../mm/heap.h"
 #include "ctypes.h"
 #include "mem.h"
 #include "stdio.h"
-#include "../mm/heap.h"
 
 /**
  * @brief      Алгоритм Fuzzy search

@@ -7,8 +7,8 @@
 
 #include "ctypes.h"
 
-#include "stdlib.h"
 #include "../kernel/log.h"
+#include "stdlib.h"
 
 void panic_assert(const char* file, u32 line, const char* desc) {
     char buffer[256];

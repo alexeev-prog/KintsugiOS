@@ -290,9 +290,14 @@ void printf(char* fmt, ...) {
     /* File contents can exceed the shared formatting buffer. Stream them. */
     if (fmt[0] == '%' && fmt[1] == 's' && !fmt[2]) {
         const char* text = va_arg(args, const char*);
-        if (!text) text = "(null)";
-        if (IS_TERMINAL_MODE()) terminal_print(text);
-        else kprint((char*)text);
+        if (!text) {
+            text = "(null)";
+        }
+        if (IS_TERMINAL_MODE()) {
+            terminal_print(text);
+        } else {
+            kprint((char*)text);
+        }
         va_end(args);
         return;
     }

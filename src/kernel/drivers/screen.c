@@ -9,8 +9,8 @@
  * ----------------------------------------------------------------------------*/
 
 #include "screen.h"
-#include "../kernel/log.h"
 
+#include "../kernel/log.h"
 #include "../kklibc/ctypes.h"
 #include "../kklibc/stdlib.h"
 #include "lowlevel_io.h"

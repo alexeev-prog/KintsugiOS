@@ -19,6 +19,18 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
     sample.write_bytes(payload)
     subprocess.run(['mcopy', '-i', str(disk), str(sample), '::/README.TXT'], check=True)
     invalid = '--invalid-fs' in sys.argv
+    corrupt = '--corrupt-fat' in sys.argv
+    if corrupt:
+        with disk.open('r+b') as image:
+            boot = image.read(512)
+            reserved = int.from_bytes(boot[14:16], 'little')
+            fat_sectors = int.from_bytes(boot[22:24], 'little')
+            # Cluster 2 points to itself in every FAT copy.
+            for copy in range(boot[16]):
+                image.seek((reserved + copy * fat_sectors) * 512 + 3)
+                pair = int.from_bytes(image.read(2), 'little')
+                image.seek((reserved + copy * fat_sectors) * 512 + 3)
+                image.write(((pair & 0xf000) | 2).to_bytes(2, 'little'))
     no_disk = '--no-disk' in sys.argv
     if invalid:
         with disk.open('r+b') as image:
@@ -108,16 +120,18 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
             proc.wait(timeout=10)
             print('PASS: unified panic', 'exception registers' if fault else 'explicit request')
             sys.exit(0)
-        if invalid or no_disk:
+        if invalid or no_disk or corrupt:
             command('ls')
-            wait_for('FAT12 not mounted')
+            wait_for('filesystem unavailable')
             command('help')
             wait_for('Keramika Shell Help')
             qmp('quit')
             proc.wait(timeout=10)
-            print('PASS:', 'missing disk' if no_disk else 'invalid BPB', 'handled without crash')
+            print('PASS:', 'missing disk' if no_disk else 'corrupt FAT' if corrupt else 'invalid BPB', 'handled without crash')
             sys.exit(0)
         command('fat12info')
+        command('fstest confirm')
+        wait_for('Filesystem self-test: PASS')
         command('ls')
         command('cat readme.txt')
         wait_for('cluster boundary data')
@@ -161,6 +175,24 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
         wait_for('dit-marker')
         command('create empty.txt')
         command('del empty.txt')
+        command('mkdir docs')
+        command('mkdir docs/sub')
+        command('cd docs/sub')
+        command('write note.txt nested-data')
+        command('append note.txt -tail')
+        command('cp note.txt copy.txt')
+        command('mv copy.txt ../moved.txt')
+        command('truncate note.txt 6')
+        command('cd /')
+        command('clear')
+        command('cat /docs/moved.txt')
+        wait_for('nested-data-tail')
+        command('rmdir docs')
+        wait_for('Directory not empty')
+        command('mv docs docs/sub/loop')
+        wait_for('Invalid path')
+        command('mkdir gone')
+        command('rmdir gone')
         # A full machine reset must not lose acknowledged writes.
         ready_count = (tmp / 'serial.log').read_text().count('[INFO] shell ready')
         qmp('system_reset')
@@ -180,6 +212,8 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
         listing = subprocess.check_output(['mdir', '-i', str(disk), '::/'])
         assert b'EMPTY' not in listing
         assert subprocess.check_output(['mtype', '-i', str(disk), '::/README.TXT']) == payload
+        assert subprocess.check_output(['mtype', '-i', str(disk), '::/DOCS/MOVED.TXT']) == b'nested-data-tail'
+        assert subprocess.check_output(['mtype', '-i', str(disk), '::/DOCS/SUB/NOTE.TXT']) == b'nested'
         subprocess.run(['fsck.fat', '-n', str(disk)], check=True)
         print('PASS:', 'ISO' if iso else 'floppy', 'boot, editor/parser/completion, FAT12, reboot persistence, fsck')
     finally:

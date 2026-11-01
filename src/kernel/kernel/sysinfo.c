@@ -1,8 +1,8 @@
 #include "sysinfo.h"
 
-#include "../mm/heap.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
+#include "../mm/heap.h"
 #include "../mm/memory.h"
 
 static system_info_t sys_info;
@@ -35,7 +35,6 @@ void detect_memory() {
     sys_info.heap_size = info.heap_size;
     sys_info.heap_used = info.total_used;
     sys_info.heap_free = info.total_free;
-
 }
 
 system_info_t* get_system_info() {

@@ -3,11 +3,11 @@
 #include "../drivers/keyboard.h"
 #include "../drivers/lowlevel_io.h"
 #include "../drivers/screen.h"
+#include "../kernel/log.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
 #include "idt.h"
 #include "timer.h"
-#include "../kernel/log.h"
 
 isr_t interrupt_handlers[256];
 

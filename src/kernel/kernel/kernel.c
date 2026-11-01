@@ -6,10 +6,10 @@
 #include "../drivers/terminal.h"
 #include "../fs/fat12.h"
 #include "../kklibc/kklibc.h"
+#include "../mm/memory.h"
 #include "../shell/shell.h"
 #include "log.h"
 #include "sysinfo.h"
-#include "../mm/memory.h"
 
 void kmain(void) {
     log_init();

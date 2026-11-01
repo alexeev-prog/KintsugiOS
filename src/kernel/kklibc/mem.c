@@ -39,4 +39,3 @@ void u32memory_set(u32* dest, u32 val, u32 len) {    // задаем памят�
         *temp++ = val;
     }
 }
-

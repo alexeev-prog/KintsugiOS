@@ -4,14 +4,17 @@
 #define PAGE_SIZE 4096u
 #define PMM_LIMIT 0x10000000u
 #define VMM_WRITE 2u
+
 typedef struct __attribute__((packed)) {
     unsigned long long base, length;
     u32 type, attributes;
 } memory_region_t;
+
 typedef struct {
     u32 managed_pages, free_pages, allocated_pages, reserved_pages;
     u32 usable_kib, mapped_pages, map_entries;
 } memory_stats_t;
+
 void memory_init(void);
 u32 pmm_alloc_page(void);
 int pmm_free_page(u32 address);

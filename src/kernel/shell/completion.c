@@ -1,4 +1,4 @@
-#include "../fs/fat12.h"
+#include "../fs/vfs.h"
 #include "../kklibc/kklibc.h"
 #include "shell.h"
 
@@ -17,19 +17,34 @@ void shell_complete(char* line, u32* length, u32* cursor) {
         }
     }
     int files = start != 0;
-    if (files && line[start] == '/') {
-        ++start;
+    char directory[VFS_PATH_MAX] = ".";
+    if (files) {
+        u32 slash = start;
+        for (u32 i = start; i < *cursor; ++i) {
+            if (line[i] == '/') {
+                slash = i + 1;
+            }
+        }
+        if (slash > start) {
+            u32 n = slash - start;
+            memcpy(directory, line + start, n);
+            directory[n] = 0;
+            start = slash;
+        }
     }
     u32 prefix = *cursor - start;
     char common[SHELL_LINE_SIZE];
     u32 common_length = 0, matches = 0;
+    u32 directory_cursor = 0;
     for (u32 i = 0;; ++i) {
         char name[13];
         const char* candidate;
         if (files) {
-            if (!fat12_root_name(i, name)) {
+            vfs_dirent_t entry;
+            if (vfs_readdir(directory, &directory_cursor, &entry) <= 0) {
                 break;
             }
+            strcpy(name, entry.name);
             candidate = name;
         } else {
             const shell_command_t* command = shell_command_at(i);

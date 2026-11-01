@@ -60,8 +60,9 @@ write /hello.txt "Hello world" escaped\ space
 cat /hello.txt
 ```
 
-Вложенные каталоги, переменные, pipelines и дополнение внутри кавычек пока
-не реализованы. Подробности: [сборка](docs/BUILD_AND_TEST_RU.md),
+Каталоги, относительные пути, `cd`, `mkdir`, `cp`, `mv`, `append`, `truncate`
+доступны через минимальный VFS. Переменные, pipelines и дополнение внутри кавычек пока
+не реализованы. Подробности: [файловая система](docs/FILESYSTEM_RU.md), [сборка](docs/BUILD_AND_TEST_RU.md),
 [архитектура shell](docs/SHELL_RU.md).
 
 > [!CAUTION]

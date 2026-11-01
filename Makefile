@@ -142,6 +142,7 @@ test: $(FLOPPY) $(ISO)
 	$(PYTHON) tools/smoke_test.py --large-kernel
 	$(PYTHON) tools/smoke_test.py --no-disk
 	$(PYTHON) tools/smoke_test.py --invalid-fs
+	$(PYTHON) tools/smoke_test.py --corrupt-fat
 	$(PYTHON) tools/smoke_test.py --panic
 	$(PYTHON) tools/smoke_test.py --fault
 .PHONY: test
