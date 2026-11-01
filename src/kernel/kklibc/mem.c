@@ -28,6 +28,7 @@ void heap_init() {
     heap_current_end = HEAP_START + HEAP_SIZE;
 
     stats.alloc_count = 0;
+    stats.total_used = 0;
     stats.free_count = 0;
     stats.max_used = 0;
     stats.leak_count = 0;
@@ -53,36 +54,26 @@ int expand_heap(u32 size) {
 }
 
 void* kmalloc(u32 size) {
-    if (size == 0) {
-        printf("WARNING: kmalloc called with size 0\n");
+    if (size == 0 || size > HEAP_SIZE - sizeof(mem_block_t)) {
+        printf("Invalid allocation size: %d\n", size);
         return NULL;
     }
 
     u32 aligned_size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
 
     mem_block_t* current = free_blocks;
-    mem_block_t* prev = NULL;
     mem_block_t* best_fit = NULL;
-    mem_block_t* best_fit_prev = NULL;
 
     while (current) {
         if (current->is_free && current->size >= aligned_size) {
             if (!best_fit || current->size < best_fit->size) {
                 best_fit = current;
-                best_fit_prev = prev;
             }
         }
-        prev = current;
         current = current->next;
     }
 
     if (best_fit) {
-        if (best_fit_prev) {
-            best_fit_prev->next = best_fit->next;
-        } else {
-            free_blocks = best_fit->next;
-        }
-
         if (best_fit->size > aligned_size + sizeof(mem_block_t) + BLOCK_SIZE) {
             mem_block_t* new_block = (mem_block_t*)((u32)best_fit + sizeof(mem_block_t) + aligned_size);
             new_block->size = best_fit->size - aligned_size - sizeof(mem_block_t);
@@ -91,12 +82,6 @@ void* kmalloc(u32 size) {
 
             best_fit->size = aligned_size;
             best_fit->next = new_block;
-
-            if (best_fit_prev) {
-                best_fit_prev->next = new_block;
-            } else {
-                free_blocks = new_block;
-            }
         }
 
         best_fit->is_free = 0;
@@ -119,12 +104,13 @@ void* kmalloc(u32 size) {
     printf("ERROR: Out of memory! Requested: %d (aligned: %d)\n", size, aligned_size);
     kmemdump();
 
-    __asm__ volatile("hlt");
-
     return NULL;
 }
 
 void* krealloc(void* ptr, u32 size) {
+    if (size > HEAP_SIZE - sizeof(mem_block_t)) {
+        return NULL;
+    }
     if (!ptr) {
         return kmalloc(size);
     }
@@ -134,6 +120,7 @@ void* krealloc(void* ptr, u32 size) {
     }
 
     mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
+    size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
     if (block->size >= size) {
         // уменьшение блока при необходимости
         if (block->size - size >= sizeof(mem_block_t) + BLOCK_SIZE) {
@@ -142,6 +129,8 @@ void* krealloc(void* ptr, u32 size) {
             new_block->is_free = 1;
             new_block->next = block->next;
             block->next = new_block;
+            stats.total_used -= block->size - size;
+            block->size = size;
         }
         return ptr;
     }
@@ -191,7 +180,6 @@ void kfree(void* ptr) {
 
     // Слияние с предыдущим блоком (нужно найти в списке)
     mem_block_t* current = free_blocks;
-    mem_block_t* prev = NULL;
 
     while (current) {
         if (current->is_free && (u32)current + sizeof(mem_block_t) + current->size == (u32)block) {
@@ -201,14 +189,12 @@ void kfree(void* ptr) {
             // printf("[kfree] Merged with previous block\n");
             return;
         }
-        prev = current;
         current = current->next;
     }
 }
 
 meminfo_t get_meminfo() {
     u32 current_addr = HEAP_START;
-    mem_block_t* current = free_blocks;
     u32 heap_end = heap_current_end;
     u32 total_used = 0;
     u32 total_free = 0;

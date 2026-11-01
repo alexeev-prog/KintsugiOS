@@ -1,14 +1,18 @@
-; ------------------------------------------------------------------------------
-;  Kintsugi OS Bootloader source code
-;  File: bootloader/kernel_entry.asm
-;  Title:	Код, служащий входной точкой для функции kmain из kernel.c
-; Description: null
-; ------------------------------------------------------------------------------
-
-
 [bits 32]
-[extern kmain]			; Определяем 'внешнюю' штуку с названием kmain - она понадобится
-						; линкеру чтобы собрать все вместе
-call kmain				; Вызываем определенную выше функцию, которая будет доступна
-						; после линковки. Это функция kmain из kernel.c
-jmp $
+section .text.entry
+global _start
+extern kmain
+extern __bss_start
+extern __bss_end
+_start:
+    cld
+    mov edi, __bss_start
+    mov ecx, __bss_end
+    sub ecx, edi
+    xor eax, eax
+    rep stosb
+    call kmain
+.idle:
+    hlt
+    jmp .idle
+section .note.GNU-stack noalloc noexec nowrite progbits

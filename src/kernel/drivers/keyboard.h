@@ -15,3 +15,4 @@
  *
  **/
 void init_keyboard();
+void keyboard_process_pending(void);

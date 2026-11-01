@@ -77,14 +77,14 @@ int hex_strtoint(char* str);
  * @param s Указатель на строку.
  * @return Длина строки (количество символов до завершающего нуля '\\0').
  */
-int strlen(char s[]);
+int strlen(const char s[]);
 
 /**
  * @brief Копирует строку из src в dest.
  * @param dest Указатель на буфер назначения.
  * @param src Указатель на строку-источник.
  */
-void strcpy(char* dest, char* src);
+void strcpy(char* dest, const char* src);
 
 /**
  * @brief Копирует до n символов из строки src в dest.

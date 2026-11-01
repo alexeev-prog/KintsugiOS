@@ -153,12 +153,10 @@ void irq_handler(registers_t r) {
 }
 
 void irq_install() {
-    /* Разрешить прерывания */
-    __asm__ volatile("sti");
-
     /* IRQ0: таймер */
     init_timer(50);
 
     /* IRQ1: клавиатура */
     init_keyboard();
+    __asm__ volatile("sti");
 }

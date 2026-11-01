@@ -14,7 +14,8 @@ isr_common_stub:
 	mov fs, ax
 	mov gs, ax
 
-    ; 2. Call C handler
+	; 2. Call C handler
+	cld
 	call isr_handler
 
     ; 3. Restore state
@@ -25,7 +26,6 @@ isr_common_stub:
 	mov gs, ax
 	popa
 	add esp, 8 ; Cleans up the pushed error code and pushed ISR number
-	sti
 	iret ; pops 5 things at once: CS, EIP, EFLAGS, SS, and ESP
 
 ; Common IRQ code. Identical to ISR code except for the 'call'
@@ -39,6 +39,7 @@ irq_common_stub:
     mov es, ax
     mov fs, ax
     mov gs, ax
+    cld
     call irq_handler ; Different than the ISR code
     pop ebx  ; Different than the ISR code
     mov ds, bx
@@ -47,7 +48,6 @@ irq_common_stub:
     mov gs, bx
     popa
     add esp, 8
-    sti
     iret
 
 ; We don't get information about which interrupt was caller

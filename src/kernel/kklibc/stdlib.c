@@ -32,10 +32,10 @@ int fuzzy_search(const char* text, const char* query, int build_score, int** sco
 
     u32 first_character_boosts = 1;
 
-    for (u32 t_idx = 0; t_idx < strlen(text); t_idx++) {
+    for (u32 t_idx = 0; t_idx < (u32)strlen(text); t_idx++) {
         char t =
             tolower(text[t_idx]);    // NOTE(deter0): to lower performs kind of strangely probably due to UTF8
-        for (u32 q_idx = 0; q_idx < strlen(query); q_idx++) {
+        for (u32 q_idx = 0; q_idx < (u32)strlen(query); q_idx++) {
             char q = tolower(query[q_idx]);
 
             if (t == q) {
@@ -55,7 +55,7 @@ int fuzzy_search(const char* text, const char* query, int build_score, int** sco
                 }
 
                 u32 streak = 0;
-                for (u32 s_idx = 1; s_idx < strlen(query) - q_idx; s_idx++) {
+                for (u32 s_idx = 1; s_idx < (u32)strlen(query) - q_idx && text[t_idx + s_idx]; s_idx++) {
                     char sq = tolower(query[q_idx + s_idx]);
                     char st = tolower(text[t_idx + s_idx]);
 
@@ -66,11 +66,11 @@ int fuzzy_search(const char* text, const char* query, int build_score, int** sco
 
                     // Beginning of string yields few points more; eg -> "Term" :: "Terminus", "Fluent
                     // Terminal"
-                    if (((float)t_idx / (float)strlen(text)) <= 0.35) {
+                    if (t_idx * 100u <= (u32)strlen(text) * 35u) {
                         streak++;
                     }
 
-                    int factor = streak * 3 / (strlen(query) * 0.2);
+                    int factor = streak * 15u / (u32)strlen(query);
                     if (build_score) {
                         (*score)[t_idx + s_idx] += factor;
                     }
@@ -89,9 +89,9 @@ int fuzzy_search(const char* text, const char* query, int build_score, int** sco
 
 void booltochar(u8 value, u8* str) {
     if (value) {
-        strcpy(str, (u8*)"true");
+        strcpy((char*)str, "true");
     } else {
-        strcpy(str, (u8*)"false");
+        strcpy((char*)str, "false");
     }
 }
 
@@ -212,7 +212,7 @@ u32 rand(u32* state) {
 // reboot
 void reboot() {
     unsigned char reset_value = 0x06;
-    __asm__ __volatile__("outb %0, %1" : : "a"(reset_value), "d"(0xCF9) : "memory");
+    __asm__ __volatile__("outb %0, %w1" : : "a"(reset_value), "d"((u16)0xCF9) : "memory");
 }
 
 // wait ожидание
@@ -328,7 +328,7 @@ void hex_to_ascii(int n, char str[]) {    // из hex в строку
     }
 }
 
-void strcpy(char* dest, char* src) {    // копирование строки
+void strcpy(char* dest, const char* src) {    // копирование строки
     while (*src) {
         *dest++ = *src++;
     }
@@ -362,7 +362,7 @@ void reverse(char s[]) {    // реверс
 }
 
 /* K&R */
-int strlen(char s[]) {    // длина строки
+int strlen(const char s[]) {    // длина строки
     int i = 0;
     while (s[i] != '\0') {
         ++i;

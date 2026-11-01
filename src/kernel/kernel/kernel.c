@@ -9,6 +9,7 @@
 
 #include "../cpu/isr.h"
 #include "../drivers/ata_pio.h"
+#include "../drivers/keyboard.h"
 #include "../drivers/screen.h"
 #include "../drivers/screen_output_switch.h"
 #include "../drivers/terminal.h"
@@ -36,17 +37,11 @@ void kmain() {
     detect_cpu();
     detect_memory();
 
-    ata_pio_init();
-    fat12_init();
-
-    kprint("\nEnter to continue . . . ");
-
-    char answer[1];
-    read_line(answer, sizeof(answer));
-
     terminal_init();
     output_set_mode(OUTPUT_MODE_TERMINAL);
     terminal_refresh();
+    ata_pio_init();
+    fat12_init();
 
     printf("\nKintsugi OS %s (C) 2025\nRepository: " "https://github.com/alexeev-prog/KintsugiOS\n", VERSION);
 
@@ -54,29 +49,21 @@ void kmain() {
 
     shell_cursor_offset = get_cursor_offset();
     shell_prompt_offset = shell_cursor_offset;
+    for (;;) {
+        keyboard_process_pending();
+        __asm__ volatile("hlt");
+    }
 }
 
 char** get_args(char* input) {
-    char* token = strtok(input, " ");
     static char* args[MAX_ARGS + 1];
     int arg_counter = 0;
-
-    while (token) {
-        token = strtok(NULL, " ");
-
-        if (arg_counter + 1 > MAX_ARGS + 1) {
-            printf_colored(
-                "Error when parsing args: %d args exceed the limit %d\n",
-                RED_ON_BLACK,
-                arg_counter + 1,
-                MAX_ARGS + 1);
-            break;
-        }
-
-        args[arg_counter] = token;
-        arg_counter++;
+    strtok(input, " ");
+    char* token;
+    while ((token = strtok(NULL, " ")) && arg_counter < MAX_ARGS) {
+        args[arg_counter++] = token;
     }
-
+    args[arg_counter] = NULL;
     return args;
 }
 

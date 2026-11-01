@@ -57,6 +57,7 @@ void rand_range_command(char** args) {
 }
 
 void reboot_command(char** args) {
+    UNUSED(args);
     reboot();
 }
 
@@ -70,14 +71,17 @@ void sleep_command(char** args) {
 }
 
 void clear_screen_command(char** args) {
+    UNUSED(args);
     clear_screen();
 }
 
 void shutdown_qemu(char** args) {
+    UNUSED(args);
     outports(0x604, 0x2000);
 }
 
 void halt_cpu(char** args) {
+    UNUSED(args);
     halted_cpu_screen_clear();
     printf_colored("Kintsugi OS %s\n\n", BLUE_ON_WHITE, VERSION);
     kprint_colored("Halted CPU Blue Screen\n", BLUE_ON_WHITE);
@@ -105,6 +109,7 @@ void sysinfo_command() {
 }
 
 void info_command_shell(char** args) {
+    UNUSED(args);
     printf("Kintsugi OS %s by alexeev-prog\n", VERSION);
 
     kprint("   __    _      __                _          \n"
@@ -118,6 +123,7 @@ void info_command_shell(char** args) {
 }
 
 void mem_dump(char** args) {
+    UNUSED(args);
     kmemdump();
 }
 
@@ -161,8 +167,8 @@ void kmalloc_command(char** args) {
 }
 
 void ls_command(char** args) {
+    UNUSED(args);
     fat12_list_root();
-    fat12_cleanup();
 }
 
 void cat_command(char** args) {
@@ -177,6 +183,10 @@ void cat_command(char** args) {
         return;
     }
 
+    if (entry.file_size >= HEAP_SIZE - sizeof(mem_block_t)) {
+        printf("File too large for memory\n");
+        return;
+    }
     u8* buffer = (u8*)kmalloc(entry.file_size + 1);
     if (!buffer) {
         return;
@@ -188,10 +198,10 @@ void cat_command(char** args) {
     }
 
     kfree(buffer);
-    fat12_cleanup();
 }
 
 void print_fat12_info_command(char** args) {
+    UNUSED(args);
     print_fat12_info();
 }
 
@@ -227,7 +237,6 @@ void load_command(char** args) {
     }
 
     kfree(buffer);
-    fat12_cleanup();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -245,8 +254,6 @@ void create_command(char** args) {
     } else {
         printf("Failed to create file: %s\n", args[0]);
     }
-
-    fat12_cleanup();
 }
 
 void delete_command(char** args) {
@@ -260,8 +267,6 @@ void delete_command(char** args) {
     } else {
         printf("Failed to delete file: %s\n", args[0]);
     }
-
-    fat12_cleanup();
 }
 
 void write_command(char** args) {
@@ -270,31 +275,24 @@ void write_command(char** args) {
         return;
     }
 
-    // Объединяем все аргументы после имени файла в один текст
-    char* text = args[1];
-    // Если есть больше аргументов, объединяем их
-    for (int i = 2; args[i] != NULL; i++) {
-        // Нужно будет сделать более сложную конкатенацию, но пока просто
-        printf("Note: Only first word written, multi-word not implemented yet\n");
-        break;
+    u8 buffer[256];
+    u32 size = 0;
+    for (int i = 1; args[i]; ++i) {
+        if (i > 1 && size < sizeof(buffer)) {
+            buffer[size++] = ' ';
+        }
+        for (const char* p = args[i]; *p; ++p) {
+            if (size == sizeof(buffer)) {
+                printf("Text too long\n");
+                return;
+            }
+            buffer[size++] = *p;
+        }
     }
-
-    u32 size = strlen(text);
-    u8* buffer = (u8*)kmalloc(size);
-
-    if (!buffer) {
-        printf("No memory for write buffer\n");
-        return;
-    }
-
-    memcpy(buffer, text, size);
 
     if (fat12_write_file(args[0], buffer, size) == 0) {
         printf("Written %d bytes to: %s\n", size, args[0]);
     } else {
         printf("Failed to write to file: %s\n", args[0]);
     }
-
-    kfree(buffer);
-    fat12_cleanup();
 }

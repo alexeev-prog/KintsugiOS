@@ -25,6 +25,8 @@ extern int shell_cursor_offset;
 extern int shell_prompt_offset;
 
 static char key_buffer[256];
+static char pending_line[256];
+static volatile int line_pending;
 
 #define SC_MAX 57
 
@@ -47,6 +49,9 @@ const char sc_ascii_upper[] = { '?', '?', '!', '@', '#', '$', '%', '^', '&', '*'
 
 static void keyboard_callback(registers_t regs) {
     u8 scancode = port_byte_in(0x60);
+    if (line_pending) {
+        return;
+    }
 
     // Обработка отпускания клавиш (старший бит установлен)
     if (scancode & 0x80) {
@@ -135,22 +140,20 @@ static void keyboard_callback(registers_t regs) {
                     kprint_backspace();
 
                     /* Также обрабатываем для общего ввода */
-                    handle_input_char(0x08);
                 } else if (scancode == ENTER) {
                     kprint("\n");
-                    user_input(key_buffer);
+                    strcpy(pending_line, key_buffer);
+                    line_pending = 1;
                     key_buffer[0] = '\0';
 
                     /* Также обрабатываем для общего ввода */
-                    handle_input_char('\n');
                 } else {
-                    if (strlen(key_buffer) < sizeof(key_buffer) - 1) {
+                    if ((u32)strlen(key_buffer) < sizeof(key_buffer) - 1) {
                         append(key_buffer, letter);
                         char str[2] = { letter, '\0' };
                         kprint(str);
 
                         /* Также обрабатываем для общего ввода */
-                        handle_input_char(letter);
                     }
                 }
                 break;
@@ -161,4 +164,13 @@ static void keyboard_callback(registers_t regs) {
 
 void init_keyboard() {
     register_interrupt_handler(IRQ1, keyboard_callback);
+}
+
+/* Disk I/O and shell commands must not run inside the keyboard IRQ. */
+void keyboard_process_pending(void) {
+    if (!line_pending) {
+        return;
+    }
+    user_input(pending_line);
+    line_pending = 0;
 }

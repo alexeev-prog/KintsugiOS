@@ -327,7 +327,7 @@ int read_line(char* buffer, int max_len) {
 }
 
 int read_line_with_prompt(const char* prompt, char* buffer, int max_len) {
-    kprint(prompt);
+    kprint((char*)prompt);
     return read_line(buffer, max_len);
 }
 

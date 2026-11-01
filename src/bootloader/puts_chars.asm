@@ -15,8 +15,10 @@ puts_chars:				; Функция вывода строки на экран.
 						; которые возьмем из стека (команда popa).
 
 	mov ah, 0x0e		; tele-type mode
+	mov si, bx
+	xor bx, bx          ; BIOS display page 0
 	loop:				; Метка loop (= цикл)
-		mov al, [bx]	; Перемещаем значение BX в AL, т.к. мы помним что в BX
+		mov al, [si]	; Read the string without using BH as display page
 						; лежит первый символ строки (см. ./main.asm)
 		cmp al, 0		; Команда cmp для сравнения AL и 0.
 		je newline		; (if) je = "jump if equal",
@@ -26,7 +28,7 @@ puts_chars:				; Функция вывода строки на экран.
 put_char:				; Метка put_char - вывод символа на экран.
 	int 0x10			; Вызываем прерывание, которое позволяет вывести
 						; на экран значение регистра AL, в котором лежит [bx].
-	inc bx				; inc <регистр> - увеличить на 1.
+	inc si				; Next character
 	jmp loop			; Возвращаемся обратно к циклу.
 
 newline:

@@ -46,7 +46,7 @@ unsigned char port_byte_in(unsigned short port) {
     /* пишем еще один %. */
     /* Перемещаем результат в регистр AL т.к. размер AL == 1 байт */
     unsigned char result;
-    __asm__("in %%dx, %%al" : "=a"(result) : "d"(port));
+    __asm__ volatile("in %%dx, %%al" : "=a"(result) : "d"(port) : "memory");
     /* разберем только что вызванную функцию: */
     /* "in %%dx, %%al"		- Прочитать содержимое порта и положить это в AL
      */
@@ -60,7 +60,7 @@ void port_byte_out(unsigned short port, unsigned char data) {
     /* Функция-обертка над assembly, пишущая data (1 байт) в port */
     /* unsigned short port: адрес регистра девайса, в который что-то запишем */
     /* unsigned char data: 1 байт какой-то информации (например, символ) */
-    __asm__("out %%al, %%dx" : : "a"(data), "d"(port));
+    __asm__ volatile("out %%al, %%dx" : : "a"(data), "d"(port) : "memory");
     /* разберем только что вызванную функцию: */
     /* "out %%al, %%dx"		- Записать data в port */
     /* : : "a" (data)		- Загрузить data в регистр EAX */

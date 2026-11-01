@@ -32,6 +32,11 @@
 
 switch_to_pm:
 	cli						; Отключаем прерывания (cli = clear interrupts)
+	; Enable A20 before the kernel uses its heap above 1 MiB.
+	in al, 0x92
+	or al, 2
+	and al, 0xfe
+	out 0x92, al
 
 	lgdt [gdt_descriptor]	; Загружаем GDT дескриптор (lgdt = load GDT)
 
@@ -53,7 +58,7 @@ init_pm:					; в PM, наши старые сегменты бесполезн�
 	mov fs, ax
 	mov gs, ax
 
-	mov ebp, 0xF0000		; Обновляем позицию стека, чтобы он был на самом
+	mov ebp, 0x90000		; Stack in conventional RAM, not BIOS ROM
 	mov esp, ebp			; верху свободного места
 
 	call BEGIN_PM

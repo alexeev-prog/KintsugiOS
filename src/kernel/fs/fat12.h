@@ -90,7 +90,7 @@ int fat12_read_boot_sector(fat12_boot_sector_t* boot);
  * @brief Поиск файла в корневом каталоге
  * @param[in] filename Имя файла в формате "NAME    EXT" (8.3, в верхнем регистре)
  * @param[out] result Указатель на структуру для сохранения найденной записи
- * @return 0 если файл найден, -1 если не найден
+ * @return 1 если файл найден, 0 если не найден или ошибка
  */
 int fat12_find_file(const char* filename, fat12_dir_entry_t* result);
 
@@ -104,7 +104,7 @@ void fat12_list_root(void);
  * @brief Чтение содержимого файла в буфер
  * @param[in] filename Имя файла для чтения (формат 8.3)
  * @param[out] buffer Буфер для сохранения данных файла
- * @return Размер прочитанных данных в байтах при успехе, -1 при ошибке
+ * @return 0 при успехе, -1 при ошибке
  * @warning Буфер должен быть достаточного размера для размещения файла
  */
 int fat12_read_file(const char* filename, u8* buffer);

@@ -15,7 +15,7 @@
 #define PRINTF_BUF_SIZE 1024
 static char printf_buf[PRINTF_BUF_SIZE];
 
-unsigned int format_string_core(char* buf, unsigned int size, char* fmt, va_list args) {
+unsigned int format_string_core(char* buf, unsigned int size, const char* fmt, va_list args) {
     unsigned int i = 0;
     char num_buf[32];
     const char* s;
