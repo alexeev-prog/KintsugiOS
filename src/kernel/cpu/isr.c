@@ -6,6 +6,7 @@
 #include "../kernel/log.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
+#include "../user/process.h"
 #include "idt.h"
 #include "timer.h"
 
@@ -118,6 +119,10 @@ char* exception_messages[] = { "Division By Zero",
                                "Reserved" };
 
 void isr_handler(registers_t r) {
+    if ((r.cs & 3) == 3 && process_active() && r.int_no != 2 && r.int_no != 8 && r.int_no != 18) {
+        printf("User fault: vector=%u eip=%x\n", r.int_no, r.eip);
+        process_exit(128 + r.int_no);
+    }
     panic(r.int_no < 32 ? exception_messages[r.int_no] : "Unknown exception", &r);
 }
 

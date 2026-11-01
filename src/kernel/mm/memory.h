@@ -4,6 +4,13 @@
 #define PAGE_SIZE 4096u
 #define PMM_LIMIT 0x10000000u
 #define VMM_WRITE 2u
+#define USER_BASE 0x40000000u
+#define USER_TOP 0x80000000u
+u32 vmm_space_create(void);
+void vmm_space_destroy(u32 space);
+void vmm_space_switch(u32 space);
+int vmm_user_page(u32 space, u32 address, int writable);
+u32 vmm_user_physical(u32 space, u32 address, int write);
 
 typedef struct __attribute__((packed)) {
     unsigned long long base, length;

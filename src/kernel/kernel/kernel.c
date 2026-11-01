@@ -8,6 +8,7 @@
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
 #include "../shell/shell.h"
+#include "../user/process.h"
 #include "log.h"
 #include "sysinfo.h"
 
@@ -17,6 +18,7 @@ void kmain(void) {
     isr_install();
     memory_init();
     heap_init();
+    process_init();
     terminal_init();
     output_set_mode(OUTPUT_MODE_TERMINAL);
     terminal_refresh();

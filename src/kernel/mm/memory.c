@@ -198,6 +198,82 @@ memory_stats_t memory_stats(void) {
     return stats;
 }
 
+u32 vmm_space_create(void) {
+    u32 space = pmm_alloc_page();
+    if (!space) {
+        return 0;
+    }
+    memcpy((void*)space, directory, sizeof(directory));
+    memset((u32*)space + USER_BASE / 0x400000, 0, (USER_TOP - USER_BASE) / 0x400000 * 4);
+    return space;
+}
+
+void vmm_space_switch(u32 space) {
+    if (!space) {
+        space = (u32)directory;
+    }
+    __asm__ volatile("mov %0, %%cr3" ::"r"(space) : "memory");
+}
+
+u32 vmm_user_physical(u32 space, u32 address, int write) {
+    if (!space || address < USER_BASE || address >= USER_TOP) {
+        return 0;
+    }
+    u32 pde = ((u32*)space)[address >> 22];
+    if ((pde & 5) != 5) {
+        return 0;
+    }
+    u32 pte = ((u32*)(pde & ~4095u))[(address >> 12) & 1023];
+    if ((pte & 5) != 5 || (write && !(pte & 2))) {
+        return 0;
+    }
+    return (pte & ~4095u) | (address & 4095);
+}
+
+int vmm_user_page(u32 space, u32 address, int writable) {
+    if (!space || address < USER_BASE || address >= USER_TOP || (address & 4095)) {
+        return 0;
+    }
+    u32* pd = (u32*)space;
+    if (!(pd[address >> 22] & 1)) {
+        u32 table = pmm_alloc_page();
+        if (!table) {
+            return 0;
+        }
+        pd[address >> 22] = table | 7;
+    }
+    u32* entry = (u32*)(pd[address >> 22] & ~4095u) + ((address >> 12) & 1023);
+    if (*entry & 1) {
+        return 0;
+    }
+    u32 page = pmm_alloc_page();
+    if (!page) {
+        return 0;
+    }
+    *entry = page | 5 | (writable ? 2 : 0);
+    return 1;
+}
+
+void vmm_space_destroy(u32 space) {
+    if (!space) {
+        return;
+    }
+    u32* pd = (u32*)space;
+    for (u32 d = USER_BASE >> 22; d < USER_TOP >> 22; ++d) {
+        if (!(pd[d] & 1)) {
+            continue;
+        }
+        u32* table = (u32*)(pd[d] & ~4095u);
+        for (u32 t = 0; t < 1024; ++t) {
+            if (table[t] & 1) {
+                pmm_free_page(table[t] & ~4095u);
+            }
+        }
+        pmm_free_page(pd[d] & ~4095u);
+    }
+    pmm_free_page(space);
+}
+
 void memory_print_info(void) {
     printf("RAM usable (E820): %u KiB; map entries: %u\n", stats.usable_kib, stats.map_entries);
     printf("PMM limit: %u MiB; page size: 4096\n", PMM_LIMIT >> 20);

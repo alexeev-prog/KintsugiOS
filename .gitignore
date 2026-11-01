@@ -58,3 +58,4 @@ bin/
 diskimgs/
 .vscode/
 bochs.log
+.gigacode/

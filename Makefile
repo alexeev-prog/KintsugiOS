@@ -24,9 +24,34 @@ FAT12_TEST_FILES := $(wildcard test_files/*)
 CFLAGS := -g -m32 -std=gnu11 -ffreestanding -nostdinc -fno-builtin -fno-stack-protector -fno-pie -fno-pic -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -msoft-float -mpreferred-stack-boundary=2 -Wall -Wextra -MMD -MP
 LDFLAGS := -m elf_i386 -T src/bootloader/kernel.ld
 C_SOURCES := $(sort $(shell find src/kernel -name '*.c'))
-OBJS := $(BIN_DIR)/bootloader/kernel_entry.o $(BIN_DIR)/kernel/cpu/interrupt.o $(C_SOURCES:src/%.c=$(BIN_DIR)/%.o)
+OBJS := $(BIN_DIR)/bootloader/kernel_entry.o $(BIN_DIR)/kernel/cpu/interrupt.o $(BIN_DIR)/kernel/user/entry.o $(C_SOURCES:src/%.c=$(BIN_DIR)/%.o)
 
-all: $(BIN_DIR)/kintsugios.bin
+all: $(BIN_DIR)/kintsugios.bin users
+
+USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT
+USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
+$(BIN_DIR)/user/start.o: src/user/start.asm
+	@mkdir -p $(dir $@)
+	$(ASM) -f elf32 $< -o $@
+$(BIN_DIR)/user/runtime.o: src/user/runtime.c src/user/runtime.h
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+define USER_RULE
+$(BIN_DIR)/user/$(1).ELF: src/user/commands.c src/user/user.ld src/user/runtime.h $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$$(CC) $$(CFLAGS) -Wno-unused-function -DCOMMAND=$(2) -c $$< -o $$(BIN_DIR)/user/$(1).o
+	$$(LD) -m elf_i386 -T src/user/user.ld $$(BIN_DIR)/user/start.o $$(BIN_DIR)/user/runtime.o $$(BIN_DIR)/user/$(1).o -o $$@
+endef
+$(eval $(call USER_RULE,ECHO,1))
+$(eval $(call USER_RULE,CAT,2))
+$(eval $(call USER_RULE,LS,3))
+$(eval $(call USER_RULE,PWD,4))
+$(eval $(call USER_RULE,FAULT,5))
+$(eval $(call USER_RULE,CHECK,6))
+$(eval $(call USER_RULE,INPUT,7))
+users: $(USER_ELFS)
+system-install: $(FATDISK) $(USER_ELFS) $(BIN_DIR)/kernel.bin
+	$(PYTHON) tools/install_system.py $(FATDISK)
+.PHONY: users system-install
 
 # Compile and link the freestanding kernel
 $(BIN_DIR)/%.o: src/%.c
@@ -108,9 +133,9 @@ FLOPPY_DRIVE = -drive file=$(FLOPPY),format=raw,if=floppy,index=0
 FAT_DRIVE = -drive file=$(FATDISK),format=raw,if=ide,index=0
 RUN = $(QEMU) -m $(MEMORY) -name KintsugiOS $(QEMU_FLAGS)
 run: run_fat12
-run_bin run_fda run_hdd run_fat12: $(FLOPPY) $(FATDISK)
+run_bin run_fda run_hdd run_fat12: $(FLOPPY) $(FATDISK) system-install
 	$(RUN) $(FLOPPY_DRIVE) $(FAT_DRIVE) -boot order=a
-run_iso: $(ISO) $(FATDISK)
+run_iso: $(ISO) $(FATDISK) system-install
 	$(RUN) -cdrom $(ISO) $(FAT_DRIVE) -boot order=d
 debug_fda debug_hdd debug_fat12: $(FLOPPY) $(FATDISK)
 	$(RUN) $(FLOPPY_DRIVE) $(FAT_DRIVE) -boot order=a -s -S
@@ -119,6 +144,7 @@ debug_iso: $(ISO) $(FATDISK)
 
 # Do not delete user-created files or writable filesystem images on clean.
 clean:
+	rm -f $(USER_ELFS) $(addprefix $(BIN_DIR)/user/,$(addsuffix .o,$(USER_PROGRAMS))) $(BIN_DIR)/user/start.o
 	rm -f $(OBJS) $(OBJS:.o=.d) $(BIN_DIR)/kernel.elf $(BIN_DIR)/kernel.map $(BIN_DIR)/kernel.bin $(BIN_DIR)/kernel_size.inc $(BIN_DIR)/bootsector.bin $(BIN_DIR)/kintsugios.bin $(FLOPPY) $(ISO)
 clean_all: clean
 	@echo 'Filesystem images and test_files preserved; remove them explicitly to recreate.'
@@ -136,7 +162,7 @@ help info:
 
 -include $(OBJS:.o=.d)
 # Headless integration tests (never use the persistent user disk)
-test: $(FLOPPY) $(ISO)
+test: $(FLOPPY) $(ISO) $(USER_ELFS)
 	$(PYTHON) tools/smoke_test.py
 	$(PYTHON) tools/smoke_test.py --iso
 	$(PYTHON) tools/smoke_test.py --large-kernel

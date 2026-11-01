@@ -101,6 +101,8 @@ static void keyboard_callback(registers_t registers) {
         if (control) {
             if (c == 'c' || c == 'C') {
                 enqueue(3);
+            } else if (c == 'd' || c == 'D') {
+                enqueue(4);
             }
         } else {
             enqueue(c);
