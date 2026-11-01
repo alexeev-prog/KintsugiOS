@@ -1,287 +1,42 @@
-/*------------------------------------------------------------------------------
- *  Kintsugi OS KKLIBC source code
- *  File: kklibc/mem.c
- *  Title: Функции работы с памятью
- *	Description: null
- * ----------------------------------------------------------------------------*/
-
 #include "mem.h"
 
-#include "../drivers/screen.h"
-#include "../kernel/sysinfo.h"
-#include "ctypes.h"
-#include "stdio.h"
-#include "stdlib.h"
-
-u32 free_mem_addr = HEAP_START;
-static mem_block_t* free_blocks = NULL;
-u32 heap_current_end = HEAP_START + HEAP_SIZE;
-
-static meminfo_t stats;
-
-// инициализация кучи
-void heap_init() {
-    free_blocks = (mem_block_t*)HEAP_START;
-    free_blocks->size = HEAP_SIZE - sizeof(mem_block_t);
-    free_blocks->next = NULL;
-    free_blocks->is_free = 1;
-    heap_current_end = HEAP_START + HEAP_SIZE;
-
-    stats.alloc_count = 0;
-    stats.total_used = 0;
-    stats.free_count = 0;
-    stats.max_used = 0;
-    stats.leak_count = 0;
-
-    // printf("Heap initialized at 0x%x with size: %d bytes\n", HEAP_START, HEAP_SIZE);
+/* Заполняет область памяти указанным значением */
+void* memset(void* s, int c, unsigned int n) {
+    unsigned char* p = (unsigned char*)s;
+    while (n--) {
+        *p++ = (unsigned char)c;
+    }
+    return s;
 }
 
-int expand_heap(u32 size) {
-    if (heap_current_end + size > HEAP_START + HEAP_SIZE) {
-        return 0;
+/* Копирует блок памяти из источника в назначение */
+void* memcpy(void* dest, const void* src, unsigned int n) {
+    unsigned char* d = (unsigned char*)dest;
+    const unsigned char* s = (const unsigned char*)src;
+    while (n--) {
+        *d++ = *s++;
     }
-
-    u32 expand_size = size;
-
-    mem_block_t* new_block = (mem_block_t*)heap_current_end;
-    new_block->size = expand_size - sizeof(mem_block_t);
-    new_block->is_free = 1;
-    new_block->next = free_blocks;
-    free_blocks = new_block;
-
-    heap_current_end += expand_size;
-    return 1;
+    return dest;
 }
 
-void* kmalloc(u32 size) {
-    if (size == 0 || size > HEAP_SIZE - sizeof(mem_block_t)) {
-        printf("Invalid allocation size: %d\n", size);
-        return NULL;
-    }
-
-    u32 aligned_size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
-
-    mem_block_t* current = free_blocks;
-    mem_block_t* best_fit = NULL;
-
-    while (current) {
-        if (current->is_free && current->size >= aligned_size) {
-            if (!best_fit || current->size < best_fit->size) {
-                best_fit = current;
-            }
-        }
-        current = current->next;
-    }
-
-    if (best_fit) {
-        if (best_fit->size > aligned_size + sizeof(mem_block_t) + BLOCK_SIZE) {
-            mem_block_t* new_block = (mem_block_t*)((u32)best_fit + sizeof(mem_block_t) + aligned_size);
-            new_block->size = best_fit->size - aligned_size - sizeof(mem_block_t);
-            new_block->is_free = 1;
-            new_block->next = best_fit->next;
-
-            best_fit->size = aligned_size;
-            best_fit->next = new_block;
-        }
-
-        best_fit->is_free = 0;
-
-        void* user_ptr = (void*)((u32)best_fit + sizeof(mem_block_t));
-
-        stats.alloc_count++;
-        stats.total_used += best_fit->size;
-        if (stats.total_used > stats.max_used) {
-            stats.max_used = stats.total_used;
-        }
-
-        return user_ptr;
-    }
-
-    if (expand_heap(aligned_size + sizeof(mem_block_t))) {
-        return kmalloc(size);
-    }
-
-    printf("ERROR: Out of memory! Requested: %d (aligned: %d)\n", size, aligned_size);
-    kmemdump();
-
-    return NULL;
-}
-
-void* krealloc(void* ptr, u32 size) {
-    if (size > HEAP_SIZE - sizeof(mem_block_t)) {
-        return NULL;
-    }
-    if (!ptr) {
-        return kmalloc(size);
-    }
-    if (size == 0) {
-        kfree(ptr);
-        return NULL;
-    }
-
-    mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
-    size = (size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
-    if (block->size >= size) {
-        // уменьшение блока при необходимости
-        if (block->size - size >= sizeof(mem_block_t) + BLOCK_SIZE) {
-            mem_block_t* new_block = (mem_block_t*)((u32)block + sizeof(mem_block_t) + size);
-            new_block->size = block->size - size - sizeof(mem_block_t);
-            new_block->is_free = 1;
-            new_block->next = block->next;
-            block->next = new_block;
-            stats.total_used -= block->size - size;
-            block->size = size;
-        }
-        return ptr;
-    }
-
-    // выделяем нового блока и копипастим данных
-    void* new_ptr = kmalloc(size);
-    if (new_ptr) {
-        memcpy(new_ptr, ptr, block->size);
-        kfree(ptr);
-    }
-    return new_ptr;
-}
-
-void kfree(void* ptr) {
-    if (!ptr) {
-        return;
-    }
-
-    mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
-
-    // Проверяем базовую валидность
-    if ((u32)block < HEAP_START || (u32)block >= heap_current_end) {
-        printf("ERROR: Invalid free pointer: 0x%x\n", (u32)ptr);
-        return;
-    }
-
-    if (block->is_free) {
-        printf("WARNING: Double free at 0x%x\n", (u32)ptr);
-        return;
-    }
-
-    // Освобождаем
-    block->is_free = 1;
-    stats.free_count++;
-    stats.total_used -= block->size;
-
-    // printf("[kfree] Freed %d bytes at 0x%x (block: 0x%x)\n",
-    //        block->size, (u32)ptr, (u32)block);
-
-    // Сливаем с соседними свободными блоками
-    // Слияние с следующим блоком
-    if (block->next && block->next->is_free) {
-        block->size += sizeof(mem_block_t) + block->next->size;
-        block->next = block->next->next;
-        // printf("[kfree] Merged with next block\n");
-    }
-
-    // Слияние с предыдущим блоком (нужно найти в списке)
-    mem_block_t* current = free_blocks;
-
-    while (current) {
-        if (current->is_free && (u32)current + sizeof(mem_block_t) + current->size == (u32)block) {
-            // Текущий блок свободен и примыкает к нашему блоку
-            current->size += sizeof(mem_block_t) + block->size;
-            current->next = block->next;
-            // printf("[kfree] Merged with previous block\n");
-            return;
-        }
-        current = current->next;
+void memory_copy(u8* source, u8* dest, int nbytes) {    // копируем память
+    int i;
+    for (i = 0; i < nbytes; i++) {
+        *(dest + i) = *(source + i);
     }
 }
 
-meminfo_t get_meminfo() {
-    u32 current_addr = HEAP_START;
-    u32 heap_end = heap_current_end;
-    u32 total_used = 0;
-    u32 total_free = 0;
-    u32 block_count = 0;
-    u32 used_blocks = 0;
-
-    while (current_addr < heap_end) {
-        mem_block_t* block = (mem_block_t*)current_addr;
-        block_count++;
-
-        if (block->is_free) {
-            total_free += block->size;
-        } else {
-            total_used += block->size;
-            used_blocks++;
-        }
-
-        current_addr += sizeof(mem_block_t) + block->size;
-    }
-
-    stats.total_used = total_used;
-    stats.total_free = total_free;
-    stats.block_count = block_count;
-    stats.leak_count = used_blocks;
-
-    stats.heap_start = HEAP_START;
-    stats.heap_size = heap_current_end - HEAP_START;
-    stats.heap_current_end = heap_current_end;
-    stats.block_size = BLOCK_SIZE;
-    stats.free_blocks = free_blocks;
-
-    return stats;
-}
-
-void kmemdump() {
-    meminfo_t info = get_meminfo();
-    u32 current_addr = HEAP_START;
-    u32 counter = 0;
-
-    printf(
-        "\nHeap: 0x%x - 0x%x (%d bytes)\n",
-        HEAP_START,
-        info.heap_current_end,
-        info.heap_current_end - HEAP_START);
-    printf("Block size: %d bytes\n", info.block_size);
-    printf(
-        "Allocations: %d, Frees: %d, Leaks: %d blocks\n", info.alloc_count, info.free_count, info.leak_count);
-    printf(
-        "Max used: %d bytes, Current: USED=%d, FREE=%d\n", info.max_used, info.total_used, info.total_free);
-    printf("Total blocks: %d\n", info.block_count);
-
-    while (current_addr < info.heap_current_end) {
-        mem_block_t* block = (mem_block_t*)current_addr;
-
-        printf(
-            "Block %d: header=0x%x (pointer 0x%x), Size=%d, %s\n",
-            counter++,
-            (u32)block,
-            (u32)block + sizeof(mem_block_t),
-            block->size,
-            block->is_free ? "FREE" : "USED");
-
-        current_addr += sizeof(mem_block_t) + block->size;
+void memory_set(u8* dest, u8 val, u32 len) {    // задаем память
+    u8* temp = (u8*)dest;
+    for (; len != 0; len--) {
+        *temp++ = val;
     }
 }
 
-void kmemcheck(void* ptr) {
-    if (!ptr) {
-        printf("kmemcheck: NULL pointer\n");
-        return;
-    }
-
-    mem_block_t* block = (mem_block_t*)((u32)ptr - sizeof(mem_block_t));
-
-    printf("kmemcheck for 0x%x:\n", (u32)ptr);
-    printf("  Block at: 0x%x\n", (u32)block);
-    printf("  Block size: %d\n", block->size);
-    printf("  Block free: %s\n", block->is_free ? "yes" : "no");
-    printf("  Heap range: 0x%x - 0x%x\n", HEAP_START, heap_current_end);
-
-    if ((u32)block < HEAP_START || (u32)block >= heap_current_end) {
-        printf("  ERROR: Block outside heap!\n");
+void u32memory_set(u32* dest, u32 val, u32 len) {    // задаем память u32
+    u32* temp = (u32*)dest;
+    for (; len != 0; len--) {
+        *temp++ = val;
     }
 }
 
-void get_freememaddr() {
-    char free_mem_addr_str[32] = "";
-    hex_to_ascii(free_mem_addr, free_mem_addr_str);
-    printf("%s\n", free_mem_addr_str);
-}

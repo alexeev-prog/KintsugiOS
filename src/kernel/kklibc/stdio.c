@@ -281,12 +281,21 @@ unsigned int format_string_core(char* buf, unsigned int size, const char* fmt, v
 }
 
 static void format_string(char* buf, char* fmt, va_list args) {
-    format_string_core(buf, 0, fmt, args);
+    format_string_core(buf, PRINTF_BUF_SIZE, fmt, args);
 }
 
 void printf(char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
+    /* File contents can exceed the shared formatting buffer. Stream them. */
+    if (fmt[0] == '%' && fmt[1] == 's' && !fmt[2]) {
+        const char* text = va_arg(args, const char*);
+        if (!text) text = "(null)";
+        if (IS_TERMINAL_MODE()) terminal_print(text);
+        else kprint((char*)text);
+        va_end(args);
+        return;
+    }
     format_string(printf_buf, fmt, args);
     va_end(args);
 

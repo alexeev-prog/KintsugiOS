@@ -9,11 +9,13 @@
 #include "../shell/shell.h"
 #include "log.h"
 #include "sysinfo.h"
+#include "../mm/memory.h"
 
 void kmain(void) {
     log_init();
     log_write("[INFO] kernel entry\n");
     isr_install();
+    memory_init();
     heap_init();
     terminal_init();
     output_set_mode(OUTPUT_MODE_TERMINAL);

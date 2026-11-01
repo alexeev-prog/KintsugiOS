@@ -37,7 +37,8 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
     boot = ['-cdrom', 'diskimgs/KintsugiOS.iso', '-boot', 'order=d'] if iso else [
         '-drive', f'file={floppy},format=raw,if=floppy', '-boot', 'order=a']
     drives = [] if no_disk else ['-drive', f'file={disk},format=raw,if=ide,index=0']
-    proc = subprocess.Popen(['qemu-system-i386', '-m', '64', '-display', 'none',
+    memory = next((x.split('=', 1)[1] for x in sys.argv if x.startswith('--memory=')), '64')
+    proc = subprocess.Popen(['qemu-system-i386', '-m', memory, '-display', 'none',
                              '-serial', f'file:{tmp}/serial.log',
                              '-qmp', f'unix:{tmp}/qmp,server=on,wait=off',
                              *drives, *boot])
@@ -90,6 +91,11 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
 
         wait_for('Keramika Shell')
         assert '[INFO] shell ready' in (tmp / 'serial.log').read_text()
+        assert '[INFO] E820 PMM VMM paging ready' in (tmp / 'serial.log').read_text()
+        command('memtest')
+        wait_for('Memory self-test: PASS')
+        command('meminfo')
+        wait_for('Paging: enabled')
         if '--panic' in sys.argv or '--fault' in sys.argv:
             fault = '--fault' in sys.argv
             command('fault confirm' if fault else 'panic confirm')

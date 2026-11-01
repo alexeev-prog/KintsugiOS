@@ -1,8 +1,9 @@
 #include "sysinfo.h"
 
-#include "../kklibc/mem.h"
+#include "../mm/heap.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
+#include "../mm/memory.h"
 
 static system_info_t sys_info;
 
@@ -24,20 +25,17 @@ void detect_cpu(void) {
 
 void detect_memory() {
     meminfo_t info = get_meminfo();
-    sys_info.total_memory = HEAP_START + HEAP_SIZE;
-    sys_info.used_memory = info.total_used + (HEAP_START - 0x1000);
-    sys_info.free_memory = info.total_free;
+    memory_stats_t physical = memory_stats();
+    sys_info.total_memory = physical.usable_kib > 0x3fffff ? 0xfffffc00u : physical.usable_kib * 1024;
+    sys_info.used_memory = physical.allocated_pages * PAGE_SIZE;
+    sys_info.free_memory = physical.free_pages * PAGE_SIZE;
 
-    sys_info.kernel_memory = HEAP_START - 0x1000;
+    extern char __bss_end[];
+    sys_info.kernel_memory = (u32)__bss_end - 0x7e00;
     sys_info.heap_size = info.heap_size;
     sys_info.heap_used = info.total_used;
     sys_info.heap_free = info.total_free;
 
-    printf(
-        "Memory detected: total=%d; used=%d; free=%d\n",
-        HEAP_START + HEAP_SIZE,
-        info.total_used + (HEAP_START - 0x1000),
-        info.total_free);
 }
 
 system_info_t* get_system_info() {
