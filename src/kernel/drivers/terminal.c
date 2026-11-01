@@ -215,12 +215,8 @@ void terminal_scroll_to(u32 line) {
 
 /* Прокрутка к нижней части */
 void terminal_scroll_to_bottom(void) {
-    u32 max_scroll = TERMINAL_HEIGHT - SCREEN_HEIGHT;
-    if (max_scroll > TERMINAL_HEIGHT) {
-        max_scroll = 0;
-    }
-
-    term_state.scroll_offset = max_scroll;
+    term_state.scroll_offset = term_state.cursor_y >= SCREEN_HEIGHT
+        ? term_state.cursor_y - SCREEN_HEIGHT + 1 : 0;
     term_state.dirty = 1;
 }
 

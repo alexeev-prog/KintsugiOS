@@ -101,7 +101,7 @@ char* strncpy(char* dest, const char* src, unsigned int n);
  * @param s2 Указатель на вторую строку.
  * @return 0 если строки равны, >0 если s1 > s2, <0 если s1 < s2.
  */
-int strcmp(char s1[], char s2[]);
+int strcmp(const char s1[], const char s2[]);
 
 /**
  * @brief Сравнивает первые n символов двух строк.

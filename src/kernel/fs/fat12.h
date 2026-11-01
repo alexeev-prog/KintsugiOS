@@ -78,6 +78,8 @@ typedef struct {
  * @details Загружает загрузочный сектор и вычисляет параметры файловой системы
  */
 void fat12_init(void);
+int fat12_is_mounted(void);
+int fat12_root_name(u32 index, char name[13]);
 
 /**
  * @brief Чтение загрузочного сектора FAT12

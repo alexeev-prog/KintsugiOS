@@ -1,176 +1,123 @@
-/*------------------------------------------------------------------------------
- *  Kintsugi OS Drivers source code
- *  File: kernel/drivers/keyboard.c
- *  Title: Функции работы с клавиатурой
- *  Author: alexeev-prog
- *  License: MIT License
- * ------------------------------------------------------------------------------
- *	Description: null
- * ----------------------------------------------------------------------------*/
-
 #include "keyboard.h"
 
 #include "../cpu/isr.h"
-#include "../kernel/kernel.h"
 #include "../kklibc/function.h"
-#include "../kklibc/stdlib.h"
 #include "lowlevel_io.h"
-#include "screen.h"
-#include "terminal.h"
 
-#define BACKSPACE 0x0E
-#define ENTER 0x1C
+#define EVENT_COUNT 128
+static int events[EVENT_COUNT];
+static volatile u32 head, tail;
+static u8 shifts, caps, control, extended;
 
-extern int shell_cursor_offset;
-extern int shell_prompt_offset;
+static const char lower[] = "??1234567890-=??qwertyuiop[]??asdfghjkl;'`?\\zxcvbnm,./??? ";
+static const char upper[] = "?" "?!@#$%^&*()_+??QWERTYUIOP{}??ASDFGHJKL:\"~?|ZXCVBNM<>???? ";
 
-static char key_buffer[256];
-static char pending_line[256];
-static volatile int line_pending;
-
-#define SC_MAX 57
-
-// Состояния модификаторов
-static int shift_pressed = 0;
-static int caps_lock = 0;
-static int ctrl_pressed = 0;
-static int alt_pressed = 0;
-
-// Таблицы символов для разных состояний
-const char sc_ascii_lower[] = { '?', '?', '1', '2', '3', '4', '5', '6', '7', '8', '9',  '0', '-', '=',  '?',
-                                '?', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p',  '[', ']', '?',  '?',
-                                'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', '?', '\\', 'z',
-                                'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', '?', '?',  '?', ' ' };
-
-const char sc_ascii_upper[] = { '?', '?', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '?',
-                                '?', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '?', '?',
-                                'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', '?', '|', 'Z',
-                                'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', '?', '?', '?', ' ' };
-
-static void keyboard_callback(registers_t regs) {
-    u8 scancode = port_byte_in(0x60);
-    if (line_pending) {
-        return;
+static void enqueue(int key) {
+    u32 next = (head + 1) % EVENT_COUNT;
+    if (next != tail) {
+        events[head] = key;
+        __asm__ volatile("" : : : "memory");
+        head = next;
     }
-
-    // Обработка отпускания клавиш (старший бит установлен)
-    if (scancode & 0x80) {
-        u8 released_key = scancode & 0x7F;
-
-        switch (released_key) {
-            case 0x2A:    // Left Shift
-            case 0x36:    // Right Shift
-                shift_pressed = 0;
-                return;
-            case 0x1D:    // Ctrl
-                ctrl_pressed = 0;
-                break;
-            case 0x38:    // Alt
-                alt_pressed = 0;
-                break;
-        }
-    }
-    // Обработка нажатия клавиш
-    else {
-        switch (scancode) {
-            case 0x2A:    // Left Shift
-            case 0x36:    // Right Shift
-                shift_pressed = 1;
-                break;
-            case 0x1D:    // Ctrl
-                ctrl_pressed = 1;
-                break;
-            case 0x38:    // Alt
-                alt_pressed = 1;
-                break;
-            case 0x3A:    // Caps Lock
-                caps_lock = !caps_lock;
-                break;
-            case 0x48:    // Стрелка вверх
-                if (shift_pressed) {
-                    // Shift+Вверх - прокрутка терминала
-                    terminal_handle_arrow_up();
-                } else {
-                    // Просто стрелка вверх - история команд
-                    // TODO: реализовать историю
-                }
-                break;
-
-            case 0x50:    // Стрелка вниз
-                if (shift_pressed) {
-                    // Shift+Вниз - прокрутка терминала
-                    terminal_handle_arrow_down();
-                } else {
-                    // Просто стрелка вниз - история команд
-                    // TODO: реализовать историю
-                }
-                break;
-            default:
-                if (scancode > SC_MAX) {
-                    return;
-                }
-
-                char letter;
-                int uppercase = shift_pressed ^ caps_lock;    // XOR для правильной логики
-
-                // Выбираем правильную таблицу символов
-                if (uppercase) {
-                    letter = sc_ascii_upper[scancode];
-                } else {
-                    letter = sc_ascii_lower[scancode];
-                }
-
-                // Специальная обработка для комбинаций с Ctrl
-                if (ctrl_pressed) {
-                    // Ctrl+ прерывания
-                    if (letter == 'c') {
-                        kprint("^C");
-                        // todo: обрывание процесса
-                        key_buffer[0] = '\0';
-                        return;
-                    }
-                }
-
-                // Остальная обработка как раньше
-                if (scancode == BACKSPACE) {
-                    if (get_cursor_offset() <= shell_prompt_offset) {
-                        return;
-                    }
-                    backspace(key_buffer);
-                    kprint_backspace();
-
-                    /* Также обрабатываем для общего ввода */
-                } else if (scancode == ENTER) {
-                    kprint("\n");
-                    strcpy(pending_line, key_buffer);
-                    line_pending = 1;
-                    key_buffer[0] = '\0';
-
-                    /* Также обрабатываем для общего ввода */
-                } else {
-                    if ((u32)strlen(key_buffer) < sizeof(key_buffer) - 1) {
-                        append(key_buffer, letter);
-                        char str[2] = { letter, '\0' };
-                        kprint(str);
-
-                        /* Также обрабатываем для общего ввода */
-                    }
-                }
-                break;
-        }
-    }
-    UNUSED(regs);
 }
 
-void init_keyboard() {
+static void keyboard_callback(registers_t registers) {
+    UNUSED(registers);
+    u8 code = port_byte_in(0x60);
+    if (code == 0xe0) {
+        extended = 1;
+        return;
+    }
+    if (code == 0xe1) {
+        extended = 0;
+        return;
+    }
+    u8 release = code & 0x80;
+    code &= 0x7f;
+    u8 ext = extended;
+    extended = 0;
+    if (!ext && (code == 0x2a || code == 0x36)) {
+        u8 mask = code == 0x2a ? 1 : 2;
+        if (release) {
+            shifts &= ~mask;
+        } else {
+            shifts |= mask;
+        }
+        return;
+    }
+    if (code == 0x1d) {
+        control = !release;
+        return;
+    }
+    if (release) {
+        return;
+    }
+    if (!ext && code == 0x3a) {
+        caps ^= 1;
+        return;
+    }
+    if (ext) {
+        switch (code) {
+            case 0x48:
+                enqueue(shifts ? KEY_SCROLL_UP : KEY_UP);
+                break;
+            case 0x50:
+                enqueue(shifts ? KEY_SCROLL_DOWN : KEY_DOWN);
+                break;
+            case 0x4b:
+                enqueue(KEY_LEFT);
+                break;
+            case 0x4d:
+                enqueue(KEY_RIGHT);
+                break;
+            case 0x47:
+                enqueue(KEY_HOME);
+                break;
+            case 0x4f:
+                enqueue(KEY_END);
+                break;
+            case 0x53:
+                enqueue(KEY_DELETE);
+                break;
+        }
+        return;
+    }
+    if (code == 0x1c) {
+        enqueue('\n');
+    } else if (code == 0x0e) {
+        enqueue('\b');
+    } else if (code == 0x0f) {
+        enqueue('\t');
+    } else if (code < sizeof(lower) - 1) {
+        char c = lower[code];
+        if (c == '?') {
+            return;
+        }
+        int uppercase = shifts != 0;
+        if (c >= 'a' && c <= 'z') {
+            uppercase ^= caps;
+        }
+        c = uppercase ? upper[code] : c;
+        if (control) {
+            if (c == 'c' || c == 'C') {
+                enqueue(3);
+            }
+        } else {
+            enqueue(c);
+        }
+    }
+}
+
+int keyboard_read_event(void) {
+    if (tail == head) {
+        return 0;
+    }
+    int key = events[tail];
+    __asm__ volatile("" : : : "memory");
+    tail = (tail + 1) % EVENT_COUNT;
+    return key;
+}
+
+void init_keyboard(void) {
     register_interrupt_handler(IRQ1, keyboard_callback);
-}
-
-/* Disk I/O and shell commands must not run inside the keyboard IRQ. */
-void keyboard_process_pending(void) {
-    if (!line_pending) {
-        return;
-    }
-    user_input(pending_line);
-    line_pending = 0;
 }

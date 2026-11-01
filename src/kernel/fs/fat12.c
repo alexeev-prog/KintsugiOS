@@ -8,6 +8,7 @@
 static fat12_context_t ctx;
 static fat12_boot_sector_t boot_sector;
 static int mounted;
+int fat12_is_mounted(void) { return mounted; }
 extern ata_disk_info_t ata_disks[2];
 
 static int read_sector(u32 sector, void* buffer) {
@@ -16,6 +17,27 @@ static int read_sector(u32 sector, void* buffer) {
 
 static int write_sector(u32 sector, void* buffer) {
     return ata_pio_write_sectors(ATA_MASTER, sector, 1, (u16*)buffer);
+}
+
+int fat12_root_name(u32 index, char name[13]) {
+    if (!mounted || !name) return 0;
+    u16 raw[256];
+    for (u32 i = 0; i < boot_sector.root_entries; ++i) {
+        if (!(i % 16) && read_sector(ctx.root_dir_start_sector+i/16, raw)) return 0;
+        fat12_dir_entry_t* e = (fat12_dir_entry_t*)((u8*)raw+(i%16)*32);
+        if (!e->filename[0]) break;
+        if ((u8)e->filename[0] == 0xe5 || (e->attributes & 0x18)) continue;
+        if (index--) continue;
+        u32 p = 0;
+        for (int j = 0; j < 8 && e->filename[j] != ' '; ++j) name[p++] = e->filename[j];
+        if (e->extension[0] != ' ') {
+            name[p++] = '.';
+            for (int j = 0; j < 3 && e->extension[j] != ' '; ++j) name[p++] = e->extension[j];
+        }
+        name[p] = 0;
+        return 1;
+    }
+    return 0;
 }
 
 int fat12_read_boot_sector(fat12_boot_sector_t* boot) {

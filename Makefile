@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := all
 .DELETE_ON_ERROR:
 
+# Tools and build configuration
 ASM ?= nasm
 CROSS ?= $(shell command -v i386-elf-gcc >/dev/null 2>&1 && echo i386-elf-)
 CC := $(CROSS)gcc
@@ -27,6 +28,7 @@ OBJS := $(BIN_DIR)/bootloader/kernel_entry.o $(BIN_DIR)/kernel/cpu/interrupt.o $
 
 all: $(BIN_DIR)/kintsugios.bin
 
+# Compile and link the freestanding kernel
 $(BIN_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -68,11 +70,13 @@ $(FLOPPY): $(BIN_DIR)/kintsugios.bin
 	@$(PYTHON) -c 'from pathlib import Path; b=Path("$<").read_bytes(); assert len(b)<=1474560; Path("$@.tmp").write_bytes(b+bytes(1474560-len(b)))'
 	mv $@.tmp $@
 
+# Persistent disks: never depend on kernel or fixture timestamps
 $(DISKIMG_DIR)/$(HDDIMG_NAME):
 	@mkdir -p $(dir $@)
 	truncate -s 16M $@
 
-$(FATDISK): $(FAT12_TEST_FILES)
+# Persistent user data: source/test changes never implicitly format this disk.
+$(FATDISK):
 	@mkdir -p $(dir $@)
 	@command -v mkfs.fat >/dev/null || { echo 'Install dosfstools'; exit 1; }
 	@command -v mcopy >/dev/null || { echo 'Install mtools'; exit 1; }
@@ -92,6 +96,10 @@ $(ISO): $(FLOPPY)
 diskimg: $(FLOPPY)
 hddimg: $(DISKIMG_DIR)/$(HDDIMG_NAME)
 fat12hdd: $(FATDISK)
+disk-create: $(FATDISK)
+disk-reset:
+	@test "$(CONFIRM)" = YES || { echo 'Deletes filesystem data: make disk-reset CONFIRM=YES'; exit 1; }
+	$(MAKE) -B disk-create
 iso: $(ISO)
 testfiles: $(FAT12_TEST_FILES)
 
@@ -117,18 +125,25 @@ clean_all: clean
 quick re:
 	$(MAKE) clean
 	$(MAKE) run_fat12
-info:
-	@echo 'make [all|diskimg|fat12hdd|iso|run|run_bin|run_fda|run_hdd|run_fat12|run_iso]'
+help info:
+	@echo 'Build: make [all|diskimg|iso]'
+	@echo 'Disk: make disk-create (only if missing); make disk-reset CONFIRM=YES (ERASES data)'
+	@echo 'Run: make run (floppy + FAT12) or make run_iso'
+	@echo 'Test: make test (temporary disks only); clean preserves persistent disks'
 	@echo 'Debug: make debug_fat12; gdb bin/kernel.elf -ex "target remote :1234"'
 	@echo 'Headless: make run QEMU_FLAGS="-display none -monitor stdio"'
 	@echo 'CC=$(CC), LD=$(LD); filesystem images survive make clean.'
 
 -include $(OBJS:.o=.d)
+# Headless integration tests (never use the persistent user disk)
 test: $(FLOPPY) $(ISO)
 	$(PYTHON) tools/smoke_test.py
 	$(PYTHON) tools/smoke_test.py --iso
 	$(PYTHON) tools/smoke_test.py --large-kernel
 	$(PYTHON) tools/smoke_test.py --no-disk
 	$(PYTHON) tools/smoke_test.py --invalid-fs
+	$(PYTHON) tools/smoke_test.py --panic
+	$(PYTHON) tools/smoke_test.py --fault
 .PHONY: test
+.PHONY: help disk-create disk-reset
 .PHONY: all diskimg hddimg fat12hdd iso testfiles run run_bin run_fda run_hdd run_fat12 run_iso debug_fda debug_hdd debug_fat12 debug_iso clean clean_all quick re info

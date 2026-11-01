@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 
+Path('/tmp/opencode').mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as directory:
     tmp = Path(directory)
     disk = tmp / 'fat.img'
@@ -37,8 +38,9 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
         '-drive', f'file={floppy},format=raw,if=floppy', '-boot', 'order=a']
     drives = [] if no_disk else ['-drive', f'file={disk},format=raw,if=ide,index=0']
     proc = subprocess.Popen(['qemu-system-i386', '-m', '64', '-display', 'none',
+                             '-serial', f'file:{tmp}/serial.log',
                              '-qmp', f'unix:{tmp}/qmp,server=on,wait=off',
-                             *drives, '-no-reboot', *boot])
+                             *drives, *boot])
     try:
         sock = socket.socket(socket.AF_UNIX)
         for _ in range(100):
@@ -79,13 +81,27 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
 
         def command(text):
             for ch in text:
-                key = {' ': 'spc', '.': 'dot', '-': 'minus'}.get(ch, ch)
+                key = {' ': 'spc', '.': 'dot', '-': 'minus', '/': 'slash',
+                       '"': 'shift-apostrophe', "'": 'apostrophe', '\\': 'backslash'}.get(ch, ch)
                 monitor(f'sendkey {key} 10')
                 time.sleep(.025)
             monitor('sendkey ret 10')
             time.sleep(.3)
 
         wait_for('Keramika Shell')
+        assert '[INFO] shell ready' in (tmp / 'serial.log').read_text()
+        if '--panic' in sys.argv or '--fault' in sys.argv:
+            fault = '--fault' in sys.argv
+            command('fault confirm' if fault else 'panic confirm')
+            wait_for('PANIC:')
+            serial = (tmp / 'serial.log').read_text()
+            assert 'PANIC:' in serial
+            if fault:
+                assert 'Invalid Opcode' in serial and 'eip=' in serial and 'eax=' in serial
+            qmp('quit')
+            proc.wait(timeout=10)
+            print('PASS: unified panic', 'exception registers' if fault else 'explicit request')
+            sys.exit(0)
         if invalid or no_disk:
             command('ls')
             wait_for('FAT12 not mounted')
@@ -110,17 +126,56 @@ with tempfile.TemporaryDirectory(prefix='kintsugi-', dir='/tmp/opencode') as dir
         command('write check.txt multi word text')
         command('cat check.txt')
         wait_for('multi word text')
+        command('write quote.txt "quoted text" escaped\\ space')
+        command('cat /quote.txt')
+        wait_for('quoted text escaped space')
+        command('help fs')
+        wait_for('Replace file contents')
+        command('not-a-command')
+        command('status')
+        wait_for('status=127')
+        command('echo "unfinished')
+        command('status')
+        wait_for('status=2')
+        # Clear old output so a previous cat cannot hide a completion failure.
+        command('clear')
+        # Command and root-path completion, editing, history and Delete.
+        for key in ['c', 'a', 'tab', 'spc', 'slash', 'q', 'u', 'tab', 'ret']:
+            monitor(f'sendkey {key} 10')
+            time.sleep(.04)
+        wait_for('quoted text escaped space')
+        command('echo history-marker')
+        monitor('sendkey up 10'); time.sleep(.1)
+        monitor('sendkey ret 10'); time.sleep(.1)
+        wait_for('history-marker')
+        command('echo edit-marker')
+        for key in ['up', 'home', 'right', 'right', 'right', 'right', 'right', 'delete', 'end', 'ret']:
+            monitor(f'sendkey {key} 10')
+            time.sleep(.04)
+        wait_for('dit-marker')
         command('create empty.txt')
         command('del empty.txt')
+        # A full machine reset must not lose acknowledged writes.
+        ready_count = (tmp / 'serial.log').read_text().count('[INFO] shell ready')
+        qmp('system_reset')
+        for _ in range(150):
+            if (tmp / 'serial.log').read_text().count('[INFO] shell ready') > ready_count:
+                break
+            time.sleep(.1)
+        else:
+            raise AssertionError('Kernel did not restart')
+        command('cat /check.txt')
+        wait_for('multi word text')
         qmp('quit')
         proc.wait(timeout=10)
         actual = subprocess.check_output(['mtype', '-i', str(disk), '::/CHECK.TXT'])
         assert actual == b'multi word text', actual
+        assert subprocess.check_output(['mtype', '-i', str(disk), '::/QUOTE.TXT']) == b'quoted text escaped space'
         listing = subprocess.check_output(['mdir', '-i', str(disk), '::/'])
         assert b'EMPTY' not in listing
         assert subprocess.check_output(['mtype', '-i', str(disk), '::/README.TXT']) == payload
         subprocess.run(['fsck.fat', '-n', str(disk)], check=True)
-        print('PASS:', 'ISO' if iso else 'floppy', 'boot, shell, FAT12 read/write/overwrite/delete, fsck')
+        print('PASS:', 'ISO' if iso else 'floppy', 'boot, editor/parser/completion, FAT12, reboot persistence, fsck')
     finally:
         if proc.poll() is None:
             proc.terminate()

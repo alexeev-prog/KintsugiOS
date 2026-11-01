@@ -1,0 +1,28 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y gcc binutils nasm python3 qemu-system-x86 dosfstools mtools genisoimage
+      - name: Build and integration tests
+        run: make -j2 test CROSS=
+      - name: Upload boot images and symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: kintsugios
+          path: |
+            bin/kernel.elf
+            diskimgs/kintsugi_floppy_i386.img
+            diskimgs/KintsugiOS.iso

@@ -9,6 +9,7 @@
  * ----------------------------------------------------------------------------*/
 
 #include "screen.h"
+#include "../kernel/log.h"
 
 #include "../kklibc/ctypes.h"
 #include "../kklibc/stdlib.h"
@@ -142,22 +143,9 @@ void halted_cpu_screen_clear() {
 }
 
 void panic_red_screen(char* title, char* description) {
-    int screen_size = MAX_COLS * MAX_ROWS;
-    u8* screen = (u8*)VIDEO_ADDRESS;
-
-    for (int i = 0; i < screen_size; ++i) {
-        screen[i * 2] = ' ';
-        screen[i * 2 + 1] = WHITE_ON_RED;
-    }
-
-    set_cursor_offset(get_offset(0, 0));
-
-    _screen_kprint_colored("KINTSUGIOS KERNEL PANIC RED SCREEN\n\n", WHITE_ON_RED);
-    _screen_kprint_colored(title, WHITE_ON_RED);
-    _screen_kprint_colored("\n\n", WHITE_ON_RED);
-    _screen_kprint_colored(description, WHITE_ON_RED);
-
-    __asm__ volatile("hlt");
+    char message[256];
+    snprintf(message, sizeof(message), "%s: %s", title, description);
+    panic(message, NULL);
 }
 
 void printf_panic_screen(char* title, const char* reason_fmt, ...) {
