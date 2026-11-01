@@ -1,5 +1,31 @@
 # KintsugiOS
 
+<div align="center">
+  <h3>Минималистичная операционная 32 разрядная система с монолитным ядром и собственным загрузчиком на (N)ASM и GCC 15</h3>
+  <br>
+
+  <a href="https://alexeev-prog.github.io/KintsugiOS/">
+    <img src="https://img.shields.io/badge/Документация-онлайн?style=for-the-badge&logo=gitbook" alt="docs">
+  </a>
+  <img src="https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Top Language">
+  <img src="https://img.shields.io/github/languages/count/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Language Count">
+  <img src="https://img.shields.io/github/license/alexeev-prog/KintsugiOS?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/github/issues/alexeev-prog/KintsugiOS?style=for-the-badge&color=critical" alt="Issues">
+  <a href="https://github.com/alexeev-prog/KintsugiOS/stargazers">
+        <img src="https://img.shields.io/github/stars/alexeev-prog/KintsugiOS?style=for-the-badge&logo=github" alt="Stars">
+  </a>
+  <img src="https://img.shields.io/github/last-commit/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Last Commit">
+  <img src="https://img.shields.io/github/contributors/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Contributors">
+</div>
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/docs/pallet-0.png" width="600" alt="">
+</div>
+
+KintsugiOS — это минималистичная x86 операционная система, написанная на (N)ASM и C, созданная в образовательных целях для глубокого понимания принципов работы операционных систем. Название проекта отсылает к японскому искусству Kintsugi, где разбитая керамика восстанавливается золотым лаком, подчеркивая красоту несовершенства и непрерывного развития.
+
+Последняя стабильная версия: [v0.5.0a](https://github.com/alexeev-prog/KintsugiOS/releases/tag/v0.5.0a)
+
 ## Быстрый старт
 
 ```sh
@@ -38,36 +64,8 @@ cat /hello.txt
 не реализованы. Подробности: [сборка](docs/BUILD_AND_TEST_RU.md),
 [архитектура shell](docs/SHELL_RU.md).
 
-<div align="center">
-  <h3>Минималистичная операционная 32 разрядная система с монолитным ядром и собственным загрузчиком на (N)ASM и GCC 15</h3>
-  <br>
-
-  <a href="https://alexeev-prog.github.io/KintsugiOS/">
-    <img src="https://img.shields.io/badge/Документация-онлайн?style=for-the-badge&logo=gitbook" alt="docs">
-  </a>
-  <img src="https://img.shields.io/github/languages/top/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Top Language">
-  <img src="https://img.shields.io/github/languages/count/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Language Count">
-  <img src="https://img.shields.io/github/license/alexeev-prog/KintsugiOS?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/github/issues/alexeev-prog/KintsugiOS?style=for-the-badge&color=critical" alt="Issues">
-  <a href="https://github.com/alexeev-prog/KintsugiOS/stargazers">
-        <img src="https://img.shields.io/github/stars/alexeev-prog/KintsugiOS?style=for-the-badge&logo=github" alt="Stars">
-  </a>
-  <img src="https://img.shields.io/github/last-commit/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Last Commit">
-  <img src="https://img.shields.io/github/contributors/alexeev-prog/KintsugiOS?style=for-the-badge" alt="Contributors">
-</div>
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/docs/pallet-0.png" width="600" alt="">
-</div>
-
-KintsugiOS — это минималистичная x86 операционная система, написанная на (N)ASM и C, созданная в образовательных целях для глубокого понимания принципов работы операционных систем. Название проекта отсылает к японскому искусству Kintsugi, где разбитая керамика восстанавливается золотым лаком, подчеркивая красоту несовершенства и непрерывного развития.
-
-Последняя стабильная версия: [v0.5.0a](https://github.com/alexeev-prog/KintsugiOS/releases/tag/v0.5.0a)
-
 > [!CAUTION]
 > KintsugiOS еще в активной стадии разработки и многие решения не финальные или нестабильные.
-
-> Также я занимаюсь [переводом OSDEV-Notes](https://github.com/alexeev-prog/Osdev-Notes-RU)
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/alexeev-prog/KintsugiOS/refs/heads/main/gallery/image.png" width="600" alt="">
