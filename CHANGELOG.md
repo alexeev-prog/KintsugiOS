@@ -1,3 +1,15 @@
+commit 15570e59cd6c90e6328563d92f9252acc5143ed3
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 1 16:20:17 2026 +0700
+
+    fix bootloader and disk error, improve fat12 fs
+
+commit 5d6a291677d2333e4a0f5d111d03b108e429b88d
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Feb 14 00:20:14 2026 +0700
+
+    update readme
+
 commit 26e720bee2948a12eed3335c7dbd4e3154444cad
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Wed Feb 11 20:48:42 2026 +0700
