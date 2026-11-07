@@ -64,7 +64,12 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
     boot = (
         ["-cdrom", "diskimgs/KintsugiOS.iso", "-boot", "order=d"]
         if iso
-        else ["-drive", f"file={floppy},format=raw,if=floppy,snapshot=on", "-boot", "order=a"]
+        else [
+            "-drive",
+            f"file={floppy},format=raw,if=floppy,snapshot=on",
+            "-boot",
+            "order=a",
+        ]
     )
     drives = [] if no_disk else ["-drive", f"file={disk},format=raw,if=ide,index=0"]
     memory = next(
@@ -194,18 +199,18 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         wait_for("Kintsugi Universal Editor")
         command("editor-content")
         monitor("sendkey ctrl-s 10")
-        time.sleep(.2)
+        time.sleep(0.2)
         wait_for("Saved")
         monitor("sendkey ctrl-q 10")
-        time.sleep(.2)
+        time.sleep(0.2)
         command("kbsm")
         wait_for("Kintsugi Basic System Monitor")
         monitor("sendkey q 10")
-        time.sleep(.2)
+        time.sleep(0.2)
         command("kc")
         wait_for("Kintsugi Commander")
         monitor("sendkey q 10")
-        time.sleep(.2)
+        time.sleep(0.2)
         command("/bin/check.elf")
         wait_for("User syscall checks: PASS")
         wait_for("User malloc checks: PASS")
@@ -313,7 +318,10 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         qmp("quit")
         proc.wait(timeout=10)
         actual = subprocess.check_output(["mtype", "-i", str(disk), "::/CHECK.TXT"])
-        assert subprocess.check_output(["mtype", "-i", str(disk), "::/EDIT.TXT"]) == b"editor-content\n"
+        assert (
+            subprocess.check_output(["mtype", "-i", str(disk), "::/EDIT.TXT"])
+            == b"editor-content\n"
+        )
         assert actual == b"multi word text", actual
         assert (
             subprocess.check_output(["mtype", "-i", str(disk), "::/QUOTE.TXT"])
