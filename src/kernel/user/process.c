@@ -1,5 +1,6 @@
 #include "process.h"
 
+#include "../../user/tuiabi.h"
 #include "../cpu/idt.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/terminal.h"
@@ -14,6 +15,7 @@ static u8 kernel_stack[16384] __attribute__((aligned(16)));
 static u32 gdt[12] __attribute__((aligned(8)));
 static u32 tss[26];
 static u32 space;
+static terminal_state_t* saved_terminal;
 static u32 user_heap_end;
 #define USER_HEAP_BASE 0x60000000u
 #define USER_HEAP_LIMIT 0x61000000u
@@ -194,6 +196,13 @@ int process_run(const char* path, int argc, char** argv) {
     vmm_space_switch(space);
     result = user_enter(entry, sp);
     vmm_space_switch(0);
+    if (saved_terminal) {
+        *terminal_get_state() = *saved_terminal;
+        terminal_get_state()->dirty = 1;
+        terminal_refresh();
+        kfree(saved_terminal);
+        saved_terminal = NULL;
+    }
 cleanup:
     vmm_space_destroy(space);
     space = 0;
@@ -277,6 +286,95 @@ void syscall_dispatch(syscall_regs_t* r) {
             strcpy((char*)r->ebx, vfs_getcwd());
             r->eax = 0;
             return;
+        case 7: /* Full screen presentation, restored automatically on exit. */
+            if (!user_range(r->ebx, 80 * 25 * sizeof(ktui_cell), 0)) {
+                break;
+            }
+            if (!saved_terminal) {
+                saved_terminal = kmalloc(sizeof(*saved_terminal));
+                if (!saved_terminal) {
+                    r->eax = VFS_ENOMEM;
+                    return;
+                }
+                *saved_terminal = *terminal_get_state();
+            }
+            terminal_clear();
+            memcpy(terminal_get_state()->buffer, (void*)r->ebx, 80 * 25 * sizeof(ktui_cell));
+            terminal_get_state()->cursor_x = r->ecx < 80 ? r->ecx : 0;
+            terminal_get_state()->cursor_y = r->edx < 25 ? r->edx : 24;
+            terminal_get_state()->dirty = 1;
+            terminal_refresh();
+            r->eax = 0;
+            return;
+        case 8: { /* Raw key: 0 poll, 1 wait, 2 wait at most one timer tick. */
+            int key;
+            do {
+                __asm__ volatile("cli" ::: "memory");
+                key = keyboard_read_event();
+                if (key || !r->ebx) {
+                    break;
+                }
+                __asm__ volatile("sti; hlt; cli" ::: "memory");
+                if (r->ebx == 2) {
+                    key = keyboard_read_event();
+                    break;
+                }
+            } while (1);
+            r->eax = key;
+            return;
+        }
+        case 9: {
+            if (!user_range(r->ebx, sizeof(ktui_stats), 1)) {
+                break;
+            }
+            memory_stats_t m = memory_stats();
+            meminfo_t h = get_meminfo();
+            ktui_stats snapshot = { m.usable_kib, m.free_pages, m.allocated_pages,
+                                    h.total_used, h.total_free, h.heap_size };
+            memcpy((void*)r->ebx, &snapshot, sizeof(snapshot));
+            r->eax = 0;
+            return;
+        }
+        case 10: /* Replace file, bounded to the editor's maximum size. */
+            if (!user_path(r->ebx, path) || r->edx > 65536 || !user_range(r->ecx, r->edx, 0)) {
+                break;
+            }
+            r->eax = vfs_replace(path, (void*)r->ecx, r->edx);
+            return;
+        case 11: /* Small filesystem operations. */
+            if (!user_path(r->ebx, path)) {
+                break;
+            }
+            switch (r->ecx) {
+                case 0:
+                    r->eax = vfs_mkdir(path);
+                    return;
+                case 1:
+                    r->eax = vfs_unlink(path);
+                    return;
+                case 2:
+                    r->eax = vfs_rmdir(path);
+                    return;
+                case 3:
+                    r->eax = vfs_chdir(path);
+                    return;
+                case 4: {
+                    if (!user_range(r->edx, sizeof(vfs_stat_t), 1)) {
+                        break;
+                    }
+                    r->eax = vfs_stat(path, (vfs_stat_t*)r->edx);
+                    return;
+                }
+            }
+            break;
+        case 12: {
+            char destination[VFS_PATH_MAX];
+            if (!user_path(r->ebx, path) || !user_path(r->ecx, destination)) {
+                break;
+            }
+            r->eax = r->edx ? vfs_rename(path, destination) : vfs_copy(path, destination);
+            return;
+        }
         case 5: { /* Grow-only page-backed user heap. malloc/free live in userspace. */
             u32 size = r->ebx;
             if (!size || size > USER_HEAP_LIMIT - user_heap_end) {

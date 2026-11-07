@@ -1,0 +1,38 @@
+#ifndef KTUILIB_H
+#define KTUILIB_H
+#include "runtime.h"
+#include "tuiabi.h"
+
+enum {
+    TUI_UP = 256,
+    TUI_DOWN,
+    TUI_LEFT,
+    TUI_RIGHT,
+    TUI_HOME,
+    TUI_END,
+    TUI_DELETE
+};
+
+typedef struct {
+    u32 size;
+    unsigned char directory, readonly;
+} tui_stat;
+
+typedef struct {
+    char name[13];
+    tui_stat stat;
+} tui_entry;
+
+u32 tui_len(const char* text);
+void tui_copy(char* out, const char* text, u32 capacity);
+void tui_clear(unsigned char color);
+void tui_text(int x, int y, const char* text, unsigned char color);
+void tui_number(int x, int y, u32 value, unsigned char color);
+void tui_bar(int y, const char* text);
+void tui_present(int x, int y);
+int tui_key(int wait);
+int tui_prompt(const char* label, char* buffer, u32 capacity);
+int tui_confirm(const char* label);
+void tui_path(char out[256], const char* directory, const char* name);
+int tui_stat_path(const char* path, tui_stat* stat);
+#endif

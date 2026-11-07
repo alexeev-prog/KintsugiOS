@@ -1,3 +1,33 @@
+commit cfd499fa5a6d9e660893d3ba38fe9cd699055055
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 1 21:20:32 2026 +0700
+
+    add ring 3, add userspace, elf files, executable
+
+commit 367ab6585656ed8872a4ffa6a4c5444bd9d0df75
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 1 19:43:15 2026 +0700
+
+    improve fat12 filesystem, add VFS, improve memory management and io
+
+commit ce461ca7b168e60013583779e62462eeea3d172d
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 1 19:22:52 2026 +0700
+
+    update
+
+commit 2f258c90321eb7a8e1745b982c8170b1706ac977
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 1 17:55:08 2026 +0700
+
+    update readme
+
+commit 5d2c297b8c71d576c33ebd3b1a22859bff761e14
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 1 17:54:01 2026 +0700
+
+    add logging, make shell modularity, add CI, small improvements
+
 commit a3c0c5f918f5a810f76426af4362fd6568b27886
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Nov 1 16:24:36 2026 +0700

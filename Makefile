@@ -30,6 +30,19 @@ all: $(BIN_DIR)/kintsugios.bin users
 
 USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT
 USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
+TUI_PROGRAMS := KUNED KBSM KC
+USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
+$(BIN_DIR)/user/ktuilib.o: src/user/ktuilib.c src/user/ktuilib.h src/user/tuiabi.h src/user/runtime.h
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+define TUI_RULE
+$(BIN_DIR)/user/$(1).ELF: src/user/$(2).c src/user/ktuilib.h src/user/user.ld $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$$(CC) $$(CFLAGS) -c $$< -o $$(BIN_DIR)/user/$(1).o
+	$$(LD) -m elf_i386 -T src/user/user.ld $$(BIN_DIR)/user/start.o $$(BIN_DIR)/user/runtime.o $$(BIN_DIR)/user/ktuilib.o $$(BIN_DIR)/user/$(1).o -o $$@
+endef
+$(eval $(call TUI_RULE,KUNED,kuned))
+$(eval $(call TUI_RULE,KBSM,kbsm))
+$(eval $(call TUI_RULE,KC,kc))
 $(BIN_DIR)/user/start.o: src/user/start.asm
 	@mkdir -p $(dir $@)
 	$(ASM) -f elf32 $< -o $@

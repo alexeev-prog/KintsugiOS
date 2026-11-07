@@ -84,6 +84,8 @@ static void keyboard_callback(registers_t registers) {
     }
     if (code == 0x1c) {
         enqueue('\n');
+    } else if (code == 1) {
+        enqueue(27);
     } else if (code == 0x0e) {
         enqueue('\b');
     } else if (code == 0x0f) {
@@ -99,6 +101,14 @@ static void keyboard_callback(registers_t registers) {
         }
         c = uppercase ? upper[code] : c;
         if (control) {
+            if (c == 's' || c == 'S') {
+                enqueue(19);
+                return;
+            }
+            if (c == 'q' || c == 'Q') {
+                enqueue(17);
+                return;
+            }
             if (c == 'c' || c == 'C') {
                 enqueue(3);
             } else if (c == 'd' || c == 'D') {
