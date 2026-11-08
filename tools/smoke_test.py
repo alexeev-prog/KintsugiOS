@@ -24,7 +24,9 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
     if full_disk:
         original = tmp / "SAFE.TXT"
         original.write_bytes(b"original-data\n")
-        subprocess.run(["mcopy", "-i", str(disk), str(original), "::/SAFE.TXT"], check=True)
+        subprocess.run(
+            ["mcopy", "-i", str(disk), str(original), "::/SAFE.TXT"], check=True
+        )
         # Consume every available cluster while leaving directory slots free.
         boot = disk.read_bytes()[:512]
         cluster_bytes = boot[13] * 512
@@ -33,16 +35,22 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         raw = disk.read_bytes()
         fat_offset = int.from_bytes(boot[14:16], "little") * 512
         fat_sectors = int.from_bytes(boot[22:24], "little")
-        data_start = int.from_bytes(boot[14:16], "little") + boot[16] * fat_sectors + (int.from_bytes(boot[17:19], "little") * 32 + 511) // 512
+        data_start = (
+            int.from_bytes(boot[14:16], "little")
+            + boot[16] * fat_sectors
+            + (int.from_bytes(boot[17:19], "little") * 32 + 511) // 512
+        )
         clusters = (len(raw) // 512 - data_start) // boot[13]
         free = 0
-        for cluster in range(2, min(clusters + 2, 0xff0)):
+        for cluster in range(2, min(clusters + 2, 0xFF0)):
             offset = fat_offset + cluster + cluster // 2
-            value = int.from_bytes(raw[offset:offset+2], "little")
-            value = value >> 4 if cluster & 1 else value & 0xfff
+            value = int.from_bytes(raw[offset : offset + 2], "little")
+            value = value >> 4 if cluster & 1 else value & 0xFFF
             free += value == 0
         reserve.write_bytes(bytes(free * cluster_bytes))
-        subprocess.run(["mcopy", "-o", "-i", str(disk), str(reserve), "::/FILL.BIN"], check=True)
+        subprocess.run(
+            ["mcopy", "-o", "-i", str(disk), str(reserve), "::/FILL.BIN"], check=True
+        )
     invalid = "--invalid-fs" in sys.argv
     corrupt = "--corrupt-fat" in sys.argv
     if corrupt:
@@ -239,7 +247,10 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             wait_for("original-data")
             qmp("quit")
             proc.wait(timeout=10)
-            assert subprocess.check_output(["mtype", "-i", str(disk), "::/SAFE.TXT"]) == b"original-data\n"
+            assert (
+                subprocess.check_output(["mtype", "-i", str(disk), "::/SAFE.TXT"])
+                == b"original-data\n"
+            )
             subprocess.run(["fsck.fat", "-n", str(disk)], check=True)
             print("PASS: ENOSPC preserves existing file and FAT consistency")
             sys.exit(0)
@@ -274,9 +285,11 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         command("wc /readme.txt")
         command("tail /readme.txt")
         wait_for("cluster boundary data")
-        for app, title in (("kprocm", "Kintsugi Process Manager"),
-                           ("kdiskman", "Kintsugi Disk Manager"),
-                           ("ktui", "Kintsugi application launcher")):
+        for app, title in (
+            ("kprocm", "Kintsugi Process Manager"),
+            ("kdiskman", "Kintsugi Disk Manager"),
+            ("ktui", "Kintsugi application launcher"),
+        ):
             command(app)
             wait_for(title)
             if app == "ktui":

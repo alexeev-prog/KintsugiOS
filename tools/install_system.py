@@ -33,7 +33,9 @@ for directory in ("BIN", "BOOT", "ETC", "HOME", "TMP"):
     print(f"Checking directory: {directory}", flush=True)
     if not run("mdir", "-i", image, f"::/{directory}/", probe=True):
         run("mmd", "-i", image, f"::/{directory}")
-programs = subprocess.check_output(["make", "--no-print-directory", "list-user-programs"], text=True).split()
+programs = subprocess.check_output(
+    ["make", "--no-print-directory", "list-user-programs"], text=True
+).split()
 for filename in programs:
     program = Path(filename)
     run("mcopy", "-o", "-i", image, str(program), f"::/BIN/{program.name}")
