@@ -10,9 +10,10 @@ int main(int argc, char** argv) {
     }
     u32 length = 0, cursor = 0, top = 0;
     int dirty = 0;
-    unsigned char settings[2] = {1, 0}; /* line numbers, dark blue theme */
+    unsigned char settings[2] = { 1, 0 }; /* line numbers, dark blue theme */
     tui_load_settings("/ETC/KUNED.CFG", settings, sizeof(settings));
-    settings[0] = !!settings[0]; settings[1] = !!settings[1];
+    settings[0] = !!settings[0];
+    settings[1] = !!settings[1];
     const char* status = "Ctrl+S save | Ctrl+Q quit | arrows/Home/End edit";
     if (*path) {
         tui_stat stat;
@@ -63,7 +64,9 @@ int main(int argc, char** argv) {
         }
         u32 r = 0, c = 0;
         u32 line = 1;
-        if (settings[0] && !top) tui_number(0, 1, line, 0x08);
+        if (settings[0] && !top) {
+            tui_number(0, 1, line, 0x08);
+        }
         int row_number_drawn = !top;
         for (u32 i = 0; i < length && r < top + 22; ++i) {
             unsigned char ch = text[i];
@@ -71,8 +74,9 @@ int main(int argc, char** argv) {
                 ++r;
                 ++line;
                 c = 0;
-                if (settings[0] && r >= top && r < top + 22)
+                if (settings[0] && r >= top && r < top + 22) {
                     tui_number(0, r - top + 1, line, 0x08);
+                }
                 row_number_drawn = r >= top;
                 continue;
             }
@@ -99,18 +103,30 @@ int main(int argc, char** argv) {
             tui_text(12, 11, "S save settings / Esc close", 0x70);
             tui_present(79, 24);
             int choice = tui_key(1);
-            if (choice == 'n') settings[0] ^= 1;
-            if (choice == 't') settings[1] ^= 1;
-            if (choice == 's') status = tui_save_settings("/ETC/KUNED.CFG", settings, sizeof(settings))
-                ? "Settings saved" : "Cannot save settings";
+            if (choice == 'n') {
+                settings[0] ^= 1;
+            }
+            if (choice == 't') {
+                settings[1] ^= 1;
+            }
+            if (choice == 's') {
+                status = tui_save_settings("/ETC/KUNED.CFG", settings, sizeof(settings))
+                    ? "Settings saved"
+                    : "Cannot save settings";
+            }
         } else if (key == 6) {
             char query[128];
             if (tui_prompt("Find literal text (after cursor):", query, sizeof(query))) {
                 u32 n = tui_len(query), i = cursor + (cursor < length);
                 for (; i <= length && n <= length - i; ++i) {
                     u32 j = 0;
-                    while (j < n && text[i+j] == query[j]) ++j;
-                    if (j == n) { cursor = i; break; }
+                    while (j < n && text[i + j] == query[j]) {
+                        ++j;
+                    }
+                    if (j == n) {
+                        cursor = i;
+                        break;
+                    }
                 }
                 status = i <= length && n <= length - i ? "Found" : "Not found";
             }

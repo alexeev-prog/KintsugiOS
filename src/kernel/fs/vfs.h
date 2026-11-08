@@ -1,7 +1,7 @@
 #ifndef FS_VFS_H
 #define FS_VFS_H
-#include "../kklibc/ctypes.h"
 #include "../../user/fsabi.h"
+#include "../kklibc/ctypes.h"
 #define VFS_PATH_MAX 256
 #define VFS_NAME_MAX 13
 

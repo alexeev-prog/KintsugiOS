@@ -1,18 +1,70 @@
 #include "runtime.h"
 
+int open(const char* path, u32 flags) {
+    return syscall(KOS_SYS_OPEN, (u32)path, flags, 0, 0);
+}
+
+int close(int fd) {
+    return syscall(KOS_SYS_CLOSE, fd, 0, 0, 0);
+}
+
+int read(int fd, void* buffer, u32 size) {
+    return syscall(KOS_SYS_READ, fd, (u32)buffer, size, 0);
+}
+
+int write(int fd, const void* buffer, u32 size) {
+    return syscall(KOS_SYS_WRITE, fd, (u32)buffer, size, 0);
+}
+
+int dup2(int source, int destination) {
+    return syscall(KOS_SYS_DUP2, source, destination, 0, 0);
+}
+
+int pipe(int pair[2]) {
+    return syscall(KOS_SYS_PIPE, (u32)pair, 0, 0, 0);
+}
+
+int seek(int fd, u32 offset) {
+    return syscall(KOS_SYS_SEEK, fd, offset, 0, 0);
+}
+
+int write_all(int fd, const void* buffer, u32 size) {
+    u32 offset = 0;
+    while (offset < size) {
+        u32 chunk = size - offset;
+        if (chunk > 4096) {
+            chunk = 4096;
+        }
+        int result = write(fd, (const char*)buffer + offset, chunk);
+        if (result <= 0) {
+            return result < 0 ? result : -2;
+        }
+        offset += result;
+    }
+    return offset;
+}
+
 /* Freestanding compiler-generated aggregate copies may call these symbols. */
 void* memcpy(void* destination, const void* source, u32 size) {
     unsigned char* out = destination;
     const unsigned char* in = source;
-    for (u32 i = 0; i < size; ++i) out[i] = in[i];
+    for (u32 i = 0; i < size; ++i) {
+        out[i] = in[i];
+    }
     return destination;
 }
 
 int spawn(const char* path, int argc, char** argv) {
     return syscall(13, (u32)path, argc, (u32)argv, 0);
 }
-int wait(int pid) { return syscall(14, pid, 0, 0, 0); }
-int getpid(void) { return syscall(15, 0, 0, 0, 0); }
+
+int wait(int pid) {
+    return syscall(14, pid, 0, 0, 0);
+}
+
+int getpid(void) {
+    return syscall(15, 0, 0, 0, 0);
+}
 
 int syscall(u32 number, u32 a, u32 b, u32 c, u32 d) {
     int result;

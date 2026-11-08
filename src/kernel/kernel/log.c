@@ -10,11 +10,16 @@ static char journal[16384];
 static u32 journal_start, journal_size;
 
 int log_read(u32 offset, char* buffer, u32 capacity) {
-    if (offset >= journal_size) return 0;
+    if (offset >= journal_size) {
+        return 0;
+    }
     u32 size = journal_size - offset;
-    if (size > capacity) size = capacity;
-    for (u32 i = 0; i < size; ++i)
+    if (size > capacity) {
+        size = capacity;
+    }
+    for (u32 i = 0; i < size; ++i) {
         buffer[i] = journal[(journal_start + offset + i) % sizeof(journal)];
+    }
     return size;
 }
 
@@ -27,8 +32,9 @@ void log_init(void) {
     port_byte_out(COM1 + 2, 0xc7);
     port_byte_out(COM1 + 4, 0x0b);
     serial_ready = 1;
-    if (*(volatile u8*)0x4f00 == 3)
+    if (*(volatile u8*)0x4f00 == 3) {
         log_write("[BOOT] BIOS loader: kernel loaded, E820 collected, protected mode entered\n");
+    }
     log_write("[INFO] serial initialized\n");
 }
 
@@ -43,7 +49,9 @@ void log_write(const char* message) {
         }
         journal[(journal_start + journal_size++) % sizeof(journal)] = *p;
     }
-    if (!serial_ready) return;
+    if (!serial_ready) {
+        return;
+    }
     while (*message) {
         u32 timeout = 100000;
         while (!(port_byte_in(COM1 + 5) & 0x20) && --timeout) {}

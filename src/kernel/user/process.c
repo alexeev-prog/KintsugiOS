@@ -1,15 +1,16 @@
 #include "process.h"
 
-#include "../../user/tuiabi.h"
 #include "../../user/sysabi.h"
-#include "../fs/fat12.h"
+#include "../../user/tuiabi.h"
 #include "../cpu/idt.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/terminal.h"
+#include "../fs/fat12.h"
 #include "../fs/vfs.h"
 #include "../kernel/log.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
+#include "fd.h"
 
 #define STACK_BOTTOM (USER_TOP - 9 * PAGE_SIZE)
 #define STACK_START (STACK_BOTTOM + PAGE_SIZE)
@@ -17,13 +18,25 @@ static u8 kernel_stack[16384] __attribute__((aligned(16)));
 static u32 gdt[12] __attribute__((aligned(8)));
 static u32 tss[26];
 #define PROCESS_MAX 16
-enum { UNUSED_PROCESS, READY, RUNNING, WAITING, ZOMBIE };
+
+enum {
+    UNUSED_PROCESS,
+    READY,
+    RUNNING,
+    WAITING,
+    ZOMBIE
+};
+
 typedef struct {
     u32 pid, parent, state, address_space, heap_end, context, entry, stack, ticks;
     int status, interrupted;
     terminal_state_t* terminal_snapshot;
     void* kernel_stack;
+    fd_table_t descriptors;
+    const void* waiting_on;
+    u32 group;
 } process_t;
+
 static process_t processes[PROCESS_MAX];
 static process_t* current;
 static u32 next_pid = 1, shell_context, foreground;
@@ -32,6 +45,24 @@ static u32 next_pid = 1, shell_context, foreground;
 #define user_heap_end (current->heap_end)
 extern void process_switch(u32* old, u32 next);
 static void schedule(void);
+
+void process_wake(const void* object) {
+    for (int i = 0; i < PROCESS_MAX; ++i) {
+        process_t* p = &processes[i];
+        if (p->state == WAITING && p->waiting_on == object) {
+            p->waiting_on = NULL;
+            p->state = READY;
+        }
+    }
+}
+
+void process_block(const void* object) {
+    current->waiting_on = object;
+    current->state = WAITING;
+    schedule();
+    process_check_interrupt();
+}
+
 #define USER_HEAP_BASE 0x60000000u
 #define USER_HEAP_LIMIT 0x61000000u
 extern int user_enter(u32 entry, u32 stack);
@@ -71,19 +102,30 @@ int process_active(void) {
     return current != NULL;
 }
 
+int process_foreground(void) {
+    return current && current->group == foreground;
+}
+
 void process_exit(int status) {
     char message[64];
     snprintf(message, sizeof(message), "[PROCESS] exit status=%d\n", status);
     log_write(message);
     __asm__ volatile("cli" ::: "memory");
+    fd_destroy(&current->descriptors);
     current->status = status;
     current->state = ZOMBIE;
     for (int i = 0; i < PROCESS_MAX; ++i) {
-        if (processes[i].pid == current->parent && processes[i].state == WAITING)
+        if (processes[i].pid == current->parent && processes[i].state == WAITING) {
             processes[i].state = READY;
+        }
+        if (processes[i].parent == current->pid) {
+            processes[i].parent = processes[0].pid;
+        }
     }
     schedule();
-    for (;;) __asm__ volatile("cli; hlt");
+    for (;;) {
+        __asm__ volatile("cli; hlt");
+    }
 }
 
 static void schedule(void) {
@@ -97,8 +139,12 @@ static void schedule(void) {
         }
         for (int n = 0; n < PROCESS_MAX; ++n) {
             process_t* p = &processes[(start + n) % PROCESS_MAX];
-            if (p->state != READY) continue;
-            if (old && old->state == RUNNING) old->state = READY;
+            if (p->state != READY) {
+                continue;
+            }
+            if (old && old->state == RUNNING) {
+                old->state = READY;
+            }
             current = p;
             p->state = RUNNING;
             tss[1] = (u32)p->kernel_stack + 16384;
@@ -106,7 +152,9 @@ static void schedule(void) {
             process_switch(old ? &old->context : &shell_context, p->context);
             return;
         }
-        if (old && old->state == RUNNING) return;
+        if (old && old->state == RUNNING) {
+            return;
+        }
         if (processes[0].state == ZOMBIE) {
             current = NULL;
             vmm_space_switch(0);
@@ -117,16 +165,31 @@ static void schedule(void) {
 }
 
 void process_tick(int user_mode) {
-    if (!current) return;
+    process_wake(NULL); /* Terminal input waiters recheck after an IRQ/tick. */
+    if (!current) {
+        return;
+    }
     ++current->ticks;
-    if (user_mode && current->interrupted) process_exit(130);
-    if (user_mode && current->ticks % 5 == 0) schedule();
+    if (user_mode && current->interrupted) {
+        process_exit(130);
+    }
+    if (user_mode && current->ticks % 5 == 0) {
+        schedule();
+    }
 }
 
 int process_interrupt(void) {
-    if (!current) return 0;
-    for (int i = 0; i < PROCESS_MAX; ++i)
-        if (processes[i].pid == foreground) processes[i].interrupted = 1;
+    if (!current) {
+        return 0;
+    }
+    for (int i = 0; i < PROCESS_MAX; ++i) {
+        if (processes[i].group == foreground) {
+            processes[i].interrupted = 1;
+            if (processes[i].state == WAITING) {
+                processes[i].state = READY;
+            }
+        }
+    }
     return 1;
 }
 
@@ -136,7 +199,9 @@ static void process_start(void) {
 }
 
 void process_check_interrupt(void) {
-    if (current && current->interrupted) process_exit(130);
+    if (current && current->interrupted) {
+        process_exit(130);
+    }
 }
 
 typedef struct __attribute__((packed)) {
@@ -227,12 +292,16 @@ static int process_load(const char* path, int argc, char** argv) {
         /* Reject overlapping load pages, including conflicting permissions. */
         for (u32 j = 0; j < i; ++j) {
             elf_segment_t* previous = (elf_segment_t*)(image + header->phoff) + j;
-            if (previous->type != 1 || !previous->memsz) continue;
+            if (previous->type != 1 || !previous->memsz) {
+                continue;
+            }
             u32 begin = s->vaddr & ~(PAGE_SIZE - 1);
             u32 end = (s->vaddr + s->memsz + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
             u32 other_begin = previous->vaddr & ~(PAGE_SIZE - 1);
             u32 other_end = (previous->vaddr + previous->memsz + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-            if (begin < other_end && other_begin < end) goto cleanup;
+            if (begin < other_end && other_begin < end) {
+                goto cleanup;
+            }
         }
         if ((s->flags & 1) && header->entry >= s->vaddr && header->entry - s->vaddr < s->memsz) {
             executable_entry = 1;
@@ -282,12 +351,17 @@ static int process_load(const char* path, int argc, char** argv) {
     kfree(image);
     image = NULL;
     current->kernel_stack = kmalloc(16384);
-    if (!current->kernel_stack) { result = VFS_ENOMEM; goto cleanup; }
+    if (!current->kernel_stack) {
+        result = VFS_ENOMEM;
+        goto cleanup;
+    }
     current->entry = entry;
     current->stack = sp;
     u32* context = (u32*)((u32)current->kernel_stack + 16384);
     *--context = (u32)process_start;
-    for (int i = 0; i < 4; ++i) *--context = 0;
+    for (int i = 0; i < 4; ++i) {
+        *--context = 0;
+    }
     current->context = (u32)context;
     current->state = READY;
     return 0;
@@ -299,6 +373,7 @@ cleanup:
 }
 
 static void reap(process_t* p) {
+    fd_destroy(&p->descriptors);
     vmm_space_destroy(p->address_space);
     kfree(p->kernel_stack);
     if (p->terminal_snapshot) {
@@ -311,18 +386,108 @@ static void reap(process_t* p) {
 }
 
 int process_run(const char* path, int argc, char** argv) {
-    if (current) return VFS_EINVAL;
+    if (current) {
+        return VFS_EINVAL;
+    }
     __asm__ volatile("cli" ::: "memory");
     current = &processes[0];
     current->pid = next_pid++;
+    current->group = current->pid;
     int result = process_load(path, argc, argv);
+    if (!result) {
+        result = fd_init(&current->descriptors);
+    }
     current = NULL;
     if (!result) {
         foreground = processes[0].pid;
         schedule();
         result = processes[0].status;
     }
-    for (int i = PROCESS_MAX - 1; i >= 0; --i) reap(&processes[i]);
+    for (int i = PROCESS_MAX - 1; i >= 0; --i) {
+        reap(&processes[i]);
+    }
+    foreground = 0;
+    __asm__ volatile("sti" ::: "memory");
+    return result;
+}
+
+int process_pipeline(int count, char** paths, int* argc, char*** argv, const char* output, int append) {
+    if (current || count < 1 || count > 8) {
+        return VFS_EINVAL;
+    }
+    __asm__ volatile("cli" ::: "memory");
+    fd_table_t setup;
+    int result = fd_init(&setup), previous = -1;
+    u32 group = next_pid;
+    for (int i = 0; !result && i < count; ++i) {
+        int pair[2] = { -1, -1 };
+        if (i + 1 < count) {
+            result = fd_pipe(&setup, pair);
+        }
+        if (result) {
+            break;
+        }
+        current = &processes[i];
+        current->pid = next_pid++;
+        current->group = group;
+        result = process_load(paths[i], argc[i], argv[i]);
+        if (!result) {
+            fd_clone(&current->descriptors, &setup);
+            if (previous >= 0) {
+                fd_dup2(&current->descriptors, previous, 0);
+            }
+            if (pair[1] >= 0) {
+                fd_dup2(&current->descriptors, pair[1], 1);
+            }
+            for (int fd = 3; fd < KOS_FD_MAX; ++fd) {
+                if (current->descriptors.entries[fd]) {
+                    fd_close(&current->descriptors, fd);
+                }
+            }
+        }
+        current = NULL;
+        if (previous >= 0) {
+            fd_close(&setup, previous);
+        }
+        if (pair[1] >= 0) {
+            fd_close(&setup, pair[1]);
+        }
+        previous = pair[0];
+    }
+    if (!result && output) {
+        vfs_stat_t stat;
+        int exists = vfs_stat(output, &stat);
+        if (exists && exists != VFS_ENOENT) {
+            result = exists;
+        } else if (!append || exists == VFS_ENOENT) {
+            result = vfs_replace(output, "", 0);
+        }
+        if (!result) {
+            fd_table_t* table = &processes[count - 1].descriptors;
+            int fd = fd_open(table, output, KOS_O_WRITE | (append ? KOS_O_APPEND : 0));
+            if (fd < 0) {
+                result = fd;
+            } else {
+                fd_dup2(table, fd, 1);
+                fd_close(table, fd);
+            }
+        }
+    }
+    fd_destroy(&setup);
+    if (!result) {
+        foreground = group;
+        /* Root is last stage so session cleanup cannot kill its producers early. */
+        process_t swap = processes[0];
+        processes[0] = processes[count - 1];
+        processes[count - 1] = swap;
+        schedule();
+        result = processes[0].status;
+    }
+    current = NULL;
+    vmm_space_switch(0);
+    for (int i = PROCESS_MAX - 1; i >= 0; --i) {
+        reap(&processes[i]);
+    }
     foreground = 0;
     __asm__ volatile("sti" ::: "memory");
     return result;
@@ -372,28 +537,83 @@ void syscall_dispatch(syscall_regs_t* r) {
     }
     char path[VFS_PATH_MAX];
     switch (r->eax) {
+        case KOS_SYS_OPEN:
+            if (!user_path(r->ebx, path)) {
+                break;
+            }
+            r->eax = fd_open(&current->descriptors, path, r->ecx);
+            return;
+        case KOS_SYS_CLOSE:
+            r->eax = fd_close(&current->descriptors, r->ebx);
+            return;
+        case KOS_SYS_DUP2:
+            r->eax = fd_dup2(&current->descriptors, r->ebx, r->ecx);
+            return;
+        case KOS_SYS_SEEK:
+            r->eax = fd_seek(&current->descriptors, r->ebx, r->ecx);
+            return;
+        case KOS_SYS_PIPE: {
+            if (!user_range(r->ebx, 8, 1)) {
+                break;
+            }
+            int pair[2];
+            int result = fd_pipe(&current->descriptors, pair);
+            if (!result) {
+                memcpy((void*)r->ebx, pair, sizeof(pair));
+            }
+            r->eax = result;
+            return;
+        }
+        case KOS_SYS_READ:
+        case KOS_SYS_WRITE: {
+            int reading = r->eax == KOS_SYS_READ;
+            if (r->edx > 4096 || !user_range(r->ecx, r->edx, reading)) {
+                break;
+            }
+            int result;
+            do {
+                process_check_interrupt();
+                result = reading ? fd_read(&current->descriptors, r->ebx, (void*)r->ecx, r->edx)
+                                 : fd_write(&current->descriptors, r->ebx, (void*)r->ecx, r->edx);
+            } while (result == KOS_EAGAIN);
+            r->eax = result;
+            return;
+        }
         case 16: { /* Bounded process table snapshot. */
-            if (r->ecx > PROCESS_MAX || !user_range(r->ebx, r->ecx * sizeof(kos_process_info), 1)) break;
+            if (r->ecx > PROCESS_MAX || !user_range(r->ebx, r->ecx * sizeof(kos_process_info), 1)) {
+                break;
+            }
             kos_process_info* out = (void*)r->ebx;
             u32 n = 0;
             for (int i = 0; i < PROCESS_MAX && n < r->ecx; ++i) {
                 process_t* p = &processes[i];
-                if (p->state) out[n++] = (kos_process_info){p->pid, p->parent, p->state,
-                    p->ticks, p->heap_end >= USER_HEAP_BASE ? p->heap_end - USER_HEAP_BASE : 0};
+                if (p->state) {
+                    out[n++] =
+                        (kos_process_info){ p->pid,
+                                            p->parent,
+                                            p->state,
+                                            p->ticks,
+                                            p->heap_end >= USER_HEAP_BASE ? p->heap_end - USER_HEAP_BASE
+                                                                          : 0 };
+                }
             }
             r->eax = n;
             return;
         }
         case 17:
-            if (r->edx > 4096 || !user_range(r->ecx, r->edx, 1)) break;
+            if (r->edx > 4096 || !user_range(r->ecx, r->edx, 1)) {
+                break;
+            }
             r->eax = log_read(r->ebx, (char*)r->ecx, r->edx);
             return;
         case 18:
             r->eax = fat12_check();
             return;
         case 19: {
-            if (!user_range(r->ebx, sizeof(kos_disk_info), 1)) break;
-            kos_disk_info info = {0};
+            if (!user_range(r->ebx, sizeof(kos_disk_info), 1)) {
+                break;
+            }
+            kos_disk_info info = { 0 };
             info.mounted = fat12_is_mounted();
             fat12_usage(&info.sectors, &info.cluster_bytes, &info.clusters, &info.free_clusters);
             memcpy((void*)r->ebx, &info, sizeof(info));
@@ -401,45 +621,74 @@ void syscall_dispatch(syscall_regs_t* r) {
             return;
         }
         case 13: { /* spawn(path, argc, argv): copy all parent pointers first. */
-            if (!user_path(r->ebx, path) || !r->ecx || r->ecx > 32
-                || !user_range(r->edx, r->ecx * 4, 0)) break;
+            if (!user_path(r->ebx, path) || !r->ecx || r->ecx > 32 || !user_range(r->edx, r->ecx * 4, 0)) {
+                break;
+            }
             char (*args)[VFS_PATH_MAX] = kmalloc(32 * VFS_PATH_MAX);
-            if (!args) { r->eax = VFS_ENOMEM; return; }
+            if (!args) {
+                r->eax = VFS_ENOMEM;
+                return;
+            }
             char* argv[32];
             for (u32 i = 0; i < r->ecx; ++i) {
                 argv[i] = args[i];
                 if (!user_path(((u32*)r->edx)[i], args[i])) {
-                    kfree(args); r->eax = VFS_EINVAL; return;
+                    kfree(args);
+                    r->eax = VFS_EINVAL;
+                    return;
                 }
             }
             process_t* parent = current;
             process_t* child = NULL;
-            for (int i = 1; i < PROCESS_MAX; ++i)
-                if (!processes[i].state) { child = &processes[i]; break; }
-            if (!child) { kfree(args); r->eax = VFS_ENOMEM; return; }
+            for (int i = 1; i < PROCESS_MAX; ++i) {
+                if (!processes[i].state) {
+                    child = &processes[i];
+                    break;
+                }
+            }
+            if (!child) {
+                kfree(args);
+                r->eax = VFS_ENOMEM;
+                return;
+            }
             child->pid = next_pid++;
             child->parent = parent->pid;
+            child->group = parent->group;
             current = child;
             int result = process_load(path, r->ecx, argv);
             current = parent;
+            if (!result) {
+                fd_clone(&child->descriptors, &parent->descriptors);
+            }
             kfree(args);
-            if (result) { memset(child, 0, sizeof(*child)); r->eax = result; }
-            else r->eax = child->pid;
+            if (result) {
+                memset(child, 0, sizeof(*child));
+                r->eax = result;
+            } else {
+                r->eax = child->pid;
+            }
             return;
         }
         case 14: { /* wait(pid): exit status, direct children only. */
             process_t* child = NULL;
-            for (int i = 1; i < PROCESS_MAX; ++i)
-                if (processes[i].state && processes[i].pid == r->ebx
-                    && processes[i].parent == current->pid) child = &processes[i];
-            if (!child) break;
-            foreground = child->pid;
+            for (int i = 1; i < PROCESS_MAX; ++i) {
+                if (processes[i].state && processes[i].pid == r->ebx && processes[i].parent == current->pid) {
+                    child = &processes[i];
+                }
+            }
+            if (!child) {
+                break;
+            }
+            u32 previous_foreground = foreground;
+            foreground = child->group;
             while (child->state != ZOMBIE) {
                 current->state = WAITING;
                 schedule();
-                if (current->interrupted) process_exit(130);
+                if (current->interrupted) {
+                    process_exit(130);
+                }
             }
-            foreground = current->pid;
+            foreground = previous_foreground;
             r->eax = child->status;
             reap(child);
             return;
@@ -480,6 +729,10 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case 7: /* Full screen presentation, restored automatically on exit. */
+            if (!process_foreground()) {
+                r->eax = VFS_EBUSY;
+                return;
+            }
             if (!user_range(r->ebx, 80 * 25 * sizeof(ktui_cell), 0)) {
                 break;
             }
@@ -500,6 +753,10 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case 8: { /* Raw key: 0 poll, 1 wait, 2 wait at most one timer tick. */
+            if (!process_foreground()) {
+                r->eax = VFS_EBUSY;
+                return;
+            }
             int key;
             do {
                 __asm__ volatile("cli" ::: "memory");

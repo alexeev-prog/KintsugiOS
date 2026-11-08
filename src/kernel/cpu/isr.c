@@ -123,9 +123,15 @@ void isr_handler(registers_t r) {
         char report[160];
         u32 address;
         __asm__ volatile("mov %%cr2, %0" : "=r"(address));
-        snprintf(report, sizeof(report),
+        snprintf(
+            report,
+            sizeof(report),
             "[FAULT] vector=%u error=%x eip=%x cs=%x cr2=%x\n",
-            r.int_no, r.err_code, r.eip, r.cs, address);
+            r.int_no,
+            r.err_code,
+            r.eip,
+            r.cs,
+            address);
         log_write(report);
         printf("User fault: vector=%u eip=%x\n", r.int_no, r.eip);
         process_exit(128 + r.int_no);
@@ -150,9 +156,15 @@ void irq_handler(registers_t r) {
         isr_t handler = interrupt_handlers[r.int_no];
         handler(r);
     }
-    if ((r.cs & 3) == 3) process_check_interrupt();
-    if (r.int_no == IRQ0) process_tick((r.cs & 3) == 3);
-    if (r.int_no == IRQ1 && (r.cs & 3) == 3) process_tick(1);
+    if ((r.cs & 3) == 3) {
+        process_check_interrupt();
+    }
+    if (r.int_no == IRQ0) {
+        process_tick((r.cs & 3) == 3);
+    }
+    if (r.int_no == IRQ1 && (r.cs & 3) == 3) {
+        process_tick(1);
+    }
 }
 
 void irq_install() {

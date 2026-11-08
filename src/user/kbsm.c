@@ -24,7 +24,9 @@ int main(int argc, char** argv) {
         kos_process_info processes[16];
         int count = syscall(16, (u32)processes, 16, 0, 0);
         tui_text(3, 19, "Processes:", 0x1f);
-        if (count >= 0) tui_number(16, 19, count, 0x1e);
+        if (count >= 0) {
+            tui_number(16, 19, count, 0x1e);
+        }
         tui_text(3, 21, "Physical allocation gauge; CPU percentage is not measured.", 0x1f);
         tui_bar(24, "Live memory statistics | Q / Esc quit");
         tui_present(79, 24);

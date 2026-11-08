@@ -166,9 +166,12 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
                     '"': "shift-apostrophe",
                     "'": "apostrophe",
                     "\\": "backslash",
+                    "|": "shift-backslash",
+                    ">": "shift-dot",
+                    "&": "shift-7",
                 }.get(ch, ch)
                 monitor(f"sendkey {key} 10")
-                time.sleep(0.025)
+                time.sleep(0.05)
             monitor("sendkey ret 10")
             time.sleep(0.3)
 
@@ -218,6 +221,10 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             )
             sys.exit(0)
         command("fat12info")
+        command("missingcmd || echo fallback-ok")
+        wait_for("fallback-ok")
+        command("fdcheck")
+        wait_for("FD checks: PASS")
         if full_disk:
             command("kuned /safe.txt")
             wait_for("Kintsugi Universal Editor")
@@ -236,6 +243,13 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             subprocess.run(["fsck.fat", "-n", str(disk)], check=True)
             print("PASS: ENOSPC preserves existing file and FAT consistency")
             sys.exit(0)
+        command("echo pipeline-ok | cat > /pipe.txt")
+        command("echo appended >> /pipe.txt")
+        command("cat /pipe.txt")
+        wait_for("pipeline-ok")
+        wait_for("appended")
+        command("cat /readme.txt | wc")
+        wait_for("301")
         for _ in range(3):
             command("spin")
             wait_for("spin: Ctrl+C to stop")

@@ -74,7 +74,7 @@ int shell_last_status(void) {
     return last_status;
 }
 
-int shell_execute(char* line) {
+static int execute_simple(char* line) {
     char* argv[SHELL_MAX_ARGS + 1];
     int argc = shell_parse(line, argv, SHELL_MAX_ARGS + 1);
     if (argc < 0) {
@@ -130,6 +130,142 @@ int shell_execute(char* line) {
     }
     printf("Unknown command: %s\n", argv[0]);
     return last_status = SHELL_NOT_FOUND;
+}
+
+static int execute_pipeline(char* line) {
+    char* stages[8] = { line };
+    int count = 1, append = 0;
+    char* output = NULL;
+    char quote = 0;
+    int operators = 0;
+    for (char* p = line; *p; ++p) {
+        if (*p == '\\' && quote != '\'') {
+            if (p[1]) {
+                ++p;
+            }
+            continue;
+        }
+        if (*p == '\'' || *p == '"') {
+            if (!quote) {
+                quote = *p;
+            } else if (quote == *p) {
+                quote = 0;
+            }
+            continue;
+        }
+        if (quote) {
+            continue;
+        }
+        if (*p == '|') {
+            if (count == 8 || output) {
+                return SHELL_USAGE;
+            }
+            *p = 0;
+            stages[count++] = p + 1;
+            operators = 1;
+        } else if (*p == '>') {
+            if (output) {
+                return SHELL_USAGE;
+            }
+            *p = 0;
+            append = p[1] == '>';
+            if (append) {
+                *++p = 0;
+            }
+            output = p + 1;
+            operators = 1;
+        }
+    }
+    if (!operators) {
+        return execute_simple(line);
+    }
+    char* arguments[8][SHELL_MAX_ARGS + 1];
+    char** argv[8];
+    int argc[8];
+    char names[8][VFS_PATH_MAX];
+    char* paths[8];
+    char* target[2];
+    if (output) {
+        if (shell_parse(output, target, 2) != 1) {
+            return SHELL_USAGE;
+        }
+        output = target[0];
+    }
+    for (int i = 0; i < count; ++i) {
+        argv[i] = arguments[i];
+        argc[i] = shell_parse(stages[i], argv[i], SHELL_MAX_ARGS + 1);
+        if (argc[i] < 1) {
+            return SHELL_USAGE;
+        }
+        snprintf(names[i], sizeof(names[i]), strchr(argv[i][0], '/') ? "%s" : "/BIN/%s.ELF", argv[i][0]);
+        paths[i] = names[i];
+        vfs_stat_t stat;
+        int result = vfs_stat(paths[i], &stat);
+        if (result) {
+            printf("exec: %s\n", vfs_error(result));
+            return 127;
+        }
+    }
+    int result = process_pipeline(count, paths, argc, argv, output, append);
+    if (result < 0) {
+        printf("pipeline: %s (%d)\n", vfs_error(result), result);
+    }
+    return result < 0 ? 126 : result;
+}
+
+/* Locate control operators without interpreting quoted or escaped text. */
+int shell_execute(char* line) {
+    char quote = 0;
+    char* alternative = NULL;
+    for (char* p = line; *p; ++p) {
+        if (*p == '\\' && quote != '\'') {
+            if (p[1]) {
+                ++p;
+            }
+            continue;
+        }
+        if (*p == '\'' || *p == '"') {
+            if (!quote) {
+                quote = *p;
+            } else if (quote == *p) {
+                quote = 0;
+            }
+            continue;
+        }
+        if (quote) {
+            continue;
+        }
+        if (*p == '|' && p[1] == '|') {
+            if (!alternative) {
+                alternative = p;
+            }
+            ++p;
+        } else if (*p == '<' || *p == '&') {
+            printf("Unsupported shell operator: %c\n", *p);
+            return last_status = SHELL_USAGE;
+        }
+    }
+    if (quote) {
+        return execute_simple(line);
+    }
+    if (alternative) {
+        char* right = alternative + 2;
+        while (*right == ' ' || *right == '\t') {
+            ++right;
+        }
+        char* left = line;
+        while (*left == ' ' || *left == '\t') {
+            ++left;
+        }
+        if (left == alternative || !*right) {
+            printf("Syntax error: missing command around ||\n");
+            return last_status = SHELL_USAGE;
+        }
+        *alternative = 0;
+        int result = execute_pipeline(line);
+        return result ? shell_execute(right) : result;
+    }
+    return last_status = execute_pipeline(line);
 }
 
 void shell_init(void) {

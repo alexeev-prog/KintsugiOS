@@ -28,7 +28,7 @@ OBJS := $(BIN_DIR)/bootloader/kernel_entry.o $(BIN_DIR)/kernel/cpu/interrupt.o $
 
 all: $(BIN_DIR)/kintsugios.bin users
 
-USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG
+USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG FDCHECK
 USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
 TUI_PROGRAMS := KUNED KBSM KC KPROCM KDISKMAN KTUI
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC
@@ -85,6 +85,7 @@ $(eval $(call USER_RULE,FAULT,5))
 $(eval $(call USER_RULE,CHECK,6))
 $(eval $(call USER_RULE,INPUT,7))
 $(eval $(call USER_RULE,SPIN,8))
+$(eval $(call USER_RULE,FDCHECK,10))
 $(eval $(call USER_RULE,KLOG,9))
 users: $(USER_ELFS)
 list-user-programs:

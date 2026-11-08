@@ -1,8 +1,8 @@
 #ifndef KTUILIB_H
 #define KTUILIB_H
+#include "fsabi.h"
 #include "runtime.h"
 #include "tuiabi.h"
-#include "fsabi.h"
 
 enum {
     TUI_UP = 256,
@@ -29,6 +29,7 @@ int tui_prompt(const char* label, char* buffer, u32 capacity);
 int tui_confirm(const char* label);
 void tui_path(char out[256], const char* directory, const char* name);
 int tui_stat_path(const char* path, tui_stat* stat);
+void tui_parent(char path[256]);
 void tui_fill(int x, int y, int width, int height, unsigned char color);
 void tui_textn(int x, int y, const char* text, u32 width, unsigned char color);
 void tui_box(int x, int y, int width, int height, const char* title, unsigned char color);

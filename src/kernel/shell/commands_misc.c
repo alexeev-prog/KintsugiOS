@@ -1,6 +1,6 @@
+#include "../fs/vfs.h"
 #include "../kklibc/kklibc.h"
 #include "shell.h"
-#include "../fs/vfs.h"
 
 static int help(int argc, char** argv) {
     if (argc > 2) {
@@ -20,10 +20,17 @@ static int help(int argc, char** argv) {
         printf("cat FILE; tail FILE (last 10 lines); wc FILE; sort FILE\n");
         printf("klog kernel/boot journal; kfsck read-only FAT12 check\n");
         printf("Installed /BIN entries:\n");
-        u32 cursor = 0; vfs_dirent_t entry; int result;
-        while ((result = vfs_readdir("/BIN", &cursor, &entry)) > 0)
-            if (!entry.stat.directory) printf("  %s\n", entry.name);
-        if (result < 0) printf("/BIN unavailable: %s\n", vfs_error(result));
+        u32 cursor = 0;
+        vfs_dirent_t entry;
+        int result;
+        while ((result = vfs_readdir("/BIN", &cursor, &entry)) > 0) {
+            if (!entry.stat.directory) {
+                printf("  %s\n", entry.name);
+            }
+        }
+        if (result < 0) {
+            printf("/BIN unavailable: %s\n", vfs_error(result));
+        }
         return SHELL_OK;
     }
     int found = 0;

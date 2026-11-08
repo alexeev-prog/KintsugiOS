@@ -29,6 +29,7 @@ optional directories-first sorting. A full view may omit later entries.
 | Arrows | Select entry |
 | Enter | Open directory, or open file in KUNED |
 | Backspace | Parent directory |
+| B | Switch to previous directory (per tab) |
 | C / M | Copy / move to the other panel, with confirmation |
 | D / N | Delete / create directory |
 | O | Settings: S sizes, D directories first, W save |
@@ -36,6 +37,9 @@ optional directories-first sorting. A full view may omit later entries.
 | Q / Esc | Quit |
 
 Settings are stored in `/ETC/KC.CFG`. Copy does not recursively copy directories
+The synthetic `..` entry is pinned above sorted entries outside root and can
+only be opened, never deleted, copied or moved. Enter and Backspace both navigate
+to the parent; B switches between the two most recently visited directories.
 and does not overwrite existing targets. Directory deletion requires emptiness.
 Tabs are session-local. Key commands above use lowercase letters.
 

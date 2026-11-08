@@ -1,22 +1,38 @@
 #include "ktuilib.h"
 static ktui_cell screen[25][80];
 
+void tui_parent(char path[256]) {
+    u32 n = tui_len(path);
+    while (n > 1 && path[n - 1] != '/') {
+        --n;
+    }
+    if (n > 1) {
+        --n;
+    }
+    path[n] = 0;
+}
+
 void tui_fill(int x, int y, int width, int height, unsigned char color) {
-    for (int row = 0; row < height && row < 25; ++row)
-        for (int col = 0; col < width && col < 80; ++col)
-            if (x + col >= 0 && x + col < 80 && y + row >= 0 && y + row < 25)
-                screen[y + row][x + col] = (ktui_cell){' ', color};
+    for (int row = 0; row < height && row < 25; ++row) {
+        for (int col = 0; col < width && col < 80; ++col) {
+            if (x + col >= 0 && x + col < 80 && y + row >= 0 && y + row < 25) {
+                screen[y + row][x + col] = (ktui_cell){ ' ', color };
+            }
+        }
+    }
 }
 
 void tui_textn(int x, int y, const char* text, u32 width, unsigned char color) {
     for (u32 i = 0; i < width && i < 80 && text[i]; ++i) {
-        char ch[2] = {text[i], 0};
+        char ch[2] = { text[i], 0 };
         tui_text(x + i, y, ch, color);
     }
 }
 
 void tui_box(int x, int y, int width, int height, const char* title, unsigned char color) {
-    if (width < 2 || height < 2 || width > 80 || height > 25) return;
+    if (width < 2 || height < 2 || width > 80 || height > 25) {
+        return;
+    }
     tui_fill(x, y, width, height, color);
     for (int i = 0; i < width; ++i) {
         tui_text(x + i, y, i && i < width - 1 ? "-" : "+", color);
@@ -38,9 +54,16 @@ void tui_message(const char* title, const char* message) {
 }
 
 void tui_gauge(int x, int y, int width, u32 used, u32 total) {
-    if (width < 1 || width > 80) return;
-    if (used > total) used = total;
-    while (total > 0x01ffffffu) { total >>= 1; used >>= 1; }
+    if (width < 1 || width > 80) {
+        return;
+    }
+    if (used > total) {
+        used = total;
+    }
+    while (total > 0x01ffffffu) {
+        total >>= 1;
+        used >>= 1;
+    }
     u32 filled = total ? used * (u32)width / total : 0;
     tui_fill(x, y, width, 1, 0x08);
     tui_fill(x, y, filled, 1, 0x2f);
@@ -48,7 +71,9 @@ void tui_gauge(int x, int y, int width, u32 used, u32 total) {
 
 int tui_load_settings(const char* path, void* data, u32 size) {
     tui_stat stat;
-    if (size > 4096 || tui_stat_path(path, &stat) || stat.size != size) return 0;
+    if (size > 4096 || tui_stat_path(path, &stat) || stat.size != size) {
+        return 0;
+    }
     return syscall(2, (u32)path, 0, (u32)data, size) == (int)size;
 }
 

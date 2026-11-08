@@ -1,6 +1,6 @@
 /* Freestanding user programs: no kernel headers or direct device access. */
-#include "runtime.h"
 #include "fsabi.h"
+#include "runtime.h"
 
 typedef kos_stat stat_t;
 typedef kos_dirent dirent_t;
@@ -18,7 +18,7 @@ static u32 length(const char* s) {
 }
 
 static void print(const char* s) {
-    call(1, (u32)s, length(s), 0, 0);
+    write_all(1, s, length(s));
 }
 
 static void number(u32 n) {
@@ -33,12 +33,41 @@ static void number(u32 n) {
 }
 
 int main(int argc, char** argv) {
-#if COMMAND == 8
-    (void)argc; (void)argv;
+#if COMMAND == 10
+    (void)argc;
+    (void)argv;
+    int ends[2];
+    char bytes[4];
+    if (pipe(ends) || write(ends[1], "abc", 3) != 3 || read(ends[0], bytes, 3) != 3 || bytes[0] != 'a'
+        || bytes[2] != 'c') {
+        return 1;
+    }
+    if (close(ends[1]) || read(ends[0], bytes, 1) != 0 || close(ends[0])) {
+        return 2;
+    }
+    if (pipe(ends) || close(ends[0]) || write(ends[1], "x", 1) != KOS_EPIPE || close(ends[1])) {
+        return 3;
+    }
+    if (close(-1) != KOS_EBADF || dup2(-1, 1) != KOS_EBADF) {
+        return 4;
+    }
+    int fd = open("/README.TXT", KOS_O_READ);
+    if (fd < 0 || dup2(fd, 15) != 15 || read(fd, bytes, 1) != 1 || seek(15, 0) || read(fd, bytes, 1) != 1
+        || bytes[0] != 'K' || close(fd) || close(15)) {
+        return 5;
+    }
+    print("FD checks: PASS\n");
+    return 0;
+#elif COMMAND == 8
+    (void)argc;
+    (void)argv;
     print("spin: Ctrl+C to stop\n");
-    for (;;) __asm__ volatile("" ::: "memory");
+    for (;;) {
+        __asm__ volatile("" ::: "memory");
+    }
 #elif COMMAND == 9
-    (void)argc; (void)argv;
+    (void)argc;
+    (void)argv;
     char buffer[1024];
     u32 offset = 0;
     int count;
@@ -57,16 +86,26 @@ int main(int argc, char** argv) {
     print("\n");
     return 0;
 #elif COMMAND == 2
-    if (argc != 2) {
-        print("Usage: cat <file>\n");
+    if (argc > 2) {
+        print("Usage: cat [file]\n");
         return 2;
     }
     char buffer[512];
-    u32 offset = 0;
+    int fd = argc == 2 ? open(argv[1], KOS_O_READ) : 0;
+    if (fd < 0) {
+        return 1;
+    }
     int n;
-    while ((n = call(2, (u32)argv[1], offset, (u32)buffer, sizeof(buffer))) > 0) {
-        call(1, (u32)buffer, n, 0, 0);
-        offset += n;
+    while ((n = read(fd, buffer, sizeof(buffer))) > 0) {
+        if (write_all(1, buffer, n) < 0) {
+            if (fd) {
+                close(fd);
+            }
+            return 1;
+        }
+    }
+    if (fd) {
+        close(fd);
     }
     if (n < 0) {
         print("cat: read failed\n");
