@@ -1,3 +1,9 @@
+commit 9e29ea8b8953bb5c1de423d4eb3df6914117def4
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 19:06:57 2026 +0700
+
+    update docs
+
 commit e2919a0d4d314e6f7e6870a7239e07a7bf3c6a4f
 Merge: de31f6c 97af659
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
