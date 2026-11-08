@@ -1,3 +1,37 @@
+commit e2919a0d4d314e6f7e6870a7239e07a7bf3c6a4f
+Merge: de31f6c 97af659
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 19:06:35 2026 +0700
+
+    improve stability and reliability
+
+commit de31f6ca0046e7644d90c1443ba68579a3a4877d
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 18:50:06 2026 +0700
+
+    improve stability and reliability
+
+commit 97af6593093359eb8b7d1f177fe1ea6a6c86b9fc
+Merge: 193a4f8 846f3a0
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 18:41:09 2026 +0700
+
+    Merge pull request #2 from alexeev-prog/feat/processes
+    
+    add pocesses and improve TUI lib, add new utils
+
+commit 846f3a015411de3295f971737dec9b8a9d822fde
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 18:33:43 2026 +0700
+
+    add pocesses and improve TUI lib, add new utils
+
+commit 193a4f8aa4ffe709d30ee322a7515908b95b3d5a
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 16:53:04 2026 +0700
+
+    bump version
+
 commit e36dd4cdfb2b01c8da88ed0869c124f15783ea0e
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Nov 8 16:52:59 2026 +0700
