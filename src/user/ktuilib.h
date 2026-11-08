@@ -2,6 +2,7 @@
 #define KTUILIB_H
 #include "runtime.h"
 #include "tuiabi.h"
+#include "fsabi.h"
 
 enum {
     TUI_UP = 256,
@@ -13,15 +14,8 @@ enum {
     TUI_DELETE
 };
 
-typedef struct {
-    u32 size;
-    unsigned char directory, readonly;
-} tui_stat;
-
-typedef struct {
-    char name[13];
-    tui_stat stat;
-} tui_entry;
+typedef kos_stat tui_stat;
+typedef kos_dirent tui_entry;
 
 u32 tui_len(const char* text);
 void tui_copy(char* out, const char* text, u32 capacity);

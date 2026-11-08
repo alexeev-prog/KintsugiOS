@@ -1,15 +1,9 @@
 /* Freestanding user programs: no kernel headers or direct device access. */
 #include "runtime.h"
+#include "fsabi.h"
 
-typedef struct {
-    u32 size;
-    unsigned char directory, readonly;
-} stat_t;
-
-typedef struct {
-    char name[13];
-    stat_t stat;
-} dirent_t;
+typedef kos_stat stat_t;
+typedef kos_dirent dirent_t;
 
 static int call(u32 number, u32 a, u32 b, u32 c, u32 d) {
     return syscall(number, a, b, c, d);
@@ -39,7 +33,21 @@ static void number(u32 n) {
 }
 
 int main(int argc, char** argv) {
-#if COMMAND == 1
+#if COMMAND == 8
+    (void)argc; (void)argv;
+    print("spin: Ctrl+C to stop\n");
+    for (;;) __asm__ volatile("" ::: "memory");
+#elif COMMAND == 9
+    (void)argc; (void)argv;
+    char buffer[1024];
+    u32 offset = 0;
+    int count;
+    while ((count = call(17, offset, (u32)buffer, sizeof(buffer), 0)) > 0) {
+        call(1, (u32)buffer, count, 0, 0);
+        offset += count;
+    }
+    return count < 0;
+#elif COMMAND == 1
     for (int i = 1; i < argc; ++i) {
         if (i > 1) {
             print(" ");

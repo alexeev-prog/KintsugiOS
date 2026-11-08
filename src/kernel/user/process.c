@@ -17,6 +17,17 @@ static u32 tss[26];
 static u32 space;
 static terminal_state_t* saved_terminal;
 static u32 user_heap_end;
+static volatile int interrupted;
+
+int process_interrupt(void) {
+    if (!process_active()) return 0;
+    interrupted = 1;
+    return 1;
+}
+
+void process_check_interrupt(void) {
+    if (process_active() && interrupted) process_exit(130);
+}
 #define USER_HEAP_BASE 0x60000000u
 #define USER_HEAP_LIMIT 0x61000000u
 extern int user_enter(u32 entry, u32 stack);
@@ -57,6 +68,9 @@ int process_active(void) {
 }
 
 void process_exit(int status) {
+    char message[64];
+    snprintf(message, sizeof(message), "[PROCESS] exit status=%d\n", status);
+    log_write(message);
     user_leave(status);
 }
 
@@ -120,6 +134,7 @@ int process_run(const char* path, int argc, char** argv) {
         return VFS_EINVAL;
     }
     space = vmm_space_create();
+    interrupted = 0;
     user_heap_end = USER_HEAP_BASE;
     if (!space) {
         kfree(image);
@@ -144,6 +159,16 @@ int process_run(const char* path, int argc, char** argv) {
             goto cleanup;
         }
         total += s->memsz;
+        /* Reject overlapping load pages, including conflicting permissions. */
+        for (u32 j = 0; j < i; ++j) {
+            elf_segment_t* previous = (elf_segment_t*)(image + header->phoff) + j;
+            if (previous->type != 1 || !previous->memsz) continue;
+            u32 begin = s->vaddr & ~(PAGE_SIZE - 1);
+            u32 end = (s->vaddr + s->memsz + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+            u32 other_begin = previous->vaddr & ~(PAGE_SIZE - 1);
+            u32 other_end = (previous->vaddr + previous->memsz + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+            if (begin < other_end && other_begin < end) goto cleanup;
+        }
         if ((s->flags & 1) && header->entry >= s->vaddr && header->entry - s->vaddr < s->memsz) {
             executable_entry = 1;
         }
@@ -248,12 +273,17 @@ static int user_path(u32 address, char path[VFS_PATH_MAX]) {
 }
 
 void syscall_dispatch(syscall_regs_t* r) {
+    process_check_interrupt();
     if (!space) {
         r->eax = VFS_EINVAL;
         return;
     }
     char path[VFS_PATH_MAX];
     switch (r->eax) {
+        case 17: /* Read bounded kernel journal chunk. */
+            if (r->edx > 4096 || !user_range(r->ecx, r->edx, 1)) break;
+            r->eax = log_read(r->ebx, (char*)r->ecx, r->edx);
+            return;
         case 0:
             process_exit(r->ebx & 255);
         case 1: /* console write */
@@ -310,6 +340,7 @@ void syscall_dispatch(syscall_regs_t* r) {
             int key;
             do {
                 __asm__ volatile("cli" ::: "memory");
+                process_check_interrupt();
                 key = keyboard_read_event();
                 if (key || !r->ebx) {
                     break;
@@ -403,6 +434,7 @@ void syscall_dispatch(syscall_regs_t* r) {
             u32 length = 0;
             for (;;) {
                 __asm__ volatile("cli" ::: "memory");
+                process_check_interrupt();
                 int key = keyboard_read_event();
                 if (!key) {
                     __asm__ volatile("sti; hlt; cli" ::: "memory");

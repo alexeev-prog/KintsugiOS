@@ -33,7 +33,9 @@ for directory in ("BIN", "BOOT", "ETC", "HOME", "TMP"):
     print(f"Checking directory: {directory}", flush=True)
     if not run("mdir", "-i", image, f"::/{directory}/", probe=True):
         run("mmd", "-i", image, f"::/{directory}")
-for program in sorted(Path("bin/user").glob("*.ELF")):
+programs = subprocess.check_output(["make", "--no-print-directory", "list-user-programs"], text=True).split()
+for filename in programs:
+    program = Path(filename)
     run("mcopy", "-o", "-i", image, str(program), f"::/BIN/{program.name}")
     print(f"Installed program: {program.name}")
 run("mcopy", "-o", "-i", image, "bin/kernel.bin", "::/BOOT/KERNEL.BIN")

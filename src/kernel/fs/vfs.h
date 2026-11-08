@@ -1,6 +1,7 @@
 #ifndef FS_VFS_H
 #define FS_VFS_H
 #include "../kklibc/ctypes.h"
+#include "../../user/fsabi.h"
 #define VFS_PATH_MAX 256
 #define VFS_NAME_MAX 13
 
@@ -20,15 +21,8 @@ enum {
     VFS_EBUSY = -12
 };
 
-typedef struct {
-    u32 size;
-    u8 directory, readonly;
-} vfs_stat_t;
-
-typedef struct {
-    char name[VFS_NAME_MAX];
-    vfs_stat_t stat;
-} vfs_dirent_t;
+typedef kos_stat vfs_stat_t;
+typedef kos_dirent vfs_dirent_t;
 
 typedef struct {
     char path[VFS_PATH_MAX];

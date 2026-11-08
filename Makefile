@@ -28,7 +28,7 @@ OBJS := $(BIN_DIR)/bootloader/kernel_entry.o $(BIN_DIR)/kernel/cpu/interrupt.o $
 
 all: $(BIN_DIR)/kintsugios.bin users
 
-USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT
+USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG
 USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
 TUI_PROGRAMS := KUNED KBSM KC
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
@@ -61,7 +61,12 @@ $(eval $(call USER_RULE,PWD,4))
 $(eval $(call USER_RULE,FAULT,5))
 $(eval $(call USER_RULE,CHECK,6))
 $(eval $(call USER_RULE,INPUT,7))
+$(eval $(call USER_RULE,SPIN,8))
+$(eval $(call USER_RULE,KLOG,9))
 users: $(USER_ELFS)
+list-user-programs:
+	@printf '%s\n' $(USER_ELFS)
+.PHONY: list-user-programs
 system-install: $(FATDISK) $(USER_ELFS) $(BIN_DIR)/kernel.bin
 	$(PYTHON) tools/install_system.py $(FATDISK)
 .PHONY: users system-install
@@ -173,7 +178,7 @@ help info:
 	@echo 'Headless: make run QEMU_FLAGS="-display none -monitor stdio"'
 	@echo 'CC=$(CC), LD=$(LD); filesystem images survive make clean.'
 
--include $(OBJS:.o=.d)
+-include $(OBJS:.o=.d) $(wildcard $(BIN_DIR)/user/*.d)
 # Headless integration tests (never use the persistent user disk)
 test: $(FLOPPY) $(ISO) $(USER_ELFS)
 	$(PYTHON) tools/smoke_test.py
@@ -182,6 +187,7 @@ test: $(FLOPPY) $(ISO) $(USER_ELFS)
 	$(PYTHON) tools/smoke_test.py --no-disk
 	$(PYTHON) tools/smoke_test.py --invalid-fs
 	$(PYTHON) tools/smoke_test.py --corrupt-fat
+	$(PYTHON) tools/smoke_test.py --full-disk
 	$(PYTHON) tools/smoke_test.py --panic
 	$(PYTHON) tools/smoke_test.py --fault
 .PHONY: test
