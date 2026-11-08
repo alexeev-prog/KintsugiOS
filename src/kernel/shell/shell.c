@@ -84,6 +84,14 @@ static int execute_simple(char* line) {
     if (!argc) {
         return last_status;
     }
+    if (!strcmp(argv[0], "jobs")) {
+        if (argc != 1) return last_status = SHELL_USAGE;
+        process_jobs();
+        return last_status = 0;
+    }
+    if (!strcmp(argv[0], "wait")) {
+        return last_status = argc == 1 ? process_wait_jobs() : SHELL_USAGE;
+    }
     /* External commands take precedence; builtins remain a rescue fallback. */
     char executable[VFS_PATH_MAX];
     if (strchr(argv[0], '/')) {
@@ -132,7 +140,7 @@ static int execute_simple(char* line) {
     return last_status = SHELL_NOT_FOUND;
 }
 
-static int execute_pipeline(char* line) {
+static int execute_pipeline(char* line, int background) {
     char* stages[8] = { line };
     int count = 1, append = 0;
     char* output = NULL;
@@ -176,7 +184,7 @@ static int execute_pipeline(char* line) {
             operators = 1;
         }
     }
-    if (!operators) {
+    if (!operators && !background) {
         return execute_simple(line);
     }
     char* arguments[8][SHELL_MAX_ARGS + 1];
@@ -206,7 +214,7 @@ static int execute_pipeline(char* line) {
             return 127;
         }
     }
-    int result = process_pipeline(count, paths, argc, argv, output, append);
+    int result = process_pipeline(count, paths, argc, argv, output, append, background);
     if (result < 0) {
         printf("pipeline: %s (%d)\n", vfs_error(result), result);
     }
@@ -217,6 +225,7 @@ static int execute_pipeline(char* line) {
 int shell_execute(char* line) {
     char quote = 0;
     char* alternative = NULL;
+    int background = 0;
     for (char* p = line; *p; ++p) {
         if (*p == '\\' && quote != '\'') {
             if (p[1]) {
@@ -240,7 +249,17 @@ int shell_execute(char* line) {
                 alternative = p;
             }
             ++p;
-        } else if (*p == '<' || *p == '&') {
+        } else if (*p == '&') {
+            char* tail = p + 1;
+            while (*tail == ' ' || *tail == '\t') ++tail;
+            if (*tail || alternative || p == line) {
+                printf("Syntax error: & must terminate a single pipeline\n");
+                return last_status = SHELL_USAGE;
+            }
+            *p = 0;
+            background = 1;
+            break;
+        } else if (*p == '<') {
             printf("Unsupported shell operator: %c\n", *p);
             return last_status = SHELL_USAGE;
         }
@@ -262,10 +281,10 @@ int shell_execute(char* line) {
             return last_status = SHELL_USAGE;
         }
         *alternative = 0;
-        int result = execute_pipeline(line);
+        int result = execute_pipeline(line, 0);
         return result ? shell_execute(right) : result;
     }
-    return last_status = execute_pipeline(line);
+    return last_status = execute_pipeline(line, background);
 }
 
 void shell_init(void) {

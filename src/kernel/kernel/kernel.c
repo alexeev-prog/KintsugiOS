@@ -29,6 +29,10 @@ void kmain(void) {
     fat12_init();
     log_write(fat12_is_mounted() ? "[INFO] FAT12 mounted\n" : "[WARN] FAT12 unavailable\n");
     printf("KintsugiOS %s\n", VERSION);
+    if (fat12_is_mounted()) {
+        int status = process_boot_init();
+        printf("init unavailable or exited (%d); rescue shell\n", status);
+    }
     shell_init();
     for (;;) {
         shell_poll();

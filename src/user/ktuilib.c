@@ -42,7 +42,9 @@ void tui_box(int x, int y, int width, int height, const char* title, unsigned ch
         tui_text(x, y + i, "|", color);
         tui_text(x + width - 1, y + i, "|", color);
     }
-    tui_textn(x + 2, y, title, width - 4, color);
+    if (width > 4 && title) {
+        tui_textn(x + 2, y, title, width - 4, color);
+    }
 }
 
 void tui_message(const char* title, const char* message) {
@@ -134,6 +136,9 @@ void tui_number(int x, int y, u32 n, unsigned char color) {
 }
 
 void tui_bar(int y, const char* text) {
+    if (y < 0 || y >= 25) {
+        return;
+    }
     for (u32 x = 0; x < 80; ++x) {
         screen[y][x] = (ktui_cell){ ' ', 0x70 };
     }
@@ -152,14 +157,14 @@ int tui_prompt(const char* label, char* buffer, u32 capacity) {
     if (!capacity) {
         return 0;
     }
-    u32 n = 0;
+    u32 n = 0, cursor = 0;
     buffer[0] = 0;
     for (;;) {
         tui_box(3, 8, 74, 7, "Input - Enter accept / Esc cancel", 0x70);
         tui_textn(5, 10, label, 70, 0x70);
-        u32 start = n > 68 ? n - 68 : 0;
+        u32 start = cursor > 68 ? cursor - 68 : 0;
         tui_textn(5, 12, buffer + start, 69, 0x70);
-        tui_present(5 + n - start, 12);
+        tui_present(5 + cursor - start, 12);
         int key = tui_key(1);
         if (key == 27 || key == 3) {
             return 0;
@@ -167,11 +172,28 @@ int tui_prompt(const char* label, char* buffer, u32 capacity) {
         if (key == '\n') {
             return n != 0;
         }
-        if (key == 8 && n) {
-            buffer[--n] = 0;
+        if (key == TUI_LEFT && cursor) {
+            --cursor;
+        } else if (key == TUI_RIGHT && cursor < n) {
+            ++cursor;
+        } else if (key == TUI_HOME) {
+            cursor = 0;
+        } else if (key == TUI_END) {
+            cursor = n;
+        } else if ((key == 8 && cursor) || (key == TUI_DELETE && cursor < n)) {
+            if (key == 8) {
+                --cursor;
+            }
+            for (u32 i = cursor; i < n; ++i) {
+                buffer[i] = buffer[i + 1];
+            }
+            --n;
         } else if (key >= 32 && key < 127 && n + 1 < capacity) {
-            buffer[n++] = key;
-            buffer[n] = 0;
+            for (u32 i = n + 1; i > cursor; --i) {
+                buffer[i] = buffer[i - 1];
+            }
+            buffer[cursor++] = key;
+            ++n;
         }
     }
 }

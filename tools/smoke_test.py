@@ -178,8 +178,18 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
                     ">": "shift-dot",
                     "&": "shift-7",
                 }.get(ch, ch)
-                monitor(f"sendkey {key} 10")
-                time.sleep(0.05)
+                # Explicit transitions avoid deferred HMP release timers.
+                keys = key.split("-")
+                if ch.isupper():
+                    keys = ["shift", ch.lower()]
+                for down, codes in ((True, keys), (False, list(reversed(keys)))):
+                    qmp("input-send-event", {"events": [
+                        {"type": "key", "data": {
+                            "down": down,
+                            "key": {"type": "qcode", "data": code},
+                        }} for code in codes
+                    ]})
+                    time.sleep(0.03)
             monitor("sendkey ret 10")
             time.sleep(0.3)
 
@@ -229,6 +239,20 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             )
             sys.exit(0)
         command("fat12info")
+        wait_for("[INIT] userspace init ready")
+        wait_for("Keramika Shell - userspace")
+        command("exit")
+        command("echo shell-restarted-ok")
+        wait_for("shell-restarted-ok")
+        command("echo background-ok | cat > /bg.txt &")
+        wait_for("[job ")
+        command("wait")
+        command("cat /bg.txt")
+        wait_for("background-ok")
+        command("jobs")
+        wait_for("PID GROUP STATE STATUS")
+        command("echo 'literal&value'")
+        wait_for("literal&value")
         command("missingcmd || echo fallback-ok")
         wait_for("fallback-ok")
         command("fdcheck")

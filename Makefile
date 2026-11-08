@@ -30,6 +30,14 @@ all: $(BIN_DIR)/kintsugios.bin users
 
 USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG FDCHECK
 USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
+USER_ELFS += $(BIN_DIR)/user/INIT.ELF
+USER_ELFS += $(BIN_DIR)/user/SHELL.ELF
+$(BIN_DIR)/user/SHELL.ELF: src/user/shell.c src/user/shellabi.h src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/SHELL.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/SHELL.o -o $@
+$(BIN_DIR)/user/INIT.ELF: src/user/init.c src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/INIT.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/INIT.o -o $@
 TUI_PROGRAMS := KUNED KBSM KC KPROCM KDISKMAN KTUI
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))

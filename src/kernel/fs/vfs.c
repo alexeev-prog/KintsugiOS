@@ -1,6 +1,7 @@
 #include "vfs.h"
 
 #include "../kklibc/kklibc.h"
+#include "../user/process.h"
 static const vfs_ops_t* backend;
 static u32 generation;
 static char cwd[VFS_PATH_MAX] = "/";
@@ -12,7 +13,8 @@ void vfs_mount(const vfs_ops_t* ops) {
 }
 
 const char* vfs_getcwd(void) {
-    return cwd;
+    char* local = process_cwd();
+    return local && local[0] ? local : cwd;
 }
 
 int vfs_open(const char* path, vfs_file_t* file) {
@@ -83,7 +85,7 @@ int vfs_normalize(const char* path, char out[VFS_PATH_MAX]) {
     out[0] = '/';
     out[1] = 0;
     if (*path != '/') {
-        strcpy(out, cwd);
+        strcpy(out, vfs_getcwd());
         length = strlen(out);
     }
     while (*path) {
@@ -151,7 +153,8 @@ int vfs_chdir(const char* path) {
     if (!stat.directory) {
         return VFS_ENOTDIR;
     }
-    strcpy(cwd, absolute);
+    char* local = process_cwd();
+    strcpy(local ? local : cwd, absolute);
     return 0;
 }
 
