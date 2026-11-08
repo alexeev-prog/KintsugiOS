@@ -1,3 +1,21 @@
+commit e36dd4cdfb2b01c8da88ed0869c124f15783ea0e
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 16:52:59 2026 +0700
+
+    bump version
+
+commit c4091b5f540ea88aef8639e48fa1eb9b2da8067a
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Nov 7 23:21:25 2026 +0700
+
+    fix codestyle in tools
+
+commit deb3b7eeb0e9f8b9fbb1e90c977b83a74b49f1d6
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sat Nov 7 23:19:12 2026 +0700
+
+    add TUI library with system monitor, editor and file manager
+
 commit cfd499fa5a6d9e660893d3ba38fe9cd699055055
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Nov 1 21:20:32 2026 +0700
