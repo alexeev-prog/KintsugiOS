@@ -8,6 +8,16 @@ import subprocess
 import sys
 import tempfile
 import time
+import signal
+
+
+def deadline(signum, frame):
+    raise TimeoutError("Smoke test exceeded its 240 second deadline")
+
+
+signal.signal(signal.SIGALRM, deadline)
+signal.alarm(240)
+started = time.monotonic()
 
 Path("/tmp/opencode").mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as directory:
@@ -20,6 +30,18 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
     sample.write_bytes(payload)
     subprocess.run(["mcopy", "-i", str(disk), str(sample), "::/README.TXT"], check=True)
     subprocess.run([sys.executable, "tools/install_system.py", str(disk)], check=True)
+    if "--light-theme" in sys.argv:
+        subprocess.run(
+            [
+                "mcopy",
+                "-o",
+                "-i",
+                str(disk),
+                "system/themes/LIGHT.THM",
+                "::/ETC/TUI.THM",
+            ],
+            check=True,
+        )
     full_disk = "--full-disk" in sys.argv
     if full_disk:
         original = tmp / "SAFE.TXT"
@@ -140,12 +162,17 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
                     + "\n"
                 ).encode()
             )
-            while True:
-                result = json.loads(stream.readline())
+            until = time.monotonic() + 10
+            while time.monotonic() < until:
+                raw = stream.readline()
+                if not raw:
+                    raise RuntimeError(f"QEMU disconnected during {execute}")
+                result = json.loads(raw)
                 if "error" in result:
                     raise RuntimeError(result)
                 if "return" in result:
                     return result["return"]
+            raise TimeoutError(f"QMP timeout: {execute}")
 
         qmp("qmp_capabilities")
 
@@ -165,6 +192,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             raise AssertionError(f"Missing {text!r}; VGA:\n{screen()}")
 
         def command(text):
+            print(f"[smoke] {text}", flush=True)
             for ch in text:
                 key = {
                     " ": "spc",
@@ -177,19 +205,29 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
                     "|": "shift-backslash",
                     ">": "shift-dot",
                     "&": "shift-7",
+                    ":": "shift-semicolon",
                 }.get(ch, ch)
                 # Explicit transitions avoid deferred HMP release timers.
                 keys = key.split("-")
                 if ch.isupper():
                     keys = ["shift", ch.lower()]
                 for down, codes in ((True, keys), (False, list(reversed(keys)))):
-                    qmp("input-send-event", {"events": [
-                        {"type": "key", "data": {
-                            "down": down,
-                            "key": {"type": "qcode", "data": code},
-                        }} for code in codes
-                    ]})
-                    time.sleep(0.03)
+                    qmp(
+                        "input-send-event",
+                        {
+                            "events": [
+                                {
+                                    "type": "key",
+                                    "data": {
+                                        "down": down,
+                                        "key": {"type": "qcode", "data": code},
+                                    },
+                                }
+                                for code in codes
+                            ]
+                        },
+                    )
+                    time.sleep(0.01)
             monitor("sendkey ret 10")
             time.sleep(0.3)
 
@@ -244,6 +282,21 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         command("exit")
         command("echo shell-restarted-ok")
         wait_for("shell-restarted-ok")
+        command("/bin/shell.elf")
+        wait_for("Keramika Shell - userspace")
+        command("help")
+        wait_for("Keramika Shell Help")
+        command("echo nested-shell-ok")
+        wait_for("nested-shell-ok")
+        command("exit")
+        command("echo parent-shell-ok")
+        wait_for("parent-shell-ok")
+        # Backspace is cursor motion, never a printable VGA glyph.
+        monitor("sendkey x 10")
+        time.sleep(0.1)
+        monitor("sendkey backspace 10")
+        time.sleep(0.1)
+        assert "\x08" not in screen(), "Backspace leaked into VGA text cells"
         command("echo background-ok | cat > /bg.txt &")
         wait_for("[job ")
         command("wait")
@@ -298,6 +351,19 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         wait_for("survived-invalid-elf")
         command("help bin")
         wait_for("KDISKMAN.ELF")
+        before_scroll = screen()
+        monitor("sendkey x 10")
+        time.sleep(0.1)
+        assert screen()[: 24 * 80] == before_scroll[: 24 * 80], (
+            "Typing moved shell output rows"
+        )
+        monitor("sendkey backspace 10")
+        time.sleep(0.1)
+        monitor("sendkey pgup 10")
+        time.sleep(0.15)
+        assert screen() != before_scroll, "Shell PageUp did not scroll output"
+        monitor("sendkey pgdn 10")
+        time.sleep(0.15)
         command("kfsck")
         wait_for("directories OK")
         command("proc")
@@ -316,7 +382,22 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         ):
             command(app)
             wait_for(title)
+            if "--light-theme" in sys.argv:
+                raw = (tmp / "vga.bin").read_bytes()
+                assert raw[1] == 0x1F, "Shared light theme did not recolor title bar"
+            if app == "kprocm":
+                wait_for("KPROCM.ELF")
+                monitor("sendkey pgdn 10")
+                time.sleep(0.1)
+                monitor("sendkey ret 10")
+                wait_for("Process details")
+                monitor("sendkey spc 10")
+                time.sleep(0.1)
             if app == "ktui":
+                monitor("sendkey ret 10")
+                wait_for("Launch application")
+                monitor("sendkey esc 10")
+                time.sleep(0.1)
                 monitor("sendkey 4 10")
                 wait_for("Kintsugi Process Manager")
                 monitor("sendkey q 10")
@@ -326,17 +407,98 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         command("kuned /edit.txt")
         wait_for("Kintsugi Universal Editor")
         command("editor-content")
+        monitor("sendkey pgup 10")
+        monitor("sendkey pgdn 10")
+        time.sleep(0.1)
+        monitor("sendkey ctrl-z 10")
+        wait_for("Undo")
+        monitor("sendkey ret 10")
+        time.sleep(0.1)
+        monitor("sendkey ctrl-f 10")
+        wait_for("Find literal text")
+        command("editor")
+        wait_for("Found")
         monitor("sendkey ctrl-s 10")
         time.sleep(0.2)
         wait_for("Saved")
         monitor("sendkey ctrl-q 10")
         time.sleep(0.2)
+        command("kuned /edit.txt --readonly")
+        wait_for("Read-only viewer")
+        monitor("sendkey x 10")
+        monitor("sendkey ctrl-s 10")
+        monitor("sendkey ctrl-q 10")
+        time.sleep(0.2)
+        command("vik /vik.txt")
+        wait_for("-- NORMAL --")
+        monitor("sendkey i 10")
+        time.sleep(0.1)
+        command("vik-content")
+        monitor("sendkey esc 10")
+        time.sleep(0.1)
+        command(":wq")
+        command("cat /vik.txt")
+        wait_for("vik-content")
+        command("ktte")
+        wait_for("Kintsugi TUI Theme Editor")
+        wait_for("Simple mode")
+        monitor("sendkey ret 10")
+        wait_for("Choose background color")
+        wait_for("Bright green")
+        before_choice = screen()
+        marker = next(
+            i for i, ch in enumerate(before_choice) if ch == ">" and i % 80 == 10
+        )
+        monitor("sendkey down 10")
+        time.sleep(0.1)
+        after_choice = screen()
+        assert after_choice[marker] == " " and after_choice[marker + 80] == ">", (
+            "Color selection did not move down"
+        )
+        monitor("sendkey up 10")
+        time.sleep(0.1)
+        assert screen()[marker] == ">", "Color selection did not move up"
+        monitor("sendkey down 10")
+        monitor("sendkey ret 10")
+        time.sleep(0.1)
+        monitor("sendkey s 10")
+        wait_for("Save theme:")
+        command("pick")
+        wait_for("Theme saved")
+        monitor("sendkey h 10")
+        wait_for("VGA color guide")
+        monitor("sendkey ret 10")
+        time.sleep(0.1)
+        monitor("sendkey n 10")
+        time.sleep(0.1)
+        monitor("sendkey m 10")
+        monitor("sendkey right 10")
+        monitor("sendkey s 10")
+        wait_for("Save theme:")
+        command("test")
+        wait_for("Theme saved")
+        monitor("sendkey ctrl-t 10")
+        wait_for("Choose shared TUI theme")
+        wait_for("TEST.THM")
+        monitor("sendkey end 10")
+        monitor("sendkey ret 10")
+        time.sleep(0.1)
+        monitor("sendkey q 10")
+        time.sleep(0.2)
         command("kbsm")
         wait_for("Kintsugi Basic System Monitor")
+        monitor("sendkey ctrl-t 10")
+        wait_for("Choose shared TUI theme")
+        monitor("sendkey ret 10")
+        time.sleep(0.2)
         monitor("sendkey q 10")
         time.sleep(0.2)
         command("kc")
         wait_for("Kintsugi Commander")
+        monitor("sendkey h 10")
+        wait_for("Commander help")
+        monitor("sendkey spc 10")
+        time.sleep(0.1)
         monitor("sendkey q 10")
         time.sleep(0.2)
         command("/bin/check.elf")
@@ -452,6 +614,21 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         )
         assert actual == b"multi word text", actual
         assert (
+            subprocess.check_output(["mtype", "-i", str(disk), "::/VIK.TXT"])
+            == b"vik-content\n"
+        )
+        theme = subprocess.check_output(
+            ["mtype", "-i", str(disk), "::/ETC/THEMES/TEST.THM"]
+        )
+        picked = subprocess.check_output(
+            ["mtype", "-i", str(disk), "::/ETC/THEMES/PICK.THM"]
+        )
+        expected_background = b"72=80\n" if "--light-theme" in sys.argv else b"72=27\n"
+        assert expected_background in picked, (
+            "Enter did not accept the selected background color"
+        )
+        assert theme.startswith(b"00=01\n01=01\n") and len(theme) == 1536
+        assert (
             subprocess.check_output(["mtype", "-i", str(disk), "::/QUOTE.TXT"])
             == b"quoted text escaped space"
         )
@@ -474,8 +651,14 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             "PASS:",
             "ISO" if iso else "floppy",
             "boot, editor/parser/completion, FAT12, reboot persistence, fsck",
+            f"({time.monotonic() - started:.1f}s)",
         )
     finally:
+        if sys.exc_info()[0] not in (None, SystemExit):
+            print(
+                "Serial diagnostics:\n" + (tmp / "serial.log").read_text()[-8000:],
+                file=sys.stderr,
+            )
         if proc.poll() is None:
             proc.terminate()
             proc.wait(timeout=10)

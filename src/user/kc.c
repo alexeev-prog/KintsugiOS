@@ -72,7 +72,8 @@ static int refresh(panel* p) {
 
 static void draw(panel* p, int x, int active) {
     tab* t = &p->tabs[p->active];
-    tui_box(x, 1, 40, 22, active ? "Active" : "Panel", 0x17);
+    tui_window window = { x, 1, 40, 22, active, active ? "Active" : "Panel" };
+    tui_window_draw(&window);
     for (u32 i = 0; i < p->count; ++i) {
         tui_text(x + 2 + i * 8, 2, "Tab", i == p->active ? 0x70 : 0x1f);
         tui_number(x + 5 + i * 8, 2, i + 1, i == p->active ? 0x70 : 0x1f);
@@ -88,6 +89,7 @@ static void draw(panel* p, int x, int active) {
             tui_number(x + 26, y, p->entries[i].stat.size, color);
         }
     }
+    tui_scrollbar(x + 38, 4, 18, t->top, 18, p->entries_count);
 }
 
 int main(int argc, char** argv) {
@@ -113,7 +115,7 @@ int main(int argc, char** argv) {
         draw(&panels[0], 0, active == 0);
         draw(&panels[1], 40, active == 1);
         tui_bar(23, status);
-        tui_bar(24, "Enter open | Backspace parent | B previous | C copy M move D delete | Q quit");
+        tui_bar(24, "Enter edit | V view | / path | R rename | C copy M move D delete N mkdir Q quit");
         tui_present(79, 24);
         int key = tui_key(1);
         panel* p = &panels[active];
@@ -127,19 +129,35 @@ int main(int argc, char** argv) {
         }
         if (key == 'h') {
             tui_message("Commander help", "Copy/move targets other panel. Enter opens files in KUNED.");
+        } else if (key == '/') {
+            char destination[256];
+            tui_stat st;
+            if (tui_prompt("Open directory (absolute path):", destination, sizeof(destination))) {
+                if (destination[0] != '/' || tui_stat_path(destination, &st) || !st.directory) {
+                    status = "Not an accessible absolute directory";
+                } else {
+                    tui_copy(t->previous, t->directory, 256);
+                    tui_copy(t->directory, destination, 256);
+                    t->selected = t->top = 0;
+                }
+            }
+        } else if (key == 'i' && p->entries_count) {
+            tui_entry* e = &p->entries[t->selected];
+            tui_message(
+                e->name,
+                e->stat.directory      ? "Directory; deletion requires it to be empty"
+                    : e->stat.readonly ? "Read-only file"
+                                       : "Writable file; V preview / Enter edit");
         } else if (key == 'o') {
-            tui_box(5, 8, 70, 7, "Commander settings", 0x70);
-            tui_text(7, 10, "S toggle sizes / D directories first / W save settings", 0x70);
-            tui_text(7, 12, "Any other key closes", 0x70);
-            tui_present(79, 24);
-            int c = tui_key(1);
-            if (c == 's') {
+            const char* items[] = { "Toggle sizes", "Toggle directories first", "Save settings" };
+            int c = tui_menu("Commander settings", items, 3, 0);
+            if (c == 0) {
                 settings[0] ^= 1;
             }
-            if (c == 'd') {
+            if (c == 1) {
                 settings[1] ^= 1;
             }
-            if (c == 'w') {
+            if (c == 2) {
                 status = tui_save_settings("/ETC/KC.CFG", settings, sizeof(settings))
                     ? "Settings saved"
                     : "Settings save failed";
@@ -157,10 +175,10 @@ int main(int argc, char** argv) {
             if (p->active >= p->count) {
                 --p->active;
             }
-        } else if (key == TUI_UP && t->selected) {
-            --t->selected;
-        } else if (key == TUI_DOWN && t->selected + 1 < p->entries_count) {
-            ++t->selected;
+        } else if (
+            (key >= TUI_UP && key <= TUI_END) || key == TUI_PAGE_UP || key == TUI_PAGE_DOWN
+            || key == TUI_SCROLL_UP || key == TUI_SCROLL_DOWN) {
+            tui_list_key(key, &t->selected, &t->top, p->entries_count, 18);
         } else if (key == 8) {
             tui_copy(t->previous, t->directory, sizeof(t->previous));
             tui_parent(t->directory);
@@ -181,7 +199,14 @@ int main(int argc, char** argv) {
             if (parent && key != '\n') {
                 continue;
             }
-            if (key == '\n' && e) {
+            if (key == 'v' && e && !e->stat.directory) {
+                char* args[] = { "KUNED", source, "--readonly", 0 };
+                int pid = spawn("/BIN/KUNED.ELF", 3, args);
+                status = pid > 0 && wait(pid) == 0 ? "Viewer closed" : "Viewer failed";
+            } else if (key == 'r' && e && tui_prompt("New name (same directory):", input, sizeof(input))) {
+                tui_path(dest, t->directory, input);
+                status = syscall(12, (u32)source, (u32)dest, 1, 0) ? "Rename failed" : "Renamed";
+            } else if (key == '\n' && e) {
                 if (e->stat.directory) {
                     tui_copy(t->previous, t->directory, sizeof(t->previous));
                     if (parent) {

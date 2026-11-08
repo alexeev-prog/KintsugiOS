@@ -38,7 +38,7 @@ $(BIN_DIR)/user/SHELL.ELF: src/user/shell.c src/user/shellabi.h src/user/runtime
 $(BIN_DIR)/user/INIT.ELF: src/user/init.c src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
 	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/INIT.o
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/INIT.o -o $@
-TUI_PROGRAMS := KUNED KBSM KC KPROCM KDISKMAN KTUI
+TUI_PROGRAMS := KUNED VIK KBSM KC KPROCM KDISKMAN KTUI KTTE
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
@@ -51,8 +51,12 @@ $(BIN_DIR)/user/$(1).ELF: src/user/$(2).c src/user/ktuilib.h src/user/user.ld $(
 	$$(LD) -m elf_i386 -T src/user/user.ld $$(BIN_DIR)/user/start.o $$(BIN_DIR)/user/runtime.o $$(BIN_DIR)/user/ktuilib.o $$(BIN_DIR)/user/$(1).o -o $$@
 endef
 $(eval $(call TUI_RULE,KUNED,kuned))
+$(BIN_DIR)/user/VIK.ELF: src/user/kuned.c src/user/ktuilib.h src/user/user.ld $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -DVIK=1 -c $< -o $(BIN_DIR)/user/VIK.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/VIK.o -o $@
 $(eval $(call TUI_RULE,KBSM,kbsm))
 $(eval $(call TUI_RULE,KC,kc))
+$(eval $(call TUI_RULE,KTTE,ktte))
 define DIAG_RULE
 $(BIN_DIR)/user/$(1).ELF: src/user/diagnostics.c src/user/sysabi.h $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
 	$$(CC) $$(CFLAGS) -DAPP=$(2) -c $$< -o $$(BIN_DIR)/user/$(1).o
@@ -212,7 +216,12 @@ help info:
 
 -include $(OBJS:.o=.d) $(wildcard $(BIN_DIR)/user/*.d)
 # Headless integration tests (never use the persistent user disk)
-test: $(FLOPPY) $(ISO) $(USER_ELFS)
+HOSTCC ?= cc
+test-tui:
+	@mkdir -p $(BIN_DIR)
+	$(HOSTCC) -Wall -Wextra -Werror -Wno-pointer-to-int-cast -no-pie tools/test_tui.c -o $(BIN_DIR)/test-tui
+	$(BIN_DIR)/test-tui
+test: $(FLOPPY) $(ISO) $(USER_ELFS) test-tui
 	$(PYTHON) tools/smoke_test.py
 	$(PYTHON) tools/smoke_test.py --iso
 	$(PYTHON) tools/smoke_test.py --large-kernel
@@ -223,5 +232,6 @@ test: $(FLOPPY) $(ISO) $(USER_ELFS)
 	$(PYTHON) tools/smoke_test.py --panic
 	$(PYTHON) tools/smoke_test.py --fault
 .PHONY: test
+.PHONY: test-tui
 .PHONY: help disk-create disk-reset
 .PHONY: all diskimg hddimg fat12hdd iso testfiles run run_bin run_fda run_hdd run_fat12 run_iso debug_fda debug_hdd debug_fat12 debug_iso clean clean_all quick re info

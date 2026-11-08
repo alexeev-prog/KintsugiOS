@@ -59,6 +59,12 @@ static void keyboard_callback(registers_t registers) {
     }
     if (ext) {
         switch (code) {
+            case 0x49:
+                enqueue(KEY_PAGE_UP);
+                break;
+            case 0x51:
+                enqueue(KEY_PAGE_DOWN);
+                break;
             case 0x48:
                 enqueue(shifts ? KEY_SCROLL_UP : KEY_UP);
                 break;
@@ -102,28 +108,18 @@ static void keyboard_callback(registers_t registers) {
         }
         c = uppercase ? upper[code] : c;
         if (control) {
-            if (c == 'o' || c == 'O') {
-                enqueue(15);
-                return;
-            }
-            if (c == 'f' || c == 'F') {
-                enqueue(6);
-                return;
-            }
-            if (c == 's' || c == 'S') {
-                enqueue(19);
-                return;
-            }
-            if (c == 'q' || c == 'Q') {
-                enqueue(17);
+            if (c != 'c' && c != 'C') {
+                if (c >= 'a' && c <= 'z') {
+                    enqueue(c - 'a' + 1);
+                } else if (c >= 'A' && c <= 'Z') {
+                    enqueue(c - 'A' + 1);
+                }
                 return;
             }
             if (c == 'c' || c == 'C') {
                 if (!process_interrupt()) {
                     enqueue(3);
                 }
-            } else if (c == 'd' || c == 'D') {
-                enqueue(4);
             }
         } else {
             enqueue(c);

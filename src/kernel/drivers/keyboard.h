@@ -10,7 +10,9 @@ enum {
     KEY_END,
     KEY_DELETE,
     KEY_SCROLL_UP,
-    KEY_SCROLL_DOWN
+    KEY_SCROLL_DOWN,
+    KEY_PAGE_UP,
+    KEY_PAGE_DOWN
 };
 
 void init_keyboard(void);

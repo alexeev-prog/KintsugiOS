@@ -3,6 +3,7 @@
 #define KOS_SYS_SESSION 32
 #define KOS_SYS_LAUNCH 33
 #define KOS_SYS_BUILTIN 34
+
 typedef struct {
     unsigned int count;
     const char* paths[8];

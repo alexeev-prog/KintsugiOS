@@ -85,7 +85,9 @@ static int execute_simple(char* line) {
         return last_status;
     }
     if (!strcmp(argv[0], "jobs")) {
-        if (argc != 1) return last_status = SHELL_USAGE;
+        if (argc != 1) {
+            return last_status = SHELL_USAGE;
+        }
         process_jobs();
         return last_status = 0;
     }
@@ -251,7 +253,9 @@ int shell_execute(char* line) {
             ++p;
         } else if (*p == '&') {
             char* tail = p + 1;
-            while (*tail == ' ' || *tail == '\t') ++tail;
+            while (*tail == ' ' || *tail == '\t') {
+                ++tail;
+            }
             if (*tail || alternative || p == line) {
                 printf("Syntax error: & must terminate a single pipeline\n");
                 return last_status = SHELL_USAGE;
