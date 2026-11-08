@@ -42,4 +42,6 @@ void fat12_cleanup(void);
 int fat12_is_mounted(void);
 int fat12_read_boot_sector(fat12_boot_sector_t* boot);
 void print_fat12_info(void);
+int fat12_check(void);
+void fat12_usage(u32* sectors, u32* cluster_bytes, u32* clusters, u32* free_clusters);
 #endif

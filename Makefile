@@ -30,7 +30,9 @@ all: $(BIN_DIR)/kintsugios.bin users
 
 USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT
 USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
-TUI_PROGRAMS := KUNED KBSM KC
+TUI_PROGRAMS := KUNED KBSM KC KPROCM KDISKMAN KTUI
+UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KLOG KFSCK PROC
+USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
 $(BIN_DIR)/user/ktuilib.o: src/user/ktuilib.c src/user/ktuilib.h src/user/tuiabi.h src/user/runtime.h
 	@mkdir -p $(dir $@)
@@ -43,6 +45,28 @@ endef
 $(eval $(call TUI_RULE,KUNED,kuned))
 $(eval $(call TUI_RULE,KBSM,kbsm))
 $(eval $(call TUI_RULE,KC,kc))
+define DIAG_RULE
+$(BIN_DIR)/user/$(1).ELF: src/user/diagnostics.c src/user/sysabi.h $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$$(CC) $$(CFLAGS) -DAPP=$(2) -c $$< -o $$(BIN_DIR)/user/$(1).o
+	$$(LD) -m elf_i386 -T src/user/user.ld $$(BIN_DIR)/user/start.o $$(BIN_DIR)/user/runtime.o $$(BIN_DIR)/user/ktuilib.o $$(BIN_DIR)/user/$(1).o -o $$@
+endef
+$(eval $(call DIAG_RULE,KPROCM,1))
+$(eval $(call DIAG_RULE,KDISKMAN,2))
+$(eval $(call DIAG_RULE,KTUI,3))
+define UTIL_RULE
+$(BIN_DIR)/user/$(1).ELF: src/user/utils.c src/user/sysabi.h $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$$(CC) $$(CFLAGS) -Wno-unused-function -Wno-unused-parameter -DUTIL=$(2) -c $$< -o $$(BIN_DIR)/user/$(1).o
+	$$(LD) -m elf_i386 -T src/user/user.ld $$(BIN_DIR)/user/start.o $$(BIN_DIR)/user/runtime.o $$(BIN_DIR)/user/ktuilib.o $$(BIN_DIR)/user/$(1).o -o $$@
+endef
+$(eval $(call UTIL_RULE,TREE,1))
+$(eval $(call UTIL_RULE,FIND,2))
+$(eval $(call UTIL_RULE,GREP,3))
+$(eval $(call UTIL_RULE,TAIL,4))
+$(eval $(call UTIL_RULE,WC,5))
+$(eval $(call UTIL_RULE,SORT,6))
+$(eval $(call UTIL_RULE,KLOG,7))
+$(eval $(call UTIL_RULE,KFSCK,8))
+$(eval $(call UTIL_RULE,PROC,9))
 $(BIN_DIR)/user/start.o: src/user/start.asm
 	@mkdir -p $(dir $@)
 	$(ASM) -f elf32 $< -o $@

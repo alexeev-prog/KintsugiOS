@@ -15,6 +15,7 @@ boot:
     mov [BOOT_DRIVE], dl
     call disk_load
     call memory_map
+    mov byte [0x4f00], 3 ; Successful loader handoff for the kernel journal.
     call switch_to_pm
     jmp $
 %include "src/bootloader/puts_chars.asm"

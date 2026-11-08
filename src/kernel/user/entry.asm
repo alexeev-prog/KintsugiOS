@@ -1,6 +1,6 @@
 [bits 32]
 section .text
-global user_enter, user_leave, syscall_entry
+global user_enter, user_leave, syscall_entry, process_switch
 extern syscall_dispatch
 ; Single foreground process. Save the kernel continuation independently of TSS stack.
 user_enter:
@@ -67,4 +67,19 @@ syscall_entry:
     iretd
 section .bss
 saved_esp: resd 1
+section .text
+; Switch kernel continuations; callers hold interrupts disabled.
+process_switch:
+    push ebp
+    push ebx
+    push esi
+    push edi
+    mov eax, [esp+20]
+    mov [eax], esp
+    mov esp, [esp+24]
+    pop edi
+    pop esi
+    pop ebx
+    pop ebp
+    ret
 section .note.GNU-stack noalloc noexec nowrite progbits
