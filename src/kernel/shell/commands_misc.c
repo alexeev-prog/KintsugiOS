@@ -1,5 +1,6 @@
 #include "../kklibc/kklibc.h"
 #include "shell.h"
+#include "../fs/vfs.h"
 
 static int help(int argc, char** argv) {
     if (argc > 2) {
@@ -7,7 +8,22 @@ static int help(int argc, char** argv) {
     }
     printf("Keramika Shell Help\n");
     if (argc == 1) {
-        printf("help <command|category>\nCategories: system fs diag memory misc\n");
+        printf("help <command|category>\nCategories: system fs diag memory misc bin\n");
+        printf("help bin: installed /BIN programs and launch syntax\n");
+        return SHELL_OK;
+    }
+    if (!strcmp(argv[1], "bin")) {
+        printf("Run: name [arguments] or /BIN/NAME.ELF [arguments]\n");
+        printf("kuned [file] editor; kc commander; kbsm resources; ktui launcher\n");
+        printf("kprocm processes; kdiskman volumes (read only); proc process list\n");
+        printf("tree [dir]; find [dir] [name substring]; grep LITERAL FILE\n");
+        printf("cat FILE; tail FILE (last 10 lines); wc FILE; sort FILE\n");
+        printf("klog kernel/boot journal; kfsck read-only FAT12 check\n");
+        printf("Installed /BIN entries:\n");
+        u32 cursor = 0; vfs_dirent_t entry; int result;
+        while ((result = vfs_readdir("/BIN", &cursor, &entry)) > 0)
+            if (!entry.stat.directory) printf("  %s\n", entry.name);
+        if (result < 0) printf("/BIN unavailable: %s\n", vfs_error(result));
         return SHELL_OK;
     }
     int found = 0;

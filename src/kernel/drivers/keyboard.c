@@ -102,6 +102,8 @@ static void keyboard_callback(registers_t registers) {
         }
         c = uppercase ? upper[code] : c;
         if (control) {
+            if (c == 'o' || c == 'O') { enqueue(15); return; }
+            if (c == 'f' || c == 'F') { enqueue(6); return; }
             if (c == 's' || c == 'S') {
                 enqueue(19);
                 return;

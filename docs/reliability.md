@@ -1,7 +1,7 @@
 # Reliability contract (current i386 kernel)
 
-The current source supports one foreground ring-3 program, not spawn/wait or a
-multi-process scheduler. Do not install leftover ELF files from other revisions:
+The source supports a bounded process table, spawn/wait and timer scheduling
+(see `processes.md`). Do not install leftover ELF files from other revisions:
 the installer obtains the supported list from `make list-user-programs`.
 
 ## Isolation and shutdown
@@ -22,9 +22,9 @@ no syscalls can therefore be stopped (status 130). Cancellation is deferred
 inside filesystem/kernel work, avoiding abandonment of in-progress mutations.
 This cannot recover from a kernel infinite loop with interrupts disabled.
 
-Normal exit, fault and cancellation return through the same kernel continuation:
-switch to the kernel page directory, restore/free the terminal snapshot, destroy
-user page tables/pages and free the ELF image. User heap pages are owned by that
+Normal exit, fault and cancellation mark a process as a zombie. Wait reaps its
+address space, kernel stack and terminal snapshot; root termination returns to
+the shell and reaps the remaining session. User heap pages are owned by that
 address space. This is not yet a proof against every resource leak under OOM.
 
 ## Filesystem safety
@@ -89,7 +89,10 @@ Other registers are restored. Negative results are errors unless stated otherwis
 | 12 | source, destination, move flag | copy/rename |
 | 17 | offset, buffer, capacity | journal bytes, max 4096 |
 
-13–16 are not implemented. Shared filesystem layouts are defined once in
+13 is spawn(path, argc, argv), 14 wait(child PID), 15 getpid(), 16 process snapshot
+(buffer, capacity up to 16). 18 runs the read-only FAT12 checker; 19 writes disk
+statistics. Diagnostic structures are in `src/user/sysabi.h`.
+Shared filesystem layouts are defined once in
 `src/user/fsabi.h`; TUI cells/stats in `src/user/tuiabi.h`. Syscall and allocator
 mechanics live in `runtime.c`, not in applications. ABI is experimental, without
 binary version negotiation; rebuild applications with the kernel.

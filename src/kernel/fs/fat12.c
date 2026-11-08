@@ -906,3 +906,16 @@ static int check_volume(void) {
     kfree(queue);
     return error;
 }
+
+int fat12_check(void) {
+    return mounted ? check_volume() : VFS_EIO;
+}
+
+void fat12_usage(u32* sectors, u32* bytes, u32* clusters, u32* free_clusters) {
+    *sectors = *bytes = *clusters = *free_clusters = 0;
+    if (!mounted) return;
+    *sectors = boot_sector.total_sectors ? boot_sector.total_sectors : boot_sector.large_sector_count;
+    *bytes = boot_sector.sectors_per_cluster * 512u;
+    *clusters = ctx.total_clusters;
+    for (u32 c = 2; valid_cluster(c); ++c) if (!fat_get(c)) ++*free_clusters;
+}

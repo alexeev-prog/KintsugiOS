@@ -1,6 +1,8 @@
 #include "process.h"
 
 #include "../../user/tuiabi.h"
+#include "../../user/sysabi.h"
+#include "../fs/fat12.h"
 #include "../cpu/idt.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/terminal.h"
@@ -14,20 +16,22 @@
 static u8 kernel_stack[16384] __attribute__((aligned(16)));
 static u32 gdt[12] __attribute__((aligned(8)));
 static u32 tss[26];
-static u32 space;
-static terminal_state_t* saved_terminal;
-static u32 user_heap_end;
-static volatile int interrupted;
-
-int process_interrupt(void) {
-    if (!process_active()) return 0;
-    interrupted = 1;
-    return 1;
-}
-
-void process_check_interrupt(void) {
-    if (process_active() && interrupted) process_exit(130);
-}
+#define PROCESS_MAX 16
+enum { UNUSED_PROCESS, READY, RUNNING, WAITING, ZOMBIE };
+typedef struct {
+    u32 pid, parent, state, address_space, heap_end, context, entry, stack, ticks;
+    int status, interrupted;
+    terminal_state_t* terminal_snapshot;
+    void* kernel_stack;
+} process_t;
+static process_t processes[PROCESS_MAX];
+static process_t* current;
+static u32 next_pid = 1, shell_context, foreground;
+#define space (current->address_space)
+#define saved_terminal (current->terminal_snapshot)
+#define user_heap_end (current->heap_end)
+extern void process_switch(u32* old, u32 next);
+static void schedule(void);
 #define USER_HEAP_BASE 0x60000000u
 #define USER_HEAP_LIMIT 0x61000000u
 extern int user_enter(u32 entry, u32 stack);
@@ -64,14 +68,75 @@ void process_init(void) {
 }
 
 int process_active(void) {
-    return space != 0;
+    return current != NULL;
 }
 
 void process_exit(int status) {
     char message[64];
     snprintf(message, sizeof(message), "[PROCESS] exit status=%d\n", status);
     log_write(message);
-    user_leave(status);
+    __asm__ volatile("cli" ::: "memory");
+    current->status = status;
+    current->state = ZOMBIE;
+    for (int i = 0; i < PROCESS_MAX; ++i) {
+        if (processes[i].pid == current->parent && processes[i].state == WAITING)
+            processes[i].state = READY;
+    }
+    schedule();
+    for (;;) __asm__ volatile("cli; hlt");
+}
+
+static void schedule(void) {
+    process_t* old = current;
+    int start = old ? (int)(old - processes) + 1 : 0;
+    for (;;) {
+        if (old && processes[0].state == ZOMBIE) {
+            current = NULL;
+            vmm_space_switch(0);
+            process_switch(&old->context, shell_context);
+        }
+        for (int n = 0; n < PROCESS_MAX; ++n) {
+            process_t* p = &processes[(start + n) % PROCESS_MAX];
+            if (p->state != READY) continue;
+            if (old && old->state == RUNNING) old->state = READY;
+            current = p;
+            p->state = RUNNING;
+            tss[1] = (u32)p->kernel_stack + 16384;
+            vmm_space_switch(p->address_space);
+            process_switch(old ? &old->context : &shell_context, p->context);
+            return;
+        }
+        if (old && old->state == RUNNING) return;
+        if (processes[0].state == ZOMBIE) {
+            current = NULL;
+            vmm_space_switch(0);
+            process_switch(&old->context, shell_context);
+        }
+        __asm__ volatile("sti; hlt; cli" ::: "memory");
+    }
+}
+
+void process_tick(int user_mode) {
+    if (!current) return;
+    ++current->ticks;
+    if (user_mode && current->interrupted) process_exit(130);
+    if (user_mode && current->ticks % 5 == 0) schedule();
+}
+
+int process_interrupt(void) {
+    if (!current) return 0;
+    for (int i = 0; i < PROCESS_MAX; ++i)
+        if (processes[i].pid == foreground) processes[i].interrupted = 1;
+    return 1;
+}
+
+static void process_start(void) {
+    user_enter(current->entry, current->stack);
+    process_exit(0);
+}
+
+void process_check_interrupt(void) {
+    if (current && current->interrupted) process_exit(130);
 }
 
 typedef struct __attribute__((packed)) {
@@ -104,8 +169,8 @@ static int user_copy(u32 address, const void* source, u32 length) {
     return 1;
 }
 
-int process_run(const char* path, int argc, char** argv) {
-    if (space || argc < 1 || argc > 32) {
+static int process_load(const char* path, int argc, char** argv) {
+    if (argc < 1 || argc > 32) {
         return VFS_EINVAL;
     }
     vfs_stat_t stat;
@@ -134,7 +199,7 @@ int process_run(const char* path, int argc, char** argv) {
         return VFS_EINVAL;
     }
     space = vmm_space_create();
-    interrupted = 0;
+    current->interrupted = 0;
     user_heap_end = USER_HEAP_BASE;
     if (!space) {
         kfree(image);
@@ -216,22 +281,49 @@ int process_run(const char* path, int argc, char** argv) {
     u32 entry = header->entry;
     kfree(image);
     image = NULL;
-    log_write("[INFO] entering user ELF\n");
-    __asm__ volatile("cli" ::: "memory");
-    vmm_space_switch(space);
-    result = user_enter(entry, sp);
-    vmm_space_switch(0);
-    if (saved_terminal) {
-        *terminal_get_state() = *saved_terminal;
-        terminal_get_state()->dirty = 1;
-        terminal_refresh();
-        kfree(saved_terminal);
-        saved_terminal = NULL;
-    }
+    current->kernel_stack = kmalloc(16384);
+    if (!current->kernel_stack) { result = VFS_ENOMEM; goto cleanup; }
+    current->entry = entry;
+    current->stack = sp;
+    u32* context = (u32*)((u32)current->kernel_stack + 16384);
+    *--context = (u32)process_start;
+    for (int i = 0; i < 4; ++i) *--context = 0;
+    current->context = (u32)context;
+    current->state = READY;
+    return 0;
 cleanup:
     vmm_space_destroy(space);
     space = 0;
     kfree(image);
+    return result;
+}
+
+static void reap(process_t* p) {
+    vmm_space_destroy(p->address_space);
+    kfree(p->kernel_stack);
+    if (p->terminal_snapshot) {
+        *terminal_get_state() = *p->terminal_snapshot;
+        terminal_get_state()->dirty = 1;
+        terminal_refresh();
+        kfree(p->terminal_snapshot);
+    }
+    memset(p, 0, sizeof(*p));
+}
+
+int process_run(const char* path, int argc, char** argv) {
+    if (current) return VFS_EINVAL;
+    __asm__ volatile("cli" ::: "memory");
+    current = &processes[0];
+    current->pid = next_pid++;
+    int result = process_load(path, argc, argv);
+    current = NULL;
+    if (!result) {
+        foreground = processes[0].pid;
+        schedule();
+        result = processes[0].status;
+    }
+    for (int i = PROCESS_MAX - 1; i >= 0; --i) reap(&processes[i]);
+    foreground = 0;
     __asm__ volatile("sti" ::: "memory");
     return result;
 }
@@ -280,9 +372,80 @@ void syscall_dispatch(syscall_regs_t* r) {
     }
     char path[VFS_PATH_MAX];
     switch (r->eax) {
-        case 17: /* Read bounded kernel journal chunk. */
+        case 16: { /* Bounded process table snapshot. */
+            if (r->ecx > PROCESS_MAX || !user_range(r->ebx, r->ecx * sizeof(kos_process_info), 1)) break;
+            kos_process_info* out = (void*)r->ebx;
+            u32 n = 0;
+            for (int i = 0; i < PROCESS_MAX && n < r->ecx; ++i) {
+                process_t* p = &processes[i];
+                if (p->state) out[n++] = (kos_process_info){p->pid, p->parent, p->state,
+                    p->ticks, p->heap_end >= USER_HEAP_BASE ? p->heap_end - USER_HEAP_BASE : 0};
+            }
+            r->eax = n;
+            return;
+        }
+        case 17:
             if (r->edx > 4096 || !user_range(r->ecx, r->edx, 1)) break;
             r->eax = log_read(r->ebx, (char*)r->ecx, r->edx);
+            return;
+        case 18:
+            r->eax = fat12_check();
+            return;
+        case 19: {
+            if (!user_range(r->ebx, sizeof(kos_disk_info), 1)) break;
+            kos_disk_info info = {0};
+            info.mounted = fat12_is_mounted();
+            fat12_usage(&info.sectors, &info.cluster_bytes, &info.clusters, &info.free_clusters);
+            memcpy((void*)r->ebx, &info, sizeof(info));
+            r->eax = 0;
+            return;
+        }
+        case 13: { /* spawn(path, argc, argv): copy all parent pointers first. */
+            if (!user_path(r->ebx, path) || !r->ecx || r->ecx > 32
+                || !user_range(r->edx, r->ecx * 4, 0)) break;
+            char (*args)[VFS_PATH_MAX] = kmalloc(32 * VFS_PATH_MAX);
+            if (!args) { r->eax = VFS_ENOMEM; return; }
+            char* argv[32];
+            for (u32 i = 0; i < r->ecx; ++i) {
+                argv[i] = args[i];
+                if (!user_path(((u32*)r->edx)[i], args[i])) {
+                    kfree(args); r->eax = VFS_EINVAL; return;
+                }
+            }
+            process_t* parent = current;
+            process_t* child = NULL;
+            for (int i = 1; i < PROCESS_MAX; ++i)
+                if (!processes[i].state) { child = &processes[i]; break; }
+            if (!child) { kfree(args); r->eax = VFS_ENOMEM; return; }
+            child->pid = next_pid++;
+            child->parent = parent->pid;
+            current = child;
+            int result = process_load(path, r->ecx, argv);
+            current = parent;
+            kfree(args);
+            if (result) { memset(child, 0, sizeof(*child)); r->eax = result; }
+            else r->eax = child->pid;
+            return;
+        }
+        case 14: { /* wait(pid): exit status, direct children only. */
+            process_t* child = NULL;
+            for (int i = 1; i < PROCESS_MAX; ++i)
+                if (processes[i].state && processes[i].pid == r->ebx
+                    && processes[i].parent == current->pid) child = &processes[i];
+            if (!child) break;
+            foreground = child->pid;
+            while (child->state != ZOMBIE) {
+                current->state = WAITING;
+                schedule();
+                if (current->interrupted) process_exit(130);
+            }
+            foreground = current->pid;
+            r->eax = child->status;
+            reap(child);
+            return;
+        }
+        case 15:
+            r->eax = current->pid;
             return;
         case 0:
             process_exit(r->ebx & 255);
@@ -345,6 +508,7 @@ void syscall_dispatch(syscall_regs_t* r) {
                 if (key || !r->ebx) {
                     break;
                 }
+                schedule();
                 __asm__ volatile("sti; hlt; cli" ::: "memory");
                 if (r->ebx == 2) {
                     key = keyboard_read_event();
@@ -437,6 +601,7 @@ void syscall_dispatch(syscall_regs_t* r) {
                 process_check_interrupt();
                 int key = keyboard_read_event();
                 if (!key) {
+                    schedule();
                     __asm__ volatile("sti; hlt; cli" ::: "memory");
                     continue;
                 }

@@ -10,6 +10,9 @@ int main(int argc, char** argv) {
     }
     u32 length = 0, cursor = 0, top = 0;
     int dirty = 0;
+    unsigned char settings[2] = {1, 0}; /* line numbers, dark blue theme */
+    tui_load_settings("/ETC/KUNED.CFG", settings, sizeof(settings));
+    settings[0] = !!settings[0]; settings[1] = !!settings[1];
     const char* status = "Ctrl+S save | Ctrl+Q quit | arrows/Home/End edit";
     if (*path) {
         tui_stat stat;
@@ -37,9 +40,11 @@ int main(int argc, char** argv) {
         }
     }
     for (;;) {
+        u32 gutter = settings[0] ? 6 : 0, width = 80 - gutter;
+        unsigned char color = settings[1] ? 0x17 : 0x07;
         u32 row = 0, col = 0;
         for (u32 i = 0; i < cursor; ++i) {
-            if (text[i] == '\n' || ++col == 80) {
+            if (text[i] == '\n' || ++col == width) {
                 ++row;
                 col = 0;
             }
@@ -50,34 +55,66 @@ int main(int argc, char** argv) {
         if (row >= top + 22) {
             top = row - 21;
         }
-        tui_clear(0x07);
+        tui_clear(color);
         tui_bar(0, "kuned - Kintsugi Universal Editor");
         tui_text(45, 0, *path ? path : "[new file]", 0x70);
         if (dirty) {
             tui_text(78, 0, "*", 0x70);
         }
         u32 r = 0, c = 0;
+        u32 line = 1;
+        if (settings[0] && !top) tui_number(0, 1, line, 0x08);
+        int row_number_drawn = !top;
         for (u32 i = 0; i < length && r < top + 22; ++i) {
             unsigned char ch = text[i];
             if (ch == '\n') {
                 ++r;
+                ++line;
                 c = 0;
+                if (settings[0] && r >= top && r < top + 22)
+                    tui_number(0, r - top + 1, line, 0x08);
+                row_number_drawn = r >= top;
                 continue;
             }
             if (r >= top) {
+                if (settings[0] && !row_number_drawn && c == 0) {
+                    tui_number(0, r - top + 1, line, 0x08);
+                    row_number_drawn = 1;
+                }
                 char s[2] = { ch >= 32 && ch < 127 ? ch : '.', 0 };
-                tui_text(c, r - top + 1, s, 0x07);
+                tui_text(c + gutter, r - top + 1, s, color);
             }
-            if (++c == 80) {
+            if (++c == width) {
                 ++r;
                 c = 0;
             }
         }
         tui_bar(23, status);
-        tui_bar(24, "Ctrl+S save | Ctrl+Q quit (confirm unsaved changes)");
-        tui_present(col, row - top + 1);
+        tui_bar(24, "Ctrl+S save | Ctrl+Q quit | Ctrl+O settings | Ctrl+F find");
+        tui_present(col + gutter, row - top + 1);
         int key = tui_key(1);
-        if (key == 17 || key == 27) {
+        if (key == 15) {
+            tui_box(10, 7, 60, 10, "Editor settings", 0x70);
+            tui_text(12, 9, "N toggle line numbers / T toggle theme", 0x70);
+            tui_text(12, 11, "S save settings / Esc close", 0x70);
+            tui_present(79, 24);
+            int choice = tui_key(1);
+            if (choice == 'n') settings[0] ^= 1;
+            if (choice == 't') settings[1] ^= 1;
+            if (choice == 's') status = tui_save_settings("/ETC/KUNED.CFG", settings, sizeof(settings))
+                ? "Settings saved" : "Cannot save settings";
+        } else if (key == 6) {
+            char query[128];
+            if (tui_prompt("Find literal text (after cursor):", query, sizeof(query))) {
+                u32 n = tui_len(query), i = cursor + (cursor < length);
+                for (; i <= length && n <= length - i; ++i) {
+                    u32 j = 0;
+                    while (j < n && text[i+j] == query[j]) ++j;
+                    if (j == n) { cursor = i; break; }
+                }
+                status = i <= length && n <= length - i ? "Found" : "Not found";
+            }
+        } else if (key == 17 || key == 27) {
             if (!dirty || tui_confirm("Discard unsaved changes? y/N")) {
                 break;
             }

@@ -29,4 +29,12 @@ int tui_prompt(const char* label, char* buffer, u32 capacity);
 int tui_confirm(const char* label);
 void tui_path(char out[256], const char* directory, const char* name);
 int tui_stat_path(const char* path, tui_stat* stat);
+void tui_fill(int x, int y, int width, int height, unsigned char color);
+void tui_textn(int x, int y, const char* text, u32 width, unsigned char color);
+void tui_box(int x, int y, int width, int height, const char* title, unsigned char color);
+void tui_message(const char* title, const char* message);
+void tui_gauge(int x, int y, int width, u32 used, u32 total);
+/* Small per-application settings file, stored under /ETC (8.3 names). */
+int tui_load_settings(const char* path, void* data, u32 size);
+int tui_save_settings(const char* path, const void* data, u32 size);
 #endif

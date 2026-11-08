@@ -151,6 +151,8 @@ void irq_handler(registers_t r) {
         handler(r);
     }
     if ((r.cs & 3) == 3) process_check_interrupt();
+    if (r.int_no == IRQ0) process_tick((r.cs & 3) == 3);
+    if (r.int_no == IRQ1 && (r.cs & 3) == 3) process_tick(1);
 }
 
 void irq_install() {

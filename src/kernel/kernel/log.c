@@ -27,6 +27,8 @@ void log_init(void) {
     port_byte_out(COM1 + 2, 0xc7);
     port_byte_out(COM1 + 4, 0x0b);
     serial_ready = 1;
+    if (*(volatile u8*)0x4f00 == 3)
+        log_write("[BOOT] BIOS loader: kernel loaded, E820 collected, protected mode entered\n");
     log_write("[INFO] serial initialized\n");
 }
 

@@ -1,5 +1,19 @@
 #include "runtime.h"
 
+/* Freestanding compiler-generated aggregate copies may call these symbols. */
+void* memcpy(void* destination, const void* source, u32 size) {
+    unsigned char* out = destination;
+    const unsigned char* in = source;
+    for (u32 i = 0; i < size; ++i) out[i] = in[i];
+    return destination;
+}
+
+int spawn(const char* path, int argc, char** argv) {
+    return syscall(13, (u32)path, argc, (u32)argv, 0);
+}
+int wait(int pid) { return syscall(14, pid, 0, 0, 0); }
+int getpid(void) { return syscall(15, 0, 0, 0, 0); }
+
 int syscall(u32 number, u32 a, u32 b, u32 c, u32 d) {
     int result;
     __asm__ volatile("int $0x80"
