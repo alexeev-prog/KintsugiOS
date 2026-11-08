@@ -3,6 +3,7 @@
 #include "../cpu/isr.h"
 #include "../kklibc/function.h"
 #include "lowlevel_io.h"
+#include "../user/process.h"
 
 #define EVENT_COUNT 128
 static int events[EVENT_COUNT];
@@ -101,6 +102,8 @@ static void keyboard_callback(registers_t registers) {
         }
         c = uppercase ? upper[code] : c;
         if (control) {
+            if (c == 'o' || c == 'O') { enqueue(15); return; }
+            if (c == 'f' || c == 'F') { enqueue(6); return; }
             if (c == 's' || c == 'S') {
                 enqueue(19);
                 return;
@@ -110,7 +113,7 @@ static void keyboard_callback(registers_t registers) {
                 return;
             }
             if (c == 'c' || c == 'C') {
-                enqueue(3);
+                if (!process_interrupt()) enqueue(3);
             } else if (c == 'd' || c == 'D') {
                 enqueue(4);
             }
