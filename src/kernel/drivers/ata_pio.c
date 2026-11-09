@@ -1,5 +1,6 @@
 #include "ata_pio.h"
 
+#include "../kernel/log.h"
 #include "../kklibc/kklibc.h"
 #include "lowlevel_io.h"
 
@@ -84,8 +85,18 @@ void ata_pio_init(void) {
     for (int i = 0; i < 2; ++i) {
         if (ata_pio_identify(i ? ATA_SLAVE : ATA_MASTER, &ata_disks[i]) == 0) {
             printf("Drive %d: %s %d MB\n", i, ata_disks[i].model, ata_disks[i].size / 2048);
+            log_event(
+                "INFO",
+                "ata",
+                "drive=%d model=%s sectors=%u capabilities=%x commands=%x",
+                i,
+                ata_disks[i].model,
+                ata_disks[i].size,
+                ata_disks[i].capabilities,
+                ata_disks[i].command_sets);
         } else {
             printf("Drive %d: no ATA disk\n", i);
+            log_event("DEBUG", "ata", "drive=%d absent or unsupported", i);
         }
     }
 }

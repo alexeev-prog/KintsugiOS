@@ -1,5 +1,9 @@
 #ifndef USER_RUNTIME_H
 #define USER_RUNTIME_H
+#include "envabi.h"
+const char* getenv(const char* name);
+int setenv(const char* name, const char* value);
+int unsetenv(const char* name);
 #include "ioabi.h"
 int open(const char* path, unsigned int flags);
 int close(int fd);

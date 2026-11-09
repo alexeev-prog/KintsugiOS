@@ -1,5 +1,52 @@
 #include "runtime.h"
 
+static kos_env_entry env_cache[KOS_ENV_MAX];
+
+const char* getenv(const char* name) {
+    if (syscall(KOS_SYS_ENV_GET, (u32)env_cache, 0, 0, 0)) {
+        return (void*)0;
+    }
+    for (int i = 0; i < KOS_ENV_MAX; ++i) {
+        u32 n = 0;
+        while (name[n] && name[n] == env_cache[i].name[n]) {
+            ++n;
+        }
+        if (!name[n] && !env_cache[i].name[n]) {
+            return env_cache[i].value;
+        }
+    }
+    return (void*)0;
+}
+
+static int environment_set(const char* name, const char* value, int remove) {
+    kos_env_entry entry = { { 0 }, { 0 } };
+    u32 n = 0;
+    while (name[n] && n + 1 < KOS_ENV_NAME) {
+        entry.name[n] = name[n];
+        ++n;
+    }
+    if (name[n]) {
+        return -3;
+    }
+    n = 0;
+    while (value[n] && n + 1 < KOS_ENV_VALUE) {
+        entry.value[n] = value[n];
+        ++n;
+    }
+    if (value[n]) {
+        return -3;
+    }
+    return syscall(KOS_SYS_ENV_SET, (u32)&entry, remove, 0, 0);
+}
+
+int setenv(const char* name, const char* value) {
+    return environment_set(name, value, 0);
+}
+
+int unsetenv(const char* name) {
+    return environment_set(name, "", 1);
+}
+
 int open(const char* path, u32 flags) {
     return syscall(KOS_SYS_OPEN, (u32)path, flags, 0, 0);
 }
