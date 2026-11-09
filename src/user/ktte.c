@@ -7,13 +7,36 @@ static const char* names[] = { "Black",      "Blue",           "Green",        "
                                "Dark gray",  "Bright blue",    "Bright green", "Bright cyan",
                                "Bright red", "Bright magenta", "Yellow",       "White" };
 
-static const char* roles[] = {
-    "Desktop background", "Panel background", "Panel text", "Panel accents", "Editor text / background",
-    "Selection",          "Popup windows",    "Shadows",    "Gauges"
-};
-static const unsigned char attributes[] = {
-    TUI_DESKTOP, 0x17, 0x1f, 0x1e, 0x07, 0x70, TUI_POPUP, 0x08, 0x2f
-};
+static const char* roles[] = { "Desktop background",
+                               "Panel background",
+                               "Panel text",
+                               "Panel accents",
+                               "Editor text / background",
+                               "Selection",
+                               "Popup windows",
+                               "Shadows",
+                               "Gauges",
+                               "Input fields",
+                               "Buttons",
+                               "Keyboard focus",
+                               "Disabled controls",
+                               "Errors",
+                               "Warnings",
+                               "Success",
+                               "Marked files",
+                               "Directories",
+                               "Window borders",
+                               "Syntax comments",
+                               "Syntax strings",
+                               "Syntax numbers",
+                               "Syntax keywords",
+                               "Visual selection",
+                               "Status text" };
+static const unsigned char attributes[] = { TUI_DESKTOP, 0x17,       0x1f,          0x1e,       0x07,
+                                            0x70,        TUI_POPUP,  0x08,          0x2f,       TUI_INPUT,
+                                            TUI_BUTTON,  TUI_FOCUS,  TUI_DISABLED,  TUI_ERROR,  TUI_WARNING,
+                                            TUI_SUCCESS, TUI_MARKED, TUI_DIRECTORY, TUI_BORDER, TUI_COMMENT,
+                                            TUI_STRING,  TUI_NUMBER, TUI_KEYWORD,   TUI_VISUAL, TUI_STATUS };
 
 static int choose_color(int value, int background) {
     if (!tui_modal_begin(background ? "Choose background color" : "Choose text color", 64, 21)) {
@@ -116,12 +139,12 @@ int main(int argc, char** argv) {
         tui_bar(0, "KTTE - Kintsugi TUI Theme Editor");
         if (simple) {
             tui_text(2, 2, "Simple mode: select an interface element", 0x1e);
-            for (u32 i = 0; i < sizeof(attributes); ++i) {
-                tui_choice_row(1, 4 + i, 46, roles[i], i == selected, 0x1f);
-                tui_sample(32, 4 + i, " Aa 123 ", colors[attributes[i]]);
+            tui_list_key(0, &selected, &top, sizeof(attributes), 16);
+            for (u32 i = top; i < sizeof(attributes) && i < top + 16; ++i) {
+                tui_choice_row(1, 4 + i - top, 46, roles[i], i == selected, 0x1f);
+                tui_sample(36, 4 + i - top, " Aa 123 ", colors[attributes[i]]);
             }
-            tui_text(2, 15, "Enter: choose color by name and sample", 0x1e);
-            tui_text(2, 16, "Tab: text / background | m: advanced mode", 0x1f);
+            tui_scrollbar(47, 4, 16, top, 16, sizeof(attributes));
         } else {
             tui_text(2, 2, "Source  Target  Sample   Role / attribute", 0x1e);
             tui_list_key(0, &selected, &top, 256, 16);
@@ -189,6 +212,11 @@ int main(int argc, char** argv) {
             }
             colors[TUI_POPUP] = 0x70;
             colors[TUI_DESKTOP] = 0x17;
+            static const unsigned char defaults[] = { 7,    0x70, 0x70, 8,    0x4f, 0x1e, 0x2f, 0x1e,
+                                                      0x1f, 0x1f, 8,    0x0a, 0x0e, 0x0b, 0x70, 0x70 };
+            for (u32 i = 0; i < sizeof(defaults); ++i) {
+                colors[TUI_INPUT + i] = defaults[i];
+            }
             path[0] = 0;
             dirty = 1;
             status = "New identity palette";

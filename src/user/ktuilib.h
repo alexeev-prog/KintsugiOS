@@ -15,7 +15,18 @@ enum {
     TUI_SCROLL_UP,
     TUI_SCROLL_DOWN,
     TUI_PAGE_UP,
-    TUI_PAGE_DOWN
+    TUI_PAGE_DOWN,
+    TUI_INSERT,
+    TUI_F1,
+    TUI_F2,
+    TUI_F3,
+    TUI_F4,
+    TUI_F5,
+    TUI_F6,
+    TUI_F7,
+    TUI_F8,
+    TUI_F9,
+    TUI_F10
 };
 
 typedef kos_stat tui_stat;
@@ -24,6 +35,50 @@ typedef kos_dirent tui_entry;
 /* Dedicated popup role; older themes inherit their selection color. */
 #define TUI_POPUP 0x71
 #define TUI_DESKTOP 0x72
+
+/* Semantic slots; omitted mappings inherit the corresponding legacy color. */
+enum {
+    TUI_INPUT = 0x73,
+    TUI_BUTTON,
+    TUI_FOCUS,
+    TUI_DISABLED,
+    TUI_ERROR,
+    TUI_WARNING,
+    TUI_SUCCESS,
+    TUI_MARKED,
+    TUI_DIRECTORY,
+    TUI_BORDER,
+    TUI_COMMENT,
+    TUI_STRING,
+    TUI_NUMBER,
+    TUI_KEYWORD,
+    TUI_VISUAL,
+    TUI_STATUS
+};
+
+typedef struct {
+    char* text;
+    u32 capacity, cursor;
+} tui_input;
+
+int tui_input_key(tui_input* input, int key);
+void tui_input_draw(tui_input* input, int x, int y, int width, int focused);
+void tui_button(int x, int y, int width, const char* label, int focused, int enabled);
+void tui_checkbox(int x, int y, const char* label, int checked, int focused);
+void tui_radio(int x, int y, const char* label, int checked, int focused);
+/* Space toggles a checkbox; arrows select a radio member. */
+int tui_toggle_key(int key, int* checked);
+int tui_focus_key(int key, u32* focus, u32 count);
+void tui_list_draw(
+    int x,
+    int y,
+    int width,
+    int height,
+    const char* const* items,
+    u32 count,
+    u32 selected,
+    u32 top,
+    int focused);
 /* Normalize a short name or path to /ETC/THEMES/NAME.THM; ASCII 8.3 only. */
 int tui_theme_path(char out[256], const char* name);
 

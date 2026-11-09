@@ -7,8 +7,13 @@
 #define HISTORY 8
 static char* undo[HISTORY];
 static u32 undo_length[HISTORY], undo_cursor[HISTORY], undos;
+static char* redo[HISTORY];
+static u32 redo_length[HISTORY], redo_cursor[HISTORY], redos;
 
 static void remember(const char* text, u32 length, u32 cursor) {
+    while (redos) {
+        free(redo[--redos]);
+    }
     char* snapshot = malloc(length + 1);
     if (!snapshot) {
         return;
@@ -28,6 +33,39 @@ static void remember(const char* text, u32 length, u32 cursor) {
     undo[undos] = snapshot;
     undo_length[undos] = length;
     undo_cursor[undos++] = cursor;
+}
+
+#include "syntax.h"
+#include "vikmode.h"
+static vik_state vim;
+
+static void history_swap(char* text, u32* length, u32* cursor, int forward) {
+    char** source = forward ? redo : undo;
+    char** target = forward ? undo : redo;
+    u32 *sizes = forward ? redo_length : undo_length, *positions = forward ? redo_cursor : undo_cursor;
+    u32 *out_sizes = forward ? undo_length : redo_length,
+        *out_positions = forward ? undo_cursor : redo_cursor;
+    u32 *count = forward ? &redos : &undos, *out_count = forward ? &undos : &redos;
+    if (!*count || *out_count >= HISTORY) {
+        return;
+    }
+    char* copy = malloc(*length + 1);
+    if (!copy) {
+        return;
+    }
+    for (u32 i = 0; i < *length; ++i) {
+        copy[i] = text[i];
+    }
+    target[*out_count] = copy;
+    out_sizes[*out_count] = *length;
+    out_positions[(*out_count)++] = *cursor;
+    --*count;
+    *length = sizes[*count];
+    *cursor = positions[*count];
+    for (u32 i = 0; i < *length; ++i) {
+        text[i] = source[*count][i];
+    }
+    free(source[*count]);
 }
 
 static int find(const char* text, u32 length, const char* query, u32 start) {
@@ -74,7 +112,8 @@ int main(int argc, char** argv) {
     tui_load_settings("/ETC/KUNED.CFG", settings, sizeof(settings));
     settings[0] = !!settings[0];
     settings[1] = !!settings[1];
-    const char* status = "Ctrl+S save | Ctrl+Q quit | arrows/Home/End edit";
+    const char* status =
+        VIK ? "VIK | :w save :q quit :q! discard" : "Ctrl+S save | Ctrl+Q quit | arrows/Home/End edit";
     if (*path) {
         tui_stat stat;
         int result = tui_stat_path(path, &stat);
@@ -132,7 +171,7 @@ int main(int argc, char** argv) {
             tui_text(78, 0, "*", 0x70);
         }
         u32 r = 0, c = 0;
-        int comment = 0, string = 0, escaped = 0;
+        syntax_state syntax = { .language = syntax_language(path) };
         u32 line = 1;
         if (settings[0] && !top) {
             tui_number(0, 1, line, 0x08);
@@ -140,8 +179,19 @@ int main(int argc, char** argv) {
         int row_number_drawn = !top;
         for (u32 i = 0; i < length && r < top + 22; ++i) {
             unsigned char ch = text[i];
+            unsigned char ink = syntax_color(&syntax, text, length, i, color);
+            if (VIK && vim.visual) {
+                u32 a = vim.anchor < cursor ? vim.anchor : cursor;
+                u32 b = vim.anchor > cursor ? vim.anchor : cursor;
+                if (vim.linewise) {
+                    a = vik_start(text, a);
+                    b = vik_end(text, length, b);
+                }
+                if (i >= a && i <= b) {
+                    ink = TUI_VISUAL;
+                }
+            }
             if (ch == '\n') {
-                comment = string = escaped = 0;
                 ++r;
                 ++line;
                 c = 0;
@@ -157,31 +207,17 @@ int main(int argc, char** argv) {
                     row_number_drawn = 1;
                 }
                 char s[2] = { ch >= 32 && ch < 127 ? ch : '.', 0 };
-                unsigned char ink = color;
-                if (comment) {
-                    ink = (color & 0xf0) | 8;
-                } else if (string || ch == '"') {
-                    ink = (color & 0xf0) | 10;
-                } else if (ch >= '0' && ch <= '9') {
-                    ink = (color & 0xf0) | 14;
-                } else if (ch == '(' || ch == ')' || ch == '{' || ch == '}') {
-                    ink = (color & 0xf0) | 11;
-                }
                 tui_text(c + gutter, r - top + 1, s, ink);
             }
-            if (!string && ch == ';') {
-                comment = 1;
-            }
-            if (!comment && ch == '"' && !escaped) {
-                string = !string;
-            }
-            escaped = string && ch == '\\' && !escaped;
             if (++c == width) {
                 ++r;
                 c = 0;
             }
         }
-        tui_bar(23, readonly ? "Read-only viewer | Ctrl+F find | Ctrl+Q quit" : status);
+        tui_bar(
+            23,
+            readonly ? (VIK ? "Read-only | / find :q quit" : "Read-only viewer | Ctrl+F find | Ctrl+Q quit")
+                     : status);
         tui_text(38, 23, "Ln", 0x70);
         tui_number(41, 23, logical_line, 0x70);
         tui_text(48, 23, "Col", 0x70);
@@ -194,11 +230,19 @@ int main(int argc, char** argv) {
             tui_text(1, 0, *path ? path : "[No Name]", 0x70);
             tui_bar(
                 24,
-                insert ? "-- INSERT -- | Esc normal | ^S save"
-                       : "-- NORMAL -- | hjkl move i/a/o insert x delete u undo / find n next : command");
+                insert           ? "-- INSERT -- | Esc normal | :w save in normal mode"
+                    : vim.visual ? "-- VISUAL -- | motions select | y yank d delete c change | Esc cancel"
+                                 : "-- NORMAL -- | hjkl i/a/o | d/c/y+motion | v/V p/P u ^R | / :w :q");
         }
         tui_present(col + gutter, row - top + 1);
         int key = tui_key(1);
+        if (VIK && !insert && key == 18) {
+            if (!readonly) {
+                history_swap(text, &length, &cursor, 1);
+                dirty = 1;
+            }
+            continue;
+        }
         if (VIK && key > 0 && key < 32 && key != 27 && key != '\n' && key != '\t' && key != 8) {
             continue;
         }
@@ -210,6 +254,9 @@ int main(int argc, char** argv) {
             continue;
         }
         if (VIK && !insert) {
+            if (vik_key(&vim, text, &length, &cursor, key, readonly, &insert, &dirty)) {
+                continue;
+            }
             if (key != 'g' && key != 'd') {
                 pending = 0;
             }
@@ -401,13 +448,7 @@ int main(int argc, char** argv) {
             }
         } else if (key == 26 && !readonly) {
             if (undos) {
-                --undos;
-                length = undo_length[undos];
-                cursor = undo_cursor[undos];
-                for (u32 i = 0; i < length; ++i) {
-                    text[i] = undo[undos][i];
-                }
-                free(undo[undos]);
+                history_swap(text, &length, &cursor, 0);
                 dirty = 1;
                 status = "Undo";
             } else {
@@ -588,6 +629,12 @@ int main(int argc, char** argv) {
     free(text);
     while (undos) {
         free(undo[--undos]);
+    }
+    while (redos) {
+        free(redo[--redos]);
+    }
+    for (int i = 0; i < 27; ++i) {
+        free(vim.registers[i]);
     }
     return 0;
 }

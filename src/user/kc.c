@@ -6,16 +6,89 @@ typedef struct {
     char directory[256];
     char previous[256];
     u32 selected, top;
+    char marked[ENTRIES][13];
+    u32 marks;
 } tab;
 
 typedef struct {
     tab tabs[TABS];
     u32 active, count, entries_count;
     tui_entry entries[ENTRIES];
+    char loaded_directory[256];
 } panel;
 
 static panel panels[2];
 static unsigned char settings[2] = { 1, 1 }; /* sizes, directories first */
+
+static int same(const char* a, const char* b) {
+    while (*a && *a == *b) {
+        ++a;
+        ++b;
+    }
+    return *a == *b;
+}
+
+static int marked(tab* t, const char* name) {
+    for (u32 i = 0; i < t->marks; ++i) {
+        if (same(t->marked[i], name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int is_parent(const tui_entry* e) {
+    return same(e->name, "..");
+}
+
+static void toggle(tab* t, const tui_entry* e) {
+    if (is_parent(e)) {
+        return;
+    }
+    int at = marked(t, e->name);
+    if (at >= 0) {
+        --t->marks;
+        tui_copy(t->marked[at], t->marked[t->marks], 13);
+    } else if (t->marks < ENTRIES) {
+        tui_copy(t->marked[t->marks++], e->name, 13);
+    }
+}
+
+static const char* batch(panel* p, panel* other, int key) {
+    tab* t = &p->tabs[p->active];
+    if (!p->entries_count) {
+        return "Empty directory";
+    }
+    if (!tui_confirm(
+            key == 'd'       ? "Delete marked entries (or current entry)?"
+                : key == 'm' ? "Move marked entries to other panel?"
+                             : "Copy marked entries to other panel?")) {
+        return "Cancelled";
+    }
+    u32 failed = 0, done = 0;
+    for (u32 i = 0; i < p->entries_count; ++i) {
+        tui_entry* e = &p->entries[i];
+        if (is_parent(e) || (t->marks ? marked(t, e->name) < 0 : i != t->selected)) {
+            continue;
+        }
+        char source[256], dest[256];
+        tui_path(source, t->directory, e->name);
+        tui_path(dest, other->tabs[other->active].directory, e->name);
+        int result = key == 'd' ? syscall(11, (u32)source, e->stat.directory ? 2 : 1, 0, 0)
+                                : syscall(12, (u32)source, (u32)dest, key == 'm', 0);
+        if (result) {
+            ++failed;
+        } else {
+            ++done;
+        }
+    }
+    t->marks = 0;
+    if (failed) {
+        return done ? "Partially completed; failures: existing target/nonempty directory/I/O"
+                    : "Failed: existing target, nonempty directory, permissions or I/O";
+    }
+    return done ? "Group operation completed" : "No actionable entries";
+}
 
 static int compare(const tui_entry* a, const tui_entry* b) {
     if (settings[1] && a->stat.directory != b->stat.directory) {
@@ -33,6 +106,11 @@ static int compare(const tui_entry* a, const tui_entry* b) {
 }
 
 static int refresh(panel* p) {
+    tab* current = &p->tabs[p->active];
+    if (!same(p->loaded_directory, current->directory)) {
+        current->marks = 0;
+        tui_copy(p->loaded_directory, current->directory, 256);
+    }
     u32 cursor = 0;
     int result = 0;
     p->entries_count = 0;
@@ -81,12 +159,19 @@ static void draw(panel* p, int x, int active) {
     tui_textn(x + 1, 3, t->directory, 38, 0x1e);
     for (u32 i = t->top; i < p->entries_count && i < t->top + 18; ++i) {
         int y = 4 + i - t->top;
-        unsigned char color = active && i == t->selected ? 0x70 : 0x17;
-        tui_fill(x + 1, y, 38, 1, color);
-        tui_text(x + 2, y, p->entries[i].stat.directory ? "/" : " ", color);
-        tui_textn(x + 3, y, p->entries[i].name, 13, color);
+        int mark = marked(t, p->entries[i].name) >= 0;
+        unsigned char color = mark ? TUI_MARKED : p->entries[i].stat.directory ? TUI_DIRECTORY : 0x17;
+        tui_choice_row(x + 1, y, 37, "", active && i == t->selected, color);
+        tui_text(
+            x + 3,
+            y,
+            mark                               ? "*"
+                : p->entries[i].stat.directory ? "/"
+                                               : " ",
+            active && i == t->selected ? 0x70 : color);
+        tui_textn(x + 4, y, p->entries[i].name, 13, active && i == t->selected ? 0x70 : color);
         if (settings[0]) {
-            tui_number(x + 26, y, p->entries[i].stat.size, color);
+            tui_number(x + 26, y, p->entries[i].stat.size, active && i == t->selected ? 0x70 : color);
         }
     }
     tui_scrollbar(x + 38, 4, 18, t->top, 18, p->entries_count);
@@ -103,7 +188,7 @@ int main(int argc, char** argv) {
         syscall(4, (u32)panels[i].tabs[0].directory, 256, 0, 0);
     }
     int active = 0;
-    const char* status = "Tab panel | T new tab | [ ] switch tab | X close tab | O settings";
+    const char* status = "Tab panel | Ins/Space mark | +/- all/none | T new tab | [ ] tabs";
     for (;;) {
         for (int i = 0; i < 2; ++i) {
             if (refresh(&panels[i]) < 0) {
@@ -115,9 +200,13 @@ int main(int argc, char** argv) {
         draw(&panels[0], 0, active == 0);
         draw(&panels[1], 40, active == 1);
         tui_bar(23, status);
-        tui_bar(24, "Enter edit | V view | / path | R rename | C copy M move D delete N mkdir Q quit");
+        tui_bar(24, "1 Help 2 Info 3 View 4 Edit 5 Copy 6 Move 7 Mkdir 8 Delete 9 Menu 10 Quit");
         tui_present(79, 24);
         int key = tui_key(1);
+        static const int functions[] = { 'h', 'i', 'v', '\n', 'c', 'm', 'n', 'd', 'o', 'q' };
+        if (key >= TUI_F1 && key <= TUI_F10) {
+            key = functions[key - TUI_F1];
+        }
         panel* p = &panels[active];
         tab* t = &p->tabs[p->active];
         if (key == 'q' || key == 27) {
@@ -127,8 +216,22 @@ int main(int argc, char** argv) {
             active ^= 1;
             continue;
         }
-        if (key == 'h') {
-            tui_message("Commander help", "Copy/move targets other panel. Enter opens files in KUNED.");
+        if (key == TUI_INSERT || key == ' ') {
+            if (p->entries_count) {
+                toggle(t, &p->entries[t->selected]);
+                tui_list_key(TUI_DOWN, &t->selected, &t->top, p->entries_count, 18);
+            }
+        } else if (key == '+' || key == '-') {
+            t->marks = 0;
+            if (key == '+') {
+                for (u32 i = 0; i < p->entries_count; ++i) {
+                    toggle(t, &p->entries[i]);
+                }
+            }
+        } else if (key == 'c' || key == 'm' || key == 'd') {
+            status = batch(p, &panels[active ^ 1], key);
+        } else if (key == 'h') {
+            tui_message("Commander help", "F1-F10 actions; Ins marks; +/- all/none; C/M/D act on marks.");
         } else if (key == '/') {
             char destination[256];
             tui_stat st;
@@ -223,18 +326,6 @@ int main(int argc, char** argv) {
             } else if (key == 'n' && tui_prompt("New directory:", input, sizeof(input))) {
                 tui_path(dest, t->directory, input);
                 status = syscall(11, (u32)dest, 0, 0, 0) ? "mkdir failed" : "Created";
-            } else if (key == 'd' && e && tui_confirm("Delete selected entry?")) {
-                status = syscall(11, (u32)source, e->stat.directory ? 2 : 1, 0, 0)
-                    ? "Delete failed (directory must be empty)"
-                    : "Deleted";
-            } else if ((key == 'c' || key == 'm') && e) {
-                panel* other = &panels[active ^ 1];
-                tui_path(dest, other->tabs[other->active].directory, e->name);
-                if (tui_confirm(key == 'c' ? "Copy to other panel?" : "Move to other panel?")) {
-                    status = syscall(12, (u32)source, (u32)dest, key == 'm', 0)
-                        ? "Failed: no overwrite or recursive directory copy"
-                        : "Done";
-                }
             }
         }
     }

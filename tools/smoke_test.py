@@ -478,6 +478,10 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         command("vik-content")
         monitor("sendkey esc 10")
         time.sleep(0.1)
+        for key in ("g", "g", "y", "y", "p", "u", "ctrl-r", "u", "ctrl-q"):
+            monitor(f"sendkey {key} 10")
+            time.sleep(0.15)
+        wait_for("-- NORMAL --")
         command(":wq")
         command("cat /vik.txt")
         wait_for("vik-content")
