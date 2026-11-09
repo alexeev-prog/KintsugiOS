@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
             column = 0;
         }
     }
-    u32 top = 0, selected = 0;
+    u32 top = 0;
     for (;;) {
         tui_clear(0x07);
         tui_bar(0, argc > 1 ? argv[1] : "PAGER - standard input");
@@ -56,13 +56,7 @@ int main(int argc, char** argv) {
         if (key == 'q' || key == 27) {
             break;
         }
-        u32 maximum = lines > 23 ? lines - 23 : 0;
-        if (key == ' ') {
-            key = TUI_PAGE_DOWN;
-        }
-        selected = top;
-        tui_list_key(key, &selected, &top, maximum + 1, 23);
-        top = selected;
+        tui_document_key(key, &top, lines, 23);
     }
     free(data);
     return 0;

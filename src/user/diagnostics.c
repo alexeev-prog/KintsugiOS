@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
         tui_window_draw(&applications);
         tui_text(11, 7, "1 Editor     2 Commander     3 Resource monitor", 0x1f);
         tui_text(11, 10, "4 Processes 5 Disks 6 Vik 7 Themes 8 Memory", 0x1f);
-        tui_text(11, 14, "Shared panels, modal dialogs, settings and gauges", 0x1e);
+        tui_text(11, 14, "9 Hieroglyph documents | H widget demo", 0x1e);
         tui_bar(23, "Choose application by number | Enter opens application menu");
 #endif
         tui_bar(
@@ -153,20 +153,23 @@ int main(int argc, char** argv) {
                                         : "FAT12 allocation and directory structure are consistent");
         }
 #elif APP == 3
-        const char* programs[] = { "KUNED", "KC", "KBSM", "KPROCM", "KDISKMAN", "VIK", "KTTE", "KMEMMAN" };
-        const char* paths[] = { "/BIN/KUNED.ELF",    "/BIN/KC.ELF",  "/BIN/KBSM.ELF", "/BIN/KPROCM.ELF",
-                                "/BIN/KDISKMAN.ELF", "/BIN/VIK.ELF", "/BIN/KTTE.ELF", "/BIN/KMEMMAN.ELF" };
+        const char* programs[] = { "KUNED", "KC",   "KBSM",    "KPROCM", "KDISKMAN",
+                                   "VIK",   "KTTE", "KMEMMAN", "HIERO" };
+        const char* paths[] = { "/BIN/KUNED.ELF",  "/BIN/KC.ELF",       "/BIN/KBSM.ELF",
+                                "/BIN/KPROCM.ELF", "/BIN/KDISKMAN.ELF", "/BIN/VIK.ELF",
+                                "/BIN/KTTE.ELF",   "/BIN/KMEMMAN.ELF",  "/BIN/HIERO.ELF" };
         if (key == '\n') {
-            const char* items[] = { "Editor", "Commander", "Resource monitor", "Processes",
-                                    "Disks",  "Vik",       "Theme editor",     "Memory manager" };
-            int choice = tui_menu("Launch application", items, 8, selected);
+            const char* items[] = { "Editor",       "Commander",      "Resource monitor",
+                                    "Processes",    "Disks",          "Vik",
+                                    "Theme editor", "Memory manager", "Hieroglyph documents" };
+            int choice = tui_menu("Launch application", items, 9, selected);
             if (choice >= 0) {
                 selected = choice;
                 key = '1' + choice;
             }
         }
         (void)top;
-        if (key >= '1' && key <= '8') {
+        if (key >= '1' && key <= '9') {
             char* args[] = { (char*)programs[key - '1'], 0 };
             int pid = spawn(paths[key - '1'], 1, args);
             if (pid < 0 || wait(pid)) {

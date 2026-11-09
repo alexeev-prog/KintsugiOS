@@ -32,6 +32,24 @@ enum {
 typedef kos_stat tui_stat;
 typedef kos_dirent tui_entry;
 
+/* Bounded multiline editor. Capacity excludes the required trailing NUL byte.
+ * Caller owns text[capacity+1]; widget owns up to eight undo/redo snapshots. */
+typedef struct {
+    char* text;
+    u32 length, capacity, cursor, top;
+    char* history[8];
+    u32 lengths[8], cursors[8], history_count, history_position;
+} tui_editor;
+
+void tui_editor_destroy(tui_editor* editor);
+/* 1 changed, 0 navigation/unhandled, -1 full/allocation failure. */
+int tui_editor_key(tui_editor* editor, int key);
+void tui_editor_draw(tui_editor* editor, int x, int y, int width, int height);
+int tui_document_key(int key, u32* top, u32 total, u32 visible);
+/* Same layout pass measures and draws: no separate wrapping implementation.
+ * Returns total rendered rows; height=0 measures without drawing. */
+u32 tui_markdown(const char* text, u32 length, int x, int y, int width, int height, u32 top);
+
 /* Dedicated popup role; older themes inherit their selection color. */
 #define TUI_POPUP 0x71
 #define TUI_DESKTOP 0x72

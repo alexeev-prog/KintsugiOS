@@ -1,5 +1,9 @@
 # KintsugiOS
 
+**Hieroglyph** — TUI для чтения и написания Markdown-документов:
+`hieroglyph /HOME/NOTE.MD`, переключение режимов F3.
+[Управление и формат](docs/HIEROGLYPH_RU.md).
+
 <div align="center">
   <h3>Минималистичная операционная 32 разрядная система с монолитным ядром и собственным загрузчиком на (N)ASM и GCC 15</h3>
   <br>
