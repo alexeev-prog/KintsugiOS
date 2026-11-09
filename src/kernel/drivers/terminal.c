@@ -66,9 +66,23 @@ static void terminal_newline(void) {
     }
 
     term_state.dirty = 1;
+    if (term_state.auto_scroll) {
+        terminal_scroll_to_bottom();
+    }
 }
 
 void terminal_putchar(char c) {
+    /* Move only: line editors erase explicitly by writing spaces. */
+    if (c == '\b') {
+        if (term_state.cursor_x) {
+            --term_state.cursor_x;
+        } else if (term_state.cursor_y) {
+            --term_state.cursor_y;
+            term_state.cursor_x = TERMINAL_WIDTH - 1;
+        }
+        term_state.dirty = 1;
+        return;
+    }
     if (c == '\n') {
         terminal_newline();
         return;
@@ -100,13 +114,7 @@ void terminal_putchar(char c) {
     term_state.dirty = 1;
 
     if (term_state.auto_scroll) {
-        u32 visible_bottom = term_state.scroll_offset + SCREEN_HEIGHT;
-        if (term_state.cursor_y >= visible_bottom - 2) {
-            term_state.scroll_offset++;
-            if (term_state.scroll_offset > TERMINAL_HEIGHT - SCREEN_HEIGHT) {
-                term_state.scroll_offset = TERMINAL_HEIGHT - SCREEN_HEIGHT;
-            }
-        }
+        terminal_scroll_to_bottom();
     }
 }
 
@@ -265,7 +273,7 @@ void terminal_clear_line(u32 line) {
 
 /* Низкоуровневая отрисовка */
 static void terminal_direct_render(void) {
-    u8* vidmem = (u8*)VIDEO_ADDRESS;
+    volatile u16* vidmem = (volatile u16*)VIDEO_ADDRESS;
 
     u32 max_scroll = 0;
     if (TERMINAL_HEIGHT > SCREEN_HEIGHT) {
@@ -293,8 +301,10 @@ static void terminal_direct_render(void) {
             }
 
             // Записываем напрямую в видеопамять
-            vidmem[offset] = character;
-            vidmem[offset + 1] = attribute;
+            u16 cell = (u8)character | ((u16)(u8)attribute << 8);
+            if (vidmem[offset / 2] != cell) {
+                vidmem[offset / 2] = cell;
+            }
         }
     }
 

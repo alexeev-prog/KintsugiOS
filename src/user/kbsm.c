@@ -4,6 +4,7 @@
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
+    int paused = 0, detail = 0;
     for (;;) {
         ktui_stats stats;
         if (syscall(9, (u32)&stats, 0, 0, 0)) {
@@ -11,6 +12,8 @@ int main(int argc, char** argv) {
         }
         tui_clear(0x17);
         tui_bar(0, "kbsm - Kintsugi Basic System Monitor");
+        tui_window metrics = { 1, 1, 78, 22, 1, detail ? "Memory accounting" : "System resources" };
+        tui_window_draw(&metrics);
         const char* labels[] = { "Usable RAM (KiB)",         "Free physical pages",
                                  "Allocated physical pages", "Kernel heap used (bytes)",
                                  "Kernel heap free (bytes)", "Kernel heap committed (bytes)" };
@@ -27,10 +30,24 @@ int main(int argc, char** argv) {
         if (count >= 0) {
             tui_number(16, 19, count, 0x1e);
         }
-        tui_text(3, 21, "Physical allocation gauge; CPU percentage is not measured.", 0x1f);
-        tui_bar(24, "Live memory statistics | Q / Esc quit");
+        tui_text(
+            3,
+            21,
+            detail ? "Pages are 4096 bytes. Heap is kernel-only; PMM includes userspace."
+                   : "Physical allocation gauge; CPU percentage is not measured.",
+            0x1f);
+        tui_bar(
+            24,
+            paused ? "Paused | Space resume | D details | Q / Esc quit"
+                   : "Live memory statistics | Space pause | D details | Q / Esc quit");
         tui_present(79, 24);
-        int key = tui_key(2);
+        int key = tui_key(paused ? 1 : 2);
+        if (key == ' ') {
+            paused = !paused;
+        }
+        if (key == 'd') {
+            detail = !detail;
+        }
         if (key == 'q' || key == 'Q' || key == 27 || key == 3) {
             break;
         }

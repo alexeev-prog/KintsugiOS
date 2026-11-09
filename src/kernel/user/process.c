@@ -1,8 +1,8 @@
 #include "process.h"
 
+#include "../../user/shellabi.h"
 #include "../../user/sysabi.h"
 #include "../../user/tuiabi.h"
-#include "../../user/shellabi.h"
 #include "../cpu/idt.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/terminal.h"
@@ -37,6 +37,8 @@ typedef struct {
     fd_table_t descriptors;
     const void* waiting_on;
     u32 group;
+    int shell;
+    char name[32];
     char cwd[VFS_PATH_MAX];
 } process_t;
 
@@ -370,6 +372,24 @@ static int process_load(const char* path, int argc, char** argv) {
         goto cleanup;
     }
     current->entry = entry;
+    const char* basename = path;
+    for (const char* p = path; *p; ++p) {
+        if (*p == '/') {
+            basename = p + 1;
+        }
+    }
+    u32 name_length = strlen(basename);
+    if (name_length >= sizeof(current->name)) {
+        name_length = sizeof(current->name) - 1;
+    }
+    memcpy(current->name, basename, name_length);
+    for (u32 i = 0; i < name_length; ++i) {
+        current->name[i] = toupper(current->name[i]);
+    }
+    current->name[name_length] = 0;
+    /* Capability is assigned by the loader, never by a user request. */
+    char executable[VFS_PATH_MAX];
+    current->shell = !vfs_normalize(path, executable) && !strcmp(executable, "/BIN/SHELL.ELF");
     current->stack = sp;
     u32* context = (u32*)((u32)current->kernel_stack + 16384);
     *--context = (u32)process_start;
@@ -400,7 +420,7 @@ static void reap(process_t* p) {
 }
 
 int process_run(const char* path, int argc, char** argv) {
-    if (current && (current->pid == init_pid || current->pid == shell_pid)) {
+    if (current && (current->pid == init_pid || current->shell)) {
         char* paths[] = { (char*)path };
         int counts[] = { argc };
         char** args[] = { argv };
@@ -432,8 +452,9 @@ int process_run(const char* path, int argc, char** argv) {
     return result;
 }
 
-int process_pipeline(int count, char** paths, int* argc, char*** argv, const char* output, int append, int background) {
-    if ((current && current->pid != init_pid && current->pid != shell_pid) || count < 1 || count > 8) {
+int process_pipeline(
+    int count, char** paths, int* argc, char*** argv, const char* output, int append, int background) {
+    if ((current && current->pid != init_pid && !current->shell) || count < 1 || count > 8) {
         return VFS_EINVAL;
     }
     __asm__ volatile("cli" ::: "memory");
@@ -562,15 +583,14 @@ void process_jobs(void) {
     for (int i = 1; i < PROCESS_MAX; ++i) {
         process_t* p = &processes[i];
         if (p->state && current && p->parent == current->pid) {
-            printf("%d %d %s %d\n", p->pid, p->group,
-                   p->state == ZOMBIE ? "done" : "running", p->status);
+            printf("%d %d %s %d\n", p->pid, p->group, p->state == ZOMBIE ? "done" : "running", p->status);
         }
     }
 }
 
 int process_wait_jobs(void) {
     int status = 0;
-    if (!current || (current->pid != init_pid && current->pid != shell_pid)) {
+    if (!current || (current->pid != init_pid && !current->shell)) {
         return VFS_EINVAL;
     }
     __asm__ volatile("cli" ::: "memory");
@@ -641,20 +661,33 @@ void syscall_dispatch(syscall_regs_t* r) {
     char path[VFS_PATH_MAX];
     switch (r->eax) {
         case KOS_SYS_SESSION:
-            if (current->pid != shell_pid && current->pid != init_pid) break;
-            if (r->ebx == 1 && current->pid == shell_pid) log_write("[INFO] shell ready\n");
+            if (!current->shell && current->pid != init_pid) {
+                break;
+            }
+            if (r->ebx == 1 && current->pid == shell_pid) {
+                log_write("[INFO] shell ready\n");
+            }
             for (int i = 1; i < PROCESS_MAX; ++i) {
-                if (processes[i].state == ZOMBIE && processes[i].parent == current->pid) reap(&processes[i]);
+                if (processes[i].state == ZOMBIE && processes[i].parent == current->pid) {
+                    reap(&processes[i]);
+                }
             }
             r->eax = 0;
             return;
         case KOS_SYS_LAUNCH: {
-            if (current->pid != shell_pid || !user_range(r->ebx, sizeof(kos_launch), 0)) break;
+            if (!current->shell || !user_range(r->ebx, sizeof(kos_launch), 0)) {
+                break;
+            }
             kos_launch request = *(kos_launch*)r->ebx;
-            if (!request.count || request.count > 8) break;
+            if (!request.count || request.count > 8) {
+                break;
+            }
             /* Copy all user pointers before process_load changes current. */
             char (*strings)[VFS_PATH_MAX] = kmalloc(265 * VFS_PATH_MAX);
-            if (!strings) { r->eax = VFS_ENOMEM; return; }
+            if (!strings) {
+                r->eax = VFS_ENOMEM;
+                return;
+            }
             char* paths[8];
             char* args[8][32];
             char** argv[8];
@@ -670,19 +703,42 @@ void syscall_dispatch(syscall_regs_t* r) {
                     valid = user_path((u32)request.argv[i][j], args[i][j]);
                 }
             }
-            if (valid && request.output) valid = user_path((u32)request.output, strings[264]);
-            r->eax = valid ? process_pipeline(request.count, paths, argc, argv,
-                request.output ? strings[264] : NULL, !!request.append, !!request.background) : VFS_EINVAL;
+            if (valid && request.output) {
+                valid = user_path((u32)request.output, strings[264]);
+            }
+            r->eax = valid ? process_pipeline(
+                                 request.count,
+                                 paths,
+                                 argc,
+                                 argv,
+                                 request.output ? strings[264] : NULL,
+                                 !!request.append,
+                                 !!request.background)
+                           : VFS_EINVAL;
             kfree(strings);
             return;
         }
         case KOS_SYS_BUILTIN: {
-            if (current->pid != shell_pid) break;
-            if (r->ebx == 1) { process_jobs(); r->eax = 0; return; }
-            if (r->ebx == 2) { r->eax = process_wait_jobs(); return; }
-            if (!r->ecx || r->ecx > 32 || !user_range(r->edx, r->ecx * 4, 0)) break;
+            if (!current->shell) {
+                break;
+            }
+            if (r->ebx == 1) {
+                process_jobs();
+                r->eax = 0;
+                return;
+            }
+            if (r->ebx == 2) {
+                r->eax = process_wait_jobs();
+                return;
+            }
+            if (!r->ecx || r->ecx > 32 || !user_range(r->edx, r->ecx * 4, 0)) {
+                break;
+            }
             char (*args)[VFS_PATH_MAX] = kmalloc(32 * VFS_PATH_MAX);
-            if (!args) { r->eax = VFS_ENOMEM; return; }
+            if (!args) {
+                r->eax = VFS_ENOMEM;
+                return;
+            }
             char* argv[32];
             int valid = 1;
             for (u32 i = 0; valid && i < r->ecx; ++i) {
@@ -695,7 +751,10 @@ void syscall_dispatch(syscall_regs_t* r) {
                 __asm__ volatile("sti" ::: "memory");
                 for (u32 i = 0; shell_command_at(i); ++i) {
                     const shell_command_t* command = shell_command_at(i);
-                    if (!strcmp(command->name, argv[0])) { result = command->run(r->ecx, argv); break; }
+                    if (!strcmp(command->name, argv[0])) {
+                        result = command->run(r->ecx, argv);
+                        break;
+                    }
                 }
                 __asm__ volatile("cli" ::: "memory");
                 vmm_space_switch(space);
@@ -755,13 +814,16 @@ void syscall_dispatch(syscall_regs_t* r) {
             for (int i = 0; i < PROCESS_MAX && n < r->ecx; ++i) {
                 process_t* p = &processes[i];
                 if (p->state) {
-                    out[n++] =
-                        (kos_process_info){ p->pid,
-                                            p->parent,
-                                            p->state,
-                                            p->ticks,
-                                            p->heap_end >= USER_HEAP_BASE ? p->heap_end - USER_HEAP_BASE
-                                                                          : 0 };
+                    kos_process_info info = { .pid = p->pid,
+                                              .parent = p->parent,
+                                              .state = p->state,
+                                              .ticks = p->ticks,
+                                              .group = p->group,
+                                              .heap_bytes = p->heap_end >= USER_HEAP_BASE
+                                                  ? p->heap_end - USER_HEAP_BASE
+                                                  : 0 };
+                    memcpy(info.name, p->name, sizeof(info.name));
+                    out[n++] = info;
                 }
             }
             r->eax = n;
@@ -823,7 +885,9 @@ void syscall_dispatch(syscall_regs_t* r) {
             child->group = parent->group;
             if (parent->pid == init_pid) {
                 child->group = child->pid;
-                if (!strcmp(path, "/BIN/SHELL.ELF")) shell_pid = child->pid;
+                if (!strcmp(path, "/BIN/SHELL.ELF")) {
+                    shell_pid = child->pid;
+                }
             }
             strcpy(child->cwd, parent->cwd);
             current = child;
@@ -938,6 +1002,32 @@ void syscall_dispatch(syscall_regs_t* r) {
                 __asm__ volatile("cli" ::: "memory");
                 process_check_interrupt();
                 key = keyboard_read_event();
+                if (current->shell
+                    && (key == KEY_SCROLL_UP || key == KEY_SCROLL_DOWN || key == KEY_PAGE_UP
+                        || key == KEY_PAGE_DOWN)) {
+                    u32 lines = key == KEY_PAGE_UP || key == KEY_PAGE_DOWN ? 23 : 1;
+                    if (key == KEY_SCROLL_UP || key == KEY_PAGE_UP) {
+                        terminal_scroll_up(lines);
+                    } else {
+                        terminal_scroll_down(lines);
+                        u32 bottom = terminal_get_state()->cursor_y >= SCREEN_HEIGHT
+                            ? terminal_get_state()->cursor_y - SCREEN_HEIGHT + 1
+                            : 0;
+                        if (terminal_get_scroll_offset() > bottom) {
+                            terminal_scroll_to(bottom);
+                        }
+                    }
+                    terminal_refresh();
+                    key = 0;
+                } else if (
+                    current->shell && key
+                    && terminal_get_scroll_offset()
+                        != (terminal_get_state()->cursor_y >= SCREEN_HEIGHT
+                                ? terminal_get_state()->cursor_y - SCREEN_HEIGHT + 1
+                                : 0)) {
+                    terminal_scroll_to_bottom();
+                    terminal_refresh();
+                }
                 if (key || !r->ebx) {
                     break;
                 }

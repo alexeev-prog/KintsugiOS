@@ -9,7 +9,9 @@ int main(int argc, char** argv) {
     for (;;) {
         char* args[] = { "shell", 0 };
         int pid = spawn("/BIN/SHELL.ELF", 1, args);
-        if (pid < 0) return 1;
+        if (pid < 0) {
+            return 1;
+        }
         wait(pid);
         syscall(32, 0, 0, 0, 0);
     }

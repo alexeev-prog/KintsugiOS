@@ -1,3 +1,33 @@
+commit 01843f1488b38abed2e216a2b718831fafc32b4a
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 01:06:57 2026 +0700
+
+    improve TUI, add themes and theme editor, improve programs
+
+commit 9ea4c979e9708c7cc8269400b5658574d0856a27
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 22:38:44 2026 +0700
+
+    update
+
+commit 6d804ff34a9a8fe39aed618b09cb7a74f4f1aa01
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 21:25:27 2026 +0700
+
+    update tools
+
+commit 640b576762c0fada300c4b83474800512ee68b82
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 21:23:06 2026 +0700
+
+    add process io init and improve programs
+
+commit d7d4af04adb3e8fb876cbd47810cfd352dd207c2
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Sun Nov 8 19:20:43 2026 +0700
+
+    update changelog
+
 commit 9e29ea8b8953bb5c1de423d4eb3df6914117def4
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Sun Nov 8 19:06:57 2026 +0700
