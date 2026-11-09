@@ -1,5 +1,6 @@
 #include "process.h"
 
+#include "../../user/envabi.h"
 #include "../../user/shellabi.h"
 #include "../../user/sysabi.h"
 #include "../../user/tuiabi.h"
@@ -40,6 +41,7 @@ typedef struct {
     int shell;
     char name[32];
     char cwd[VFS_PATH_MAX];
+    kos_env_entry* environment;
 } process_t;
 
 static process_t processes[PROCESS_MAX];
@@ -251,6 +253,14 @@ static int user_copy(u32 address, const void* source, u32 length) {
 }
 
 static int process_load(const char* path, int argc, char** argv) {
+    if (!current->environment) {
+        current->environment = kmalloc(KOS_ENV_MAX * sizeof(kos_env_entry));
+        if (!current->environment) {
+            return VFS_ENOMEM;
+        }
+        memset(current->environment, 0, KOS_ENV_MAX * sizeof(kos_env_entry));
+    }
+    log_event("DEBUG", "elf", "Loading %s argc=%d", path, argc);
     if (argc < 1 || argc > 32) {
         return VFS_EINVAL;
     }
@@ -372,6 +382,8 @@ static int process_load(const char* path, int argc, char** argv) {
         goto cleanup;
     }
     current->entry = entry;
+    log_event(
+        "INFO", "elf", "pid=%u loaded %s entry=%x mapped payload=%u bytes", current->pid, path, entry, total);
     const char* basename = path;
     for (const char* p = path; *p; ++p) {
         if (*p == '/') {
@@ -407,6 +419,7 @@ cleanup:
 }
 
 static void reap(process_t* p) {
+    kfree(p->environment);
     fd_destroy(&p->descriptors);
     vmm_space_destroy(p->address_space);
     kfree(p->kernel_stack);
@@ -490,6 +503,9 @@ int process_pipeline(
         current->parent = parent ? parent->pid : 0;
         current->group = group;
         result = process_load(paths[i], argc[i], argv[i]);
+        if (!result && parent) {
+            memcpy(current->environment, parent->environment, KOS_ENV_MAX * sizeof(kos_env_entry));
+        }
         if (!result) {
             fd_clone(&current->descriptors, &setup);
             if (previous >= 0) {
@@ -660,6 +676,54 @@ void syscall_dispatch(syscall_regs_t* r) {
     }
     char path[VFS_PATH_MAX];
     switch (r->eax) {
+        case KOS_SYS_ENV_GET:
+            if (!user_range(r->ebx, KOS_ENV_MAX * sizeof(kos_env_entry), 1)) {
+                break;
+            }
+            memcpy((void*)r->ebx, current->environment, KOS_ENV_MAX * sizeof(kos_env_entry));
+            r->eax = 0;
+            return;
+        case KOS_SYS_ENV_SET: {
+            if (!user_range(r->ebx, sizeof(kos_env_entry), 0)) {
+                break;
+            }
+            kos_env_entry entry = *(kos_env_entry*)r->ebx;
+            u32 n = 0, v = 0;
+            while (n < KOS_ENV_NAME && entry.name[n]) {
+                char c = entry.name[n];
+                if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'
+                      || (n && c >= '0' && c <= '9'))) {
+                    break;
+                }
+                ++n;
+            }
+            while (v < KOS_ENV_VALUE && entry.value[v]) {
+                ++v;
+            }
+            if (!n || n == KOS_ENV_NAME || entry.name[n] || v == KOS_ENV_VALUE) {
+                break;
+            }
+            int slot = -1;
+            for (int i = 0; i < KOS_ENV_MAX; ++i) {
+                if (!strcmp(current->environment[i].name, entry.name)) {
+                    slot = i;
+                    break;
+                }
+                if (slot < 0 && !current->environment[i].name[0]) {
+                    slot = i;
+                }
+            }
+            if (slot < 0) {
+                r->eax = VFS_ENOSPC;
+                return;
+            }
+            current->environment[slot] = entry;
+            if (r->ecx) {
+                memset(&current->environment[slot], 0, sizeof(entry));
+            }
+            r->eax = 0;
+            return;
+        }
         case KOS_SYS_SESSION:
             if (!current->shell && current->pid != init_pid) {
                 break;
@@ -892,13 +956,16 @@ void syscall_dispatch(syscall_regs_t* r) {
             strcpy(child->cwd, parent->cwd);
             current = child;
             int result = process_load(path, r->ecx, argv);
+            if (!result) {
+                memcpy(child->environment, parent->environment, KOS_ENV_MAX * sizeof(kos_env_entry));
+            }
             current = parent;
             if (!result) {
                 fd_clone(&child->descriptors, &parent->descriptors);
             }
             kfree(args);
             if (result) {
-                memset(child, 0, sizeof(*child));
+                reap(child);
                 r->eax = result;
             } else {
                 r->eax = child->pid;

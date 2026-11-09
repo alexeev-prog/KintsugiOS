@@ -6,8 +6,23 @@
 
 #define COM1 0x3f8
 static int serial_ready;
-static char journal[16384];
+static char journal[32768];
 static u32 journal_start, journal_size;
+static u32 sequence;
+extern u32 tick;
+
+void log_event(const char* level, const char* component, const char* format, ...) {
+    char message[384], record[480];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+    u32 flags;
+    __asm__ volatile("pushf; pop %0; cli" : "=r"(flags)::"memory");
+    snprintf(record, sizeof(record), "[%u t=%u] [%s] [%s] %s\n", ++sequence, tick, level, component, message);
+    log_write(record);
+    __asm__ volatile("push %0; popf" ::"r"(flags) : "memory", "cc");
+}
 
 int log_read(u32 offset, char* buffer, u32 capacity) {
     if (offset >= journal_size) {

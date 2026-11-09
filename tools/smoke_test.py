@@ -43,6 +43,12 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             check=True,
         )
     full_disk = "--full-disk" in sys.argv
+    if not full_disk:
+        script = tmp / "DEMO.SH"
+        script.write_text('#!/BIN/SHELL.ELF\n# script regression\necho "script-$1-$#-$DEMO" > /script.txt\nexport DEMO=child\n')
+        subprocess.run(["mcopy", "-i", str(disk), str(script), "::/DEMO.SH"], check=True)
+        script.write_bytes(b'export SOURCED=source-ok\r\necho "${SOURCED}" > /source.txt')
+        subprocess.run(["mcopy", "-i", str(disk), str(script), "::/SOURCE.SH"], check=True)
     if full_disk:
         original = tmp / "SAFE.TXT"
         original.write_bytes(b"original-data\n")
@@ -206,6 +212,8 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
                     ">": "shift-dot",
                     "&": "shift-7",
                     ":": "shift-semicolon",
+                    "=": "equal",
+                    "$": "shift-4",
                 }.get(ch, ch)
                 # Explicit transitions avoid deferred HMP release timers.
                 keys = key.split("-")
@@ -349,6 +357,32 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         wait_for("exec:")
         command("echo survived-invalid-elf")
         wait_for("survived-invalid-elf")
+        command("help bin")
+        command("export DEMO=parent")
+        command("sh /demo.sh arg")
+        time.sleep(1.5)
+        command("cat /script.txt")
+        wait_for("script-arg-1-parent")
+        command("echo env-$DEMO")
+        wait_for("env-parent")
+        command("source /source.sh")
+        command("echo $SOURCED")
+        wait_for("source-ok")
+        command("/demo.sh direct")
+        time.sleep(1.5)
+        command("cat /script.txt")
+        wait_for("script-direct-1-parent")
+        command("journal --save /boot.log")
+        command("pager /boot.log")
+        wait_for("Arrows/PgUp/PgDn")
+        monitor("sendkey end 10")
+        monitor("sendkey home 10")
+        monitor("sendkey q 10")
+        time.sleep(.2)
+        command("echo pager-pipe-ok | pager")
+        wait_for("pager-pipe-ok")
+        monitor("sendkey q 10")
+        time.sleep(.2)
         command("help bin")
         wait_for("KDISKMAN.ELF")
         before_scroll = screen()
@@ -620,6 +654,9 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         theme = subprocess.check_output(
             ["mtype", "-i", str(disk), "::/ETC/THEMES/TEST.THM"]
         )
+        boot_log = subprocess.check_output(["mtype", "-i", str(disk), "::/BOOT.LOG"])
+        assert b"[DEBUG] [fat12] BPB" in boot_log and b"[INFO] [ata]" in boot_log
+        assert subprocess.check_output(["mtype", "-i", str(disk), "::/SOURCE.TXT"]) == b"source-ok\n"
         picked = subprocess.check_output(
             ["mtype", "-i", str(disk), "::/ETC/THEMES/PICK.THM"]
         )
