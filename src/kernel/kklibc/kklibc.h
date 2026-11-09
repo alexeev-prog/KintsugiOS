@@ -10,6 +10,6 @@
 /* Compatibility umbrella for kernel clients; libc mem.h itself has no allocator. */
 #include "../mm/heap.h"
 
-#define VERSION "v0.6.0a"
+#define VERSION "v0.7.0a"
 
 #endif

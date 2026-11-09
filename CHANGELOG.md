@@ -1,3 +1,76 @@
+commit 082f367756f318a541f8777907e4b7bbe0f723b6
+Merge: 3fb1623 b394c03
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 22:41:17 2026 +0700
+
+    Merge pull request #7 from alexeev-prog/feat/reliable-base-system
+    
+    improve system base reliable with memory and fs
+
+commit b394c03facf2664294b567f6897abc4110240055
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 22:40:50 2026 +0700
+
+    improve system base reliable with memory and fs
+
+commit 3fb1623c4f8a7f2edb01f2093e3ac54319735da8
+Merge: 087fb93 fa9a2da
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 18:24:26 2026 +0700
+
+    Merge pull request #6 from alexeev-prog/feat/tui-widgets-commanders
+    
+    add TUI widgets, improve TUI programs and TUI lib
+
+commit fa9a2dafb934c6d1735a9f447c1f260e5d279cae
+Merge: fd72f1a 087fb93
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 18:03:16 2026 +0700
+
+    Merge branch 'main' into feat/tui-widgets-commanders
+
+commit fd72f1a0ac01d6f78089f1bd820ebc010699b34c
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 17:57:34 2026 +0700
+
+    add TUI widgets, improve TUI programs and TUI lib
+
+commit 087fb93fa701663512ff632a74d6847da1fc7c0d
+Merge: 51d9ce4 d46492b
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 17:09:30 2026 +0700
+
+    Merge pull request #5 from alexeev-prog/feat/scripts-env-pager-journal
+    
+    add shell scripts and shell interpreter, add pager, env and journal
+
+commit d46492b0fee2ee25088c64110a4200196fbb0acd
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 17:03:57 2026 +0700
+
+    fix codestyle for tests
+
+commit c2b4b9e8e5f03136939958a0e071079d499089e9
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 17:03:16 2026 +0700
+
+    add shell scripts and shell interpreter, add pager, env and journal
+
+commit 51d9ce465ed4adfda489f6739028a720c43e44ee
+Merge: 9ea4c97 39e1fbc
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 15:37:40 2026 +0700
+
+    Merge pull request #4 from alexeev-prog/feat/tui-workspace
+    
+    improve TUI, add themes and theme editor, improve programs
+
+commit 39e1fbc80c8220850459894f831eee8c143ed452
+Author: Alexeev Bronislav <alexeev.dev@mail.ru>
+Date:   Mon Nov 9 01:09:33 2026 +0700
+
+    improve TUI, add themes and theme editor, improve programs
+
 commit 01843f1488b38abed2e216a2b718831fafc32b4a
 Author: Alexeev Bronislav <alexeev.dev@mail.ru>
 Date:   Mon Nov 9 01:06:57 2026 +0700
