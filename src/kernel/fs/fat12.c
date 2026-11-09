@@ -1,6 +1,7 @@
 #include "fat12.h"
 
 #include "../drivers/ata_pio.h"
+#include "../kernel/log.h"
 #include "../kklibc/kklibc.h"
 #include "vfs.h"
 
@@ -24,6 +25,8 @@ static int read_sector(u32 sector, void* buffer) {
 static int write_sector(u32 sector, void* buffer) {
     int result = ata_pio_write_sectors(ATA_MASTER, sector, 1, (u16*)buffer);
     if (result) {
+        log_event(
+            "ERROR", "fat12", "Sector write failed lba=%u error=%d; mutations disabled", sector, result);
         mounted = 0; /* Ambiguous writes must never be followed by more mutations. */
     }
     return result;
@@ -61,6 +64,15 @@ void fat12_init(void) {
     }
     u32 spc = boot_sector.sectors_per_cluster;
     u32 total = boot_sector.total_sectors ? boot_sector.total_sectors : boot_sector.large_sector_count;
+    log_event(
+        "DEBUG",
+        "fat12",
+        "BPB bytes/sector=%u sectors/cluster=%u total=%u FAT copies=%u root entries=%u",
+        boot_sector.bytes_per_sector,
+        spc,
+        total,
+        boot_sector.fat_count,
+        boot_sector.root_entries);
     if (boot_sector.bytes_per_sector != 512 || !spc || spc > 128 || (spc & (spc - 1))
         || !boot_sector.reserved_sectors || !boot_sector.sectors_per_fat || !boot_sector.fat_count
         || boot_sector.fat_count > 2 || !boot_sector.root_entries || total > ata_disks[0].size) {
@@ -105,9 +117,17 @@ void fat12_init(void) {
         goto invalid;
     }
     vfs_mount(&fat_ops);
+    log_event(
+        "INFO",
+        "fat12",
+        "Mounted / clusters=%u FAT start=%u data start=%u; integrity check passed",
+        ctx.total_clusters,
+        ctx.fat_start_sector,
+        ctx.data_start_sector);
     printf("FAT12 mounted: %d clusters\n", ctx.total_clusters);
     return;
 invalid:
+    log_event("ERROR", "fat12", "Mount rejected: unavailable disk, invalid BPB/FAT or integrity failure");
     fat12_cleanup();
     printf("FAT12 unavailable: missing disk or invalid/unsupported volume\n");
 }
