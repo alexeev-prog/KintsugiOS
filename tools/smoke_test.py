@@ -45,10 +45,18 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
     full_disk = "--full-disk" in sys.argv
     if not full_disk:
         script = tmp / "DEMO.SH"
-        script.write_text('#!/BIN/SHELL.ELF\n# script regression\necho "script-$1-$#-$DEMO" > /script.txt\nexport DEMO=child\n')
-        subprocess.run(["mcopy", "-i", str(disk), str(script), "::/DEMO.SH"], check=True)
-        script.write_bytes(b'export SOURCED=source-ok\r\necho "${SOURCED}" > /source.txt')
-        subprocess.run(["mcopy", "-i", str(disk), str(script), "::/SOURCE.SH"], check=True)
+        script.write_text(
+            '#!/BIN/SHELL.ELF\n# script regression\necho "script-$1-$#-$DEMO" > /script.txt\nexport DEMO=child\n'
+        )
+        subprocess.run(
+            ["mcopy", "-i", str(disk), str(script), "::/DEMO.SH"], check=True
+        )
+        script.write_bytes(
+            b'export SOURCED=source-ok\r\necho "${SOURCED}" > /source.txt'
+        )
+        subprocess.run(
+            ["mcopy", "-i", str(disk), str(script), "::/SOURCE.SH"], check=True
+        )
     if full_disk:
         original = tmp / "SAFE.TXT"
         original.write_bytes(b"original-data\n")
@@ -378,11 +386,11 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         monitor("sendkey end 10")
         monitor("sendkey home 10")
         monitor("sendkey q 10")
-        time.sleep(.2)
+        time.sleep(0.2)
         command("echo pager-pipe-ok | pager")
         wait_for("pager-pipe-ok")
         monitor("sendkey q 10")
-        time.sleep(.2)
+        time.sleep(0.2)
         command("help bin")
         wait_for("KDISKMAN.ELF")
         before_scroll = screen()
@@ -656,7 +664,10 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         )
         boot_log = subprocess.check_output(["mtype", "-i", str(disk), "::/BOOT.LOG"])
         assert b"[DEBUG] [fat12] BPB" in boot_log and b"[INFO] [ata]" in boot_log
-        assert subprocess.check_output(["mtype", "-i", str(disk), "::/SOURCE.TXT"]) == b"source-ok\n"
+        assert (
+            subprocess.check_output(["mtype", "-i", str(disk), "::/SOURCE.TXT"])
+            == b"source-ok\n"
+        )
         picked = subprocess.check_output(
             ["mtype", "-i", str(disk), "::/ETC/THEMES/PICK.THM"]
         )
