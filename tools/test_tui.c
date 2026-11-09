@@ -38,6 +38,62 @@ static void remember(const char* t, u32 n, u32 p) {
 #include "../src/user/vikmode.h"
 
 int main(void) {
+    char document[65] = "abc\nxyz";
+    tui_editor editor = { .text = document, .length = 7, .capacity = 64, .cursor = 1 };
+    assert(tui_editor_key(&editor, 'Q') == 1 && !strcmp(document, "aQbc\nxyz"));
+    assert(tui_editor_key(&editor, 26) == 1 && !strcmp(document, "abc\nxyz"));
+    assert(tui_editor_key(&editor, 18) == 1 && !strcmp(document, "aQbc\nxyz"));
+    tui_editor_key(&editor, 26);
+    tui_editor_key(&editor, 'W');
+    assert(!tui_editor_key(&editor, 18) && !strcmp(document, "aWbc\nxyz"));
+    tui_editor_key(&editor, TUI_DOWN);
+    assert(editor.cursor == 7);
+    tui_editor_key(&editor, TUI_END);
+    assert(editor.cursor == editor.length);
+    tui_editor_draw(&editor, 1, 1, 8, 3);
+    tui_editor_destroy(&editor);
+    char small[17] = "";
+    tui_editor bounded = { .text = small, .capacity = 16 };
+    for (int i = 0; i < 12; ++i) {
+        assert(tui_editor_key(&bounded, 'a' + i) == 1);
+    }
+    for (int i = 0; i < 8; ++i) {
+        assert(tui_editor_key(&bounded, 26) == 1);
+    }
+    assert(bounded.length == 4 && !tui_editor_key(&bounded, 26));
+    for (int i = 0; i < 8; ++i) {
+        assert(tui_editor_key(&bounded, 18) == 1);
+    }
+    assert(bounded.length == 12 && !strcmp(small, "abcdefghijkl"));
+    tui_editor_destroy(&bounded);
+    editor.capacity = editor.length;
+    assert(tui_editor_key(&editor, 'x') == -1);
+    u32 doc_top = 0;
+    assert(tui_document_key(TUI_END, &doc_top, 51, 20) && doc_top == 31);
+    assert(tui_document_key(TUI_PAGE_UP, &doc_top, 51, 20) && doc_top == 11);
+    tui_document_key(TUI_END, &doc_top, 1, 20);
+    assert(doc_top == 0);
+    const char* md = "# Title\n\n- Item\n> Quote\n```\n**literal**\n```\n";
+    u32 measured = tui_markdown(md, strlen(md), 1, 1, 30, 0, 0);
+    assert(measured == 7);
+    assert(tui_markdown(md, strlen(md), 1, 1, 30, 10, 0) == measured);
+    assert(screen[1][1].character == 'T' && screen[3][2].character == '*');
+    assert(screen[6][1].character == '*' && screen[6][2].character == '*');
+    const char* wrapped = "abc defgh ijk";
+    assert(tui_markdown(wrapped, strlen(wrapped), 1, 1, 8, 0, 0) == 3);
+    tui_markdown(md, strlen(md), 1, 1, 30, 2, 5);
+    assert(screen[1][1].character == '*');
+    char pages[201];
+    for (int i = 0; i < 100; ++i) {
+        pages[i * 2] = 'x';
+        pages[i * 2 + 1] = '\n';
+    }
+    pages[200] = 0;
+    assert(tui_markdown(pages, 200, 1, 1, 30, 0, 0) == 100);
+    assert(tui_markdown(pages, 200, 1, 1, 30, 20, 80) == 100);
+    assert(screen[20][1].character == 'x');
+    tui_markdown("*unclosed", 9, 1, 1, 30, 1, 0);
+    assert(screen[1][1].character == '*');
     vik_state vim = { 0 };
     char text[CAPACITY] = "one two\nthree\nfour\n";
     u32 length = strlen(text), cursor = 0;

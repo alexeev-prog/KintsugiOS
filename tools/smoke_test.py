@@ -227,6 +227,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
                     ":": "shift-semicolon",
                     "=": "equal",
                     "$": "shift-4",
+                    "#": "shift-3",
                 }.get(ch, ch)
                 # Explicit transitions avoid deferred HMP release timers.
                 keys = key.split("-")
@@ -452,6 +453,25 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
                 wait_for("Kintsugi application launcher")
             monitor("sendkey q 10")
             time.sleep(0.2)
+        command("hieroglyph /note.md")
+        wait_for("WRITE - Markdown source")
+        command("# Document")
+        command("- Item")
+        monitor("sendkey f3 10")
+        wait_for("READ - formatted document")
+        wait_for("Document")
+        monitor("sendkey f2 10")
+        wait_for("Document saved")
+        monitor("sendkey f10 10")
+        time.sleep(.2)
+        command("hieroglyph /note.md")
+        wait_for("READ - formatted document")
+        monitor("sendkey end 10")
+        time.sleep(.1)
+        monitor("sendkey home 10")
+        time.sleep(.1)
+        monitor("sendkey f10 10")
+        time.sleep(.2)
         command("kuned /edit.txt")
         wait_for("Kintsugi Universal Editor")
         command("editor-content")
@@ -665,6 +685,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             and "ACPI S5 power-off requested" in serial
         )
         actual = subprocess.check_output(["mtype", "-i", str(disk), "::/CHECK.TXT"])
+        assert subprocess.check_output(["mtype", "-i", str(disk), "::/NOTE.MD"]) == b"# Document\n- Item\n"
         assert (
             subprocess.check_output(["mtype", "-i", str(disk), "::/EDIT.TXT"])
             == b"editor-content\n"

@@ -156,6 +156,10 @@ static int parse(char* text, char** argv, int capacity) {
 }
 
 static void path(char* out, const char* name) {
+    if (equal(name, "hieroglyph")) {
+        copy(out, "/BIN/HIERO.ELF");
+        return;
+    }
     if (equal(name, "sh")) {
         copy(out, "/BIN/SHELL.ELF");
         return;

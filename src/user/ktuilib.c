@@ -1,4 +1,6 @@
 #include "ktuilib.h"
+
+#include "tuidoc.c"
 static ktui_cell screen[25][80];
 #define MODALS 4
 static ktui_cell backgrounds[MODALS][25][80];

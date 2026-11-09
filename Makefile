@@ -38,7 +38,7 @@ $(BIN_DIR)/user/SHELL.ELF: src/user/shell.c src/user/shellabi.h src/user/runtime
 $(BIN_DIR)/user/INIT.ELF: src/user/init.c src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
 	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/INIT.o
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/INIT.o -o $@
-TUI_PROGRAMS := KUNED VIK KBSM KMEMMAN KC KPROCM KDISKMAN KTUI KTTE PAGER JOURNAL
+TUI_PROGRAMS := KUNED VIK KBSM KMEMMAN KC KPROCM KDISKMAN KTUI KTTE PAGER JOURNAL HIERO
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
@@ -61,6 +61,8 @@ $(eval $(call TUI_RULE,KC,kc))
 $(eval $(call TUI_RULE,KTTE,ktte))
 $(eval $(call TUI_RULE,PAGER,pager))
 $(eval $(call TUI_RULE,JOURNAL,journal))
+$(eval $(call TUI_RULE,HIERO,hieroglyph))
+$(BIN_DIR)/user/ktuilib.o: src/user/tuidoc.c
 define DIAG_RULE
 $(BIN_DIR)/user/$(1).ELF: src/user/diagnostics.c src/user/sysabi.h $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
 	$$(CC) $$(CFLAGS) -DAPP=$(2) -c $$< -o $$(BIN_DIR)/user/$(1).o
