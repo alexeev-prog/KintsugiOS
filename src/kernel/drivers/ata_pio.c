@@ -42,6 +42,24 @@ int ata_pio_wait(void) {
     return ata_poll(0);
 }
 
+int ata_pio_flush(void) {
+    for (int i = 0; i < 2; ++i) {
+        if (!ata_disks[i].size) {
+            continue;
+        }
+        ata_select(i ? ATA_SLAVE : ATA_MASTER, 0);
+        if (ata_poll(0)) {
+            return -1;
+        }
+        port_byte_out(ATA_PRIMARY_CMD, ATA_CMD_CACHE_FLUSH);
+        ata_delay();
+        if (ata_poll(0)) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 int ata_pio_identify(u8 drive, ata_disk_info_t* info) {
     if (!info || (drive != ATA_MASTER && drive != ATA_SLAVE)) {
         return -1;

@@ -16,5 +16,6 @@ void process_block(const void* object);
 void process_wake(const void* object);
 int process_foreground(void);
 char* process_cwd(void);
+void process_shutdown(void);
 __attribute__((noreturn)) void process_exit(int status);
 #endif

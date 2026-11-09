@@ -1,5 +1,27 @@
 #include "runtime.h"
 
+#include "errors.h"
+
+const char* kos_error(int error) {
+    return kos_error_text(error);
+}
+
+int ftruncate(int fd, u32 size) {
+    return syscall(KOS_SYS_FTRUNCATE, fd, size, 0, 0);
+}
+
+int fstat(int fd, kos_stat* stat) {
+    return syscall(KOS_SYS_FSTAT, fd, (u32)stat, 0, 0);
+}
+
+int sync(void) {
+    return syscall(KOS_SYS_SYNC, 0, 0, 0, 0);
+}
+
+int kill(int pid) {
+    return syscall(KOS_SYS_KILL, pid, 0, 0, 0);
+}
+
 static kos_env_entry env_cache[KOS_ENV_MAX];
 
 const char* getenv(const char* name) {

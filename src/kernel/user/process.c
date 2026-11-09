@@ -5,11 +5,13 @@
 #include "../../user/sysabi.h"
 #include "../../user/tuiabi.h"
 #include "../cpu/idt.h"
+#include "../drivers/ata_pio.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/terminal.h"
 #include "../fs/fat12.h"
 #include "../fs/vfs.h"
 #include "../kernel/log.h"
+#include "../kernel/power.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
 #include "../shell/shell.h"
@@ -32,7 +34,7 @@ enum {
 
 typedef struct {
     u32 pid, parent, state, address_space, heap_end, context, entry, stack, ticks;
-    int status, interrupted;
+    int status, interrupted, orphan;
     terminal_state_t* terminal_snapshot;
     void* kernel_stack;
     fd_table_t descriptors;
@@ -55,6 +57,18 @@ static void schedule(void);
 static void reap(process_t* p);
 static u32 init_pid;
 static u32 shell_pid;
+
+void process_shutdown(void) {
+    /* Single CPU, interrupts disabled by the power path: no new userspace work. */
+    for (int i = 0; i < PROCESS_MAX; ++i) {
+        if (&processes[i] != current) {
+            reap(&processes[i]);
+        }
+    }
+    if (current) {
+        fd_destroy(&current->descriptors);
+    }
+}
 
 char* process_cwd(void) {
     return current ? current->cwd : NULL;
@@ -134,6 +148,7 @@ void process_exit(int status) {
         }
         if (processes[i].parent == current->pid) {
             processes[i].parent = processes[0].pid;
+            processes[i].orphan = 1;
         }
     }
     schedule();
@@ -144,6 +159,12 @@ void process_exit(int status) {
 
 static void schedule(void) {
     process_t* old = current;
+    /* A dead process cannot free the kernel stack it is still executing on. */
+    for (int i = 1; i < PROCESS_MAX; ++i) {
+        if (&processes[i] != old && processes[i].state == ZOMBIE && processes[i].orphan) {
+            reap(&processes[i]);
+        }
+    }
     int start = old ? (int)(old - processes) + 1 : 0;
     for (;;) {
         if (old && processes[0].state == ZOMBIE) {
@@ -335,6 +356,7 @@ static int process_load(const char* path, int argc, char** argv) {
         u32 end = (s->vaddr + s->memsz + 4095) & ~4095u;
         for (u32 va = s->vaddr & ~4095u; va < end; va += PAGE_SIZE) {
             if (!vmm_user_page(space, va, !!(s->flags & 2))) {
+                result = VFS_ENOMEM;
                 goto cleanup;
             }
         }
@@ -842,6 +864,37 @@ void syscall_dispatch(syscall_regs_t* r) {
         case KOS_SYS_SEEK:
             r->eax = fd_seek(&current->descriptors, r->ebx, r->ecx);
             return;
+        case KOS_SYS_FTRUNCATE:
+            r->eax = fd_truncate(&current->descriptors, r->ebx, r->ecx);
+            return;
+        case KOS_SYS_FSTAT:
+            if (!user_range(r->ecx, sizeof(kos_stat), 1)) {
+                break;
+            }
+            r->eax = fd_stat(&current->descriptors, r->ebx, (kos_stat*)r->ecx);
+            return;
+        case KOS_SYS_SYNC:
+            r->eax = system_sync();
+            return;
+        case KOS_SYS_KILL:
+            r->eax = KOS_ESRCH;
+            for (int i = 0; i < PROCESS_MAX; ++i) {
+                process_t* p = &processes[i];
+                if (p->pid != r->ebx || !p->state || p->state == ZOMBIE) {
+                    continue;
+                }
+                if (p == current || p->pid == init_pid || p->shell) {
+                    r->eax = KOS_EPERM;
+                } else {
+                    p->interrupted = 1;
+                    if (p->state == WAITING) {
+                        p->state = READY;
+                    }
+                    r->eax = 0;
+                }
+                break;
+            }
+            return;
         case KOS_SYS_PIPE: {
             if (!user_range(r->ebx, 8, 1)) {
                 break;
@@ -887,6 +940,11 @@ void syscall_dispatch(syscall_regs_t* r) {
                                                   ? p->heap_end - USER_HEAP_BASE
                                                   : 0 };
                     memcpy(info.name, p->name, sizeof(info.name));
+                    for (int fd = 0; fd < KOS_FD_MAX; ++fd) {
+                        if (p->descriptors.entries[fd]) {
+                            ++info.open_fds;
+                        }
+                    }
                     out[n++] = info;
                 }
             }
@@ -908,6 +966,8 @@ void syscall_dispatch(syscall_regs_t* r) {
             }
             kos_disk_info info = { 0 };
             info.mounted = fat12_is_mounted();
+            info.disk_sectors = ata_disks[0].size;
+            memcpy(info.model, ata_disks[0].model, sizeof(info.model));
             fat12_usage(&info.sectors, &info.cluster_bytes, &info.clusters, &info.free_clusters);
             memcpy((void*)r->ebx, &info, sizeof(info));
             r->eax = 0;
@@ -980,7 +1040,8 @@ void syscall_dispatch(syscall_regs_t* r) {
                 }
             }
             if (!child) {
-                break;
+                r->eax = KOS_ECHILD;
+                return;
             }
             u32 previous_foreground = foreground;
             foreground = child->group;
@@ -1170,7 +1231,13 @@ void syscall_dispatch(syscall_regs_t* r) {
             u32 start = user_heap_end;
             for (u32 n = 0; n < size; n += PAGE_SIZE) {
                 if (!vmm_user_page(space, user_heap_end, 1)) {
-                    /* Pages remain owned by the process and are reclaimed on exit. */
+                    /* Failed growth must not consume invisible heap/pages. */
+                    vmm_user_unmap(space, user_heap_end);
+                    while (user_heap_end > start) {
+                        user_heap_end -= PAGE_SIZE;
+                        vmm_user_unmap(space, user_heap_end);
+                    }
+                    vmm_space_switch(space);
                     r->eax = 0;
                     return;
                 }

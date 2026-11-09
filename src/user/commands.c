@@ -56,6 +56,44 @@ int main(int argc, char** argv) {
         || bytes[0] != 'K' || close(fd) || close(15)) {
         return 5;
     }
+    if (wait(0x7fffffff) != KOS_ECHILD || kill(getpid()) != KOS_EPERM || kill(0x7fffffff) != KOS_ESRCH) {
+        return 6;
+    }
+    for (int i = 0; i < 8; ++i) {
+        char* args[] = { "SPIN", 0 };
+        int pid = spawn("/BIN/SPIN.ELF", 1, args);
+        if (pid < 0 || kill(pid) || wait(pid) != 130 || wait(pid) != KOS_ECHILD) {
+            return 13;
+        }
+    }
+    /* Existing descriptors survive failed namespace changes. */
+    fd = open("/README.TXT", KOS_O_READ);
+    if (fd < 0 || !call(11, (u32) "/MISSING.ZZZ", 1, 0, 0) || read(fd, bytes, 1) != 1 || close(fd)) {
+        return 7;
+    }
+    /* Only run mutating checks when the fixture was supplied by the test harness. */
+    fd = open("/FDTEST.TXT", KOS_O_READ | KOS_O_WRITE);
+    if (fd >= 0) {
+        kos_stat stat;
+        if (ftruncate(fd, 3) || fstat(fd, &stat) || stat.size != 3 || seek(fd, 1) || write(fd, "Z", 1) != 1
+            || seek(fd, 0) || read(fd, bytes, 3) != 3 || bytes[1] != 'Z' || close(fd)) {
+            return 8;
+        }
+        if (open("/FDTEST.TXT", KOS_O_WRITE | KOS_O_CREATE | KOS_O_EXCL) != -5) {
+            return 9;
+        }
+        fd = open("/FDTEST.TXT", KOS_O_WRITE | KOS_O_APPEND);
+        if (fd < 0 || write(fd, "!", 1) != 1 || fstat(fd, &stat) || stat.size != 4 || close(fd)) {
+            return 10;
+        }
+        fd = open("/FDNEW.TXT", KOS_O_WRITE | KOS_O_CREATE | KOS_O_TRUNC);
+        if (fd < 0 || write(fd, "new", 3) != 3 || close(fd) || sync()) {
+            return 11;
+        }
+        if (call(11, (u32) "/FDNEW.TXT", 1, 0, 0)) {
+            return 12;
+        }
+    }
     print("FD checks: PASS\n");
     return 0;
 #elif COMMAND == 8

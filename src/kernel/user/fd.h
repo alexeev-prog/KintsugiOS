@@ -1,5 +1,6 @@
 #ifndef USER_FD_H
 #define USER_FD_H
+#include "../../user/fsabi.h"
 #include "../../user/ioabi.h"
 #include "../kklibc/ctypes.h"
 typedef struct open_description open_description_t;
@@ -18,4 +19,6 @@ int fd_pipe(fd_table_t* table, int pair[2]);
 int fd_read(fd_table_t* table, int fd, void* buffer, u32 size);
 int fd_write(fd_table_t* table, int fd, const void* buffer, u32 size);
 int fd_seek(fd_table_t* table, int fd, u32 offset);
+int fd_truncate(fd_table_t* table, int fd, u32 size);
+int fd_stat(fd_table_t* table, int fd, kos_stat* stat);
 #endif

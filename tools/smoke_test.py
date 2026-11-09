@@ -44,6 +44,11 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         )
     full_disk = "--full-disk" in sys.argv
     if not full_disk:
+        fixture = tmp / "FDTEST.TXT"
+        fixture.write_bytes(b"abcdef")
+        subprocess.run(
+            ["mcopy", "-i", str(disk), str(fixture), "::/FDTEST.TXT"], check=True
+        )
         script = tmp / "DEMO.SH"
         script.write_text(
             '#!/BIN/SHELL.ELF\n# script regression\necho "script-$1-$#-$DEMO" > /script.txt\nexport DEMO=child\n'
@@ -420,6 +425,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         for app, title in (
             ("kprocm", "Kintsugi Process Manager"),
             ("kdiskman", "Kintsugi Disk Manager"),
+            ("kmemman", "Kintsugi Memory Manager"),
             ("ktui", "Kintsugi application launcher"),
         ):
             command(app)
@@ -651,8 +657,13 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             raise AssertionError("Kernel did not restart")
         command("cat /check.txt")
         wait_for("multi word text")
-        qmp("quit")
+        command("shutdown")
         proc.wait(timeout=10)
+        serial = (tmp / "serial.log").read_text()
+        assert (
+            "Disk caches synchronized" in serial
+            and "ACPI S5 power-off requested" in serial
+        )
         actual = subprocess.check_output(["mtype", "-i", str(disk), "::/CHECK.TXT"])
         assert (
             subprocess.check_output(["mtype", "-i", str(disk), "::/EDIT.TXT"])

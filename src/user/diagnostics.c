@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
             tui_textn(46, y, list[i].name, 31, color);
         }
         tui_scrollbar(78, 4, 14, top, 14, count);
-        tui_bar(23, "S sort PID/ticks | Enter details | PgUp/PgDn scroll | Space pause");
+        tui_bar(23, "S sort PID/ticks | Enter details | K terminate | Space pause");
 #elif APP == 2
         tui_bar(0, "KDISKMAN - Kintsugi Disk Manager (read only)");
         kos_disk_info info;
@@ -66,18 +66,21 @@ int main(int argc, char** argv) {
             tui_number(35, 6 + i * 2, values[i], 0x1e);
         }
         tui_gauge(3, 15, 70, info.clusters - info.free_clusters, info.clusters);
+        tui_textn(3, 17, info.model, 41, 0x1f);
+        tui_text(3, 19, "ATA sectors:", 0x1f);
+        tui_number(18, 19, info.disk_sectors, 0x1e);
         tui_text(
             3,
             18,
             info.mounted ? "Volume online" : "Volume unavailable",
             info.mounted ? TUI_SUCCESS : TUI_ERROR);
-        tui_bar(23, "C check filesystem | No partitioning, formatting or repair operations");
+        tui_bar(23, "C check filesystem | S sync disks | No formatting or repair operations");
 #else
         tui_bar(0, "KTUI - Kintsugi application launcher");
         tui_window applications = { 8, 4, 64, 16, 1, "Applications" };
         tui_window_draw(&applications);
         tui_text(11, 7, "1 Editor     2 Commander     3 Resource monitor", 0x1f);
-        tui_text(11, 10, "4 Processes  5 Disks  6 Vik  7 Themes  H Library demo", 0x1f);
+        tui_text(11, 10, "4 Processes 5 Disks 6 Vik 7 Themes 8 Memory", 0x1f);
         tui_text(11, 14, "Shared panels, modal dialogs, settings and gauges", 0x1e);
         tui_bar(23, "Choose application by number | Enter opens application menu");
 #endif
@@ -106,6 +109,10 @@ int main(int argc, char** argv) {
         if (key == 's') {
             sort_ticks = !sort_ticks;
         }
+        if (key == 'k' && count && tui_confirm("Terminate selected process? Shell/init are protected.")) {
+            int result = kill(list[selected].pid);
+            tui_message("Terminate process", result ? kos_error(result) : "Termination requested");
+        }
         if (key == '\n' && count) {
             if (tui_modal_begin("Process details", 64, 13)) {
                 kos_process_info* p = &list[selected];
@@ -117,7 +124,8 @@ int main(int argc, char** argv) {
                 tui_text(11, 13, "Scheduled ticks / committed user heap bytes", 0x1e);
                 tui_number(11, 14, p->ticks, 0x1f);
                 tui_number(30, 14, p->heap_bytes, 0x1f);
-                tui_text(11, 16, "Press any key", 0x1e);
+                tui_text(11, 16, "Open descriptors:", 0x1e);
+                tui_number(30, 16, p->open_fds, 0x1f);
                 tui_present(79, 24);
                 tui_key(1);
                 tui_modal_end();
@@ -134,6 +142,10 @@ int main(int argc, char** argv) {
         }
 #endif
 #if APP == 2
+        if (key == 's') {
+            int result = sync();
+            tui_message("Disk synchronization", result ? kos_error(result) : "Disk caches synchronized");
+        }
         if (key == 'c') {
             tui_message(
                 "Filesystem check",
@@ -141,20 +153,20 @@ int main(int argc, char** argv) {
                                         : "FAT12 allocation and directory structure are consistent");
         }
 #elif APP == 3
-        const char* programs[] = { "KUNED", "KC", "KBSM", "KPROCM", "KDISKMAN", "VIK", "KTTE" };
+        const char* programs[] = { "KUNED", "KC", "KBSM", "KPROCM", "KDISKMAN", "VIK", "KTTE", "KMEMMAN" };
         const char* paths[] = { "/BIN/KUNED.ELF",    "/BIN/KC.ELF",  "/BIN/KBSM.ELF", "/BIN/KPROCM.ELF",
-                                "/BIN/KDISKMAN.ELF", "/BIN/VIK.ELF", "/BIN/KTTE.ELF" };
+                                "/BIN/KDISKMAN.ELF", "/BIN/VIK.ELF", "/BIN/KTTE.ELF", "/BIN/KMEMMAN.ELF" };
         if (key == '\n') {
             const char* items[] = { "Editor", "Commander", "Resource monitor", "Processes",
-                                    "Disks",  "Vik",       "Theme editor" };
-            int choice = tui_menu("Launch application", items, 7, selected);
+                                    "Disks",  "Vik",       "Theme editor",     "Memory manager" };
+            int choice = tui_menu("Launch application", items, 8, selected);
             if (choice >= 0) {
                 selected = choice;
                 key = '1' + choice;
             }
         }
         (void)top;
-        if (key >= '1' && key <= '7') {
+        if (key >= '1' && key <= '8') {
             char* args[] = { (char*)programs[key - '1'], 0 };
             int pid = spawn(paths[key - '1'], 1, args);
             if (pid < 0 || wait(pid)) {

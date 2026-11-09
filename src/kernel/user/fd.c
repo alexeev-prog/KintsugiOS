@@ -120,7 +120,8 @@ int fd_dup2(fd_table_t* table, int source, int destination) {
 }
 
 int fd_open(fd_table_t* table, const char* path, u32 flags) {
-    if (!(flags & 3) || (flags & ~7u)) {
+    if (!(flags & 3) || (flags & ~63u) || ((flags & (KOS_O_APPEND | KOS_O_TRUNC)) && !(flags & KOS_O_WRITE))
+        || ((flags & KOS_O_EXCL) && !(flags & KOS_O_CREATE))) {
         return VFS_EINVAL;
     }
     int fd = vacant(table);
@@ -132,6 +133,25 @@ int fd_open(fd_table_t* table, const char* path, u32 flags) {
         return VFS_ENOMEM;
     }
     int result = vfs_open(path, &object->file);
+    if (!result && (flags & KOS_O_EXCL)) {
+        result = VFS_EEXIST;
+    }
+    if (result == VFS_ENOENT && (flags & KOS_O_CREATE)) {
+        result = vfs_create(path);
+        if (!result) {
+            result = vfs_open(path, &object->file);
+        }
+    }
+    if (!result && (flags & KOS_O_WRITE)) {
+        vfs_stat_t stat;
+        result = vfs_stat(path, &stat);
+        if (!result && stat.readonly) {
+            result = VFS_EROFS;
+        }
+    }
+    if (!result && (flags & KOS_O_TRUNC)) {
+        result = vfs_truncate(path, 0);
+    }
     if (result) {
         kfree(object);
         return result;
@@ -239,8 +259,12 @@ int fd_write(fd_table_t* table, int fd, const void* buffer, u32 size) {
     }
     if (object->kind == FILE_OBJECT) {
         if (object->flags & KOS_O_APPEND) {
-            int result = vfs_append(object->file.path, buffer, size);
-            return result ? result : (int)size;
+            vfs_stat_t stat;
+            int result = vfs_stat(object->file.path, &stat);
+            if (!result) {
+                result = vfs_seek(&object->file, stat.size);
+            }
+            return result ? result : vfs_file_write(&object->file, buffer, size);
         }
         return vfs_file_write(&object->file, buffer, size);
     }
@@ -276,4 +300,28 @@ int fd_seek(fd_table_t* table, int fd, u32 offset) {
     }
     open_description_t* object = table->entries[fd];
     return object->kind == FILE_OBJECT ? vfs_seek(&object->file, offset) : KOS_ESPIPE;
+}
+
+int fd_truncate(fd_table_t* table, int fd, u32 size) {
+    open_description_t* object = get(table, fd, KOS_O_WRITE);
+    if (!object) {
+        return KOS_EBADF;
+    }
+    if (object->kind != FILE_OBJECT) {
+        return KOS_ESPIPE;
+    }
+    int result = vfs_seek(&object->file, object->file.offset);
+    return result ? result : vfs_truncate(object->file.path, size);
+}
+
+int fd_stat(fd_table_t* table, int fd, kos_stat* stat) {
+    if (fd < 0 || fd >= KOS_FD_MAX || !table->entries[fd]) {
+        return KOS_EBADF;
+    }
+    open_description_t* object = table->entries[fd];
+    if (object->kind != FILE_OBJECT) {
+        return KOS_ESPIPE;
+    }
+    int result = vfs_seek(&object->file, object->file.offset);
+    return result ? result : vfs_stat(object->file.path, stat);
 }
