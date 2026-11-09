@@ -548,15 +548,3 @@ KintsugiOS распространяется под лицензией MIT. По�
 <div align="center">
 <sub>Название "Kintsugi" отсылает к японскому искусству восстановления керамики золотым лаком — метафора красоты в несовершенстве и постоянного развития.</sub>
 </div>
-# Исправленная сборка и проверка загрузки
-
-Актуальные команды запуска, устройство образов и ограничения FAT12 описаны в
-[docs/BUILD_AND_TEST_RU.md](docs/BUILD_AND_TEST_RU.md). Быстрый запуск:
-`make run`; автоматическая проверка floppy/ISO и ФС: `make test`.
-# TUI applications and utilities
-
-Use `help bin` inside the OS to discover installed ELF programs. The desktop-style
-launcher is `ktui`; applications include `kc` (two-panel Commander), `kuned`
-(editor), `kbsm`, `kprocm`, and read-only `kdiskman`. See
-[TUI and utilities](docs/tui-programs.md) for controls, settings, diagnostic tools
-and current limitations.
