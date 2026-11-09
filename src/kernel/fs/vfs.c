@@ -1,5 +1,6 @@
 #include "vfs.h"
 
+#include "../../user/errors.h"
 #include "../kklibc/kklibc.h"
 #include "../user/process.h"
 static const vfs_ops_t* backend;
@@ -249,7 +250,9 @@ static int ancestor(const char* parent, const char* child) {
 int vfs_unlink(const char* path) {
     RESOLVE(path);
     result = backend->remove(absolute, 0);
-    ++generation;
+    if (!result) {
+        ++generation;
+    }
     return result;
 }
 
@@ -272,7 +275,9 @@ int vfs_rename(const char* source, const char* destination) {
         return VFS_EBUSY;
     }
     result = backend->rename(absolute, target);
-    ++generation;
+    if (!result) {
+        ++generation;
+    }
     return result;
 }
 
@@ -314,32 +319,5 @@ int vfs_copy(const char* source, const char* destination) {
 }
 
 const char* vfs_error(int e) {
-    switch (e) {
-        case VFS_ENOENT:
-            return "Not found";
-        case VFS_EIO:
-            return "Disk I/O error or filesystem unavailable";
-        case VFS_EINVAL:
-            return "Invalid path or argument (8.3 names required)";
-        case VFS_ENOSPC:
-            return "Disk or directory full";
-        case VFS_EEXIST:
-            return "Already exists";
-        case VFS_ENOTDIR:
-            return "Not a directory";
-        case VFS_EISDIR:
-            return "Is a directory";
-        case VFS_ENOTEMPTY:
-            return "Directory not empty";
-        case VFS_EROFS:
-            return "Read-only";
-        case VFS_ECORRUPT:
-            return "Corrupt filesystem";
-        case VFS_ENOMEM:
-            return "Out of memory";
-        case VFS_EBUSY:
-            return "Directory is in use";
-        default:
-            return "Filesystem error";
-    }
+    return kos_error_text(e);
 }

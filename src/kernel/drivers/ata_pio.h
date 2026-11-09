@@ -68,10 +68,13 @@ typedef struct {
     char model[41];
 } ata_disk_info_t;
 
+extern ata_disk_info_t ata_disks[2];
+
 /**
  * @brief Инициализация драйвера ATA PIO
  */
 void ata_pio_init();
+int ata_pio_flush(void);
 
 /**
  * @brief Определение типа и параметров диска

@@ -10,6 +10,7 @@ u32 vmm_space_create(void);
 void vmm_space_destroy(u32 space);
 void vmm_space_switch(u32 space);
 int vmm_user_page(u32 space, u32 address, int writable);
+void vmm_user_unmap(u32 space, u32 address);
 u32 vmm_user_physical(u32 space, u32 address, int write);
 
 typedef struct __attribute__((packed)) {

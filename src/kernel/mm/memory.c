@@ -274,6 +274,30 @@ void vmm_space_destroy(u32 space) {
     pmm_free_page(space);
 }
 
+void vmm_user_unmap(u32 space, u32 address) {
+    if (!space || address < USER_BASE || address >= USER_TOP || (address & 4095)) {
+        return;
+    }
+    u32* pd = (u32*)space;
+    u32 d = address >> 22;
+    if (!(pd[d] & 1)) {
+        return;
+    }
+    u32* table = (u32*)(pd[d] & ~4095u);
+    u32 t = (address >> 12) & 1023;
+    if (table[t] & 1) {
+        pmm_free_page(table[t] & ~4095u);
+        table[t] = 0;
+    }
+    for (u32 i = 0; i < 1024; ++i) {
+        if (table[i] & 1) {
+            return;
+        }
+    }
+    pmm_free_page(pd[d] & ~4095u);
+    pd[d] = 0;
+}
+
 void memory_print_info(void) {
     printf("RAM usable (E820): %u KiB; map entries: %u\n", stats.usable_kib, stats.map_entries);
     printf("PMM limit: %u MiB; page size: 4096\n", PMM_LIMIT >> 20);

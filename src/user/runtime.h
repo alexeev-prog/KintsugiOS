@@ -4,7 +4,13 @@
 const char* getenv(const char* name);
 int setenv(const char* name, const char* value);
 int unsetenv(const char* name);
+#include "fsabi.h"
 #include "ioabi.h"
+int ftruncate(int fd, unsigned int size);
+int fstat(int fd, kos_stat* stat);
+int sync(void);
+int kill(int pid);
+const char* kos_error(int error);
 int open(const char* path, unsigned int flags);
 int close(int fd);
 int read(int fd, void* buffer, unsigned int size);
