@@ -45,6 +45,7 @@ static int hex(char c) {
 int tui_theme_parse(const char* text, u32 length) {
     unsigned char next[256];
     int popup = 0, desktop = 0;
+    unsigned char specified[256] = { 0 };
     for (int i = 0; i < 256; ++i) {
         next[i] = i;
     }
@@ -72,6 +73,7 @@ int tui_theme_parse(const char* text, u32 length) {
             return 0;
         }
         next[a * 16 + b] = c * 16 + d;
+        specified[a * 16 + b] = 1;
         if (a * 16 + b == TUI_POPUP) {
             popup = 1;
         }
@@ -84,6 +86,13 @@ int tui_theme_parse(const char* text, u32 length) {
     }
     if (!desktop) {
         next[TUI_DESKTOP] = next[0x17];
+    }
+    static const unsigned char fallback[] = { 0x07, 0x70, 0x70, 0x08, 0x4f, 0x1e, 0x2f, 0x1e,
+                                              0x1f, 0x1f, 0x08, 0x0a, 0x0e, 0x0b, 0x70, 0x70 };
+    for (u32 i = 0; i < sizeof(fallback); ++i) {
+        if (!specified[TUI_INPUT + i]) {
+            next[TUI_INPUT + i] = next[fallback[i]];
+        }
     }
     for (int i = 0; i < 256; ++i) {
         palette[i] = next[i];
@@ -215,7 +224,7 @@ int tui_command(const char* prefix, char* buffer, u32 capacity) {
 
 void tui_window_draw(const tui_window* w) {
     tui_fill(w->x + 1, w->y + 1, w->width, w->height, 0x08);
-    tui_box(w->x, w->y, w->width, w->height, w->title, w->focused ? 0x1f : 0x17);
+    tui_box(w->x, w->y, w->width, w->height, w->title, w->focused ? TUI_BORDER : 0x17);
 }
 
 void tui_window_text(const tui_window* w, int x, int y, const char* text, unsigned char color) {
@@ -348,10 +357,7 @@ int tui_menu(const char* title, const char* const* items, int count, int initial
     int y = (25 - visible - 4) / 2;
     for (;;) {
         tui_list_key(0, &selected, &top, count, visible);
-        for (int row = 0; row < visible; ++row) {
-            int i = top + row;
-            tui_choice_row(10, y + 1 + row, 60, items[i], i == (int)selected, TUI_POPUP);
-        }
+        tui_list_draw(10, y + 1, 61, visible, items, count, selected, top, 1);
         tui_text(11, y + visible + 2, "Arrows/PgDn select | Enter accept | Esc cancel", TUI_POPUP);
         tui_scrollbar(70, y + 1, visible, top, visible, count);
         tui_present(79, 24);
@@ -419,8 +425,8 @@ void tui_message(const char* title, const char* message) {
     if (!tui_modal_begin(title, 70, 7)) {
         return;
     }
-    tui_textn(7, 11, message, 66, 0x1f);
-    tui_text(7, 13, "Press any key", 0x1e);
+    tui_textn(7, 11, message, 66, TUI_POPUP);
+    tui_button(7, 13, 22, "OK - press any key", 1, 1);
     tui_present(79, 24);
     tui_key(1);
     tui_modal_end();
@@ -552,7 +558,7 @@ int tui_prompt(const char* label, char* buffer, u32 capacity) {
     if (!capacity) {
         return 0;
     }
-    u32 n = 0, cursor = 0;
+    tui_input input = { buffer, capacity, 0 };
     buffer[0] = 0;
     if (!tui_modal_begin("Input - Enter accept / Esc cancel", 74, 7)) {
         return 0;
@@ -560,9 +566,8 @@ int tui_prompt(const char* label, char* buffer, u32 capacity) {
     for (;;) {
         tui_fill(4, 10, 72, 4, TUI_POPUP);
         tui_textn(5, 10, label, 70, TUI_POPUP);
-        u32 start = cursor > 68 ? cursor - 68 : 0;
-        tui_textn(5, 12, buffer + start, 69, TUI_POPUP);
-        tui_present(5 + cursor - start, 12);
+        tui_input_draw(&input, 5, 12, 69, 1);
+        tui_present(5 + (input.cursor < 69 ? input.cursor : 68), 12);
         int key = tui_key(1);
         if (key == 27 || key == 3) {
             tui_modal_end();
@@ -570,31 +575,9 @@ int tui_prompt(const char* label, char* buffer, u32 capacity) {
         }
         if (key == '\n') {
             tui_modal_end();
-            return n != 0;
+            return buffer[0] != 0;
         }
-        if (key == TUI_LEFT && cursor) {
-            --cursor;
-        } else if (key == TUI_RIGHT && cursor < n) {
-            ++cursor;
-        } else if (key == TUI_HOME) {
-            cursor = 0;
-        } else if (key == TUI_END) {
-            cursor = n;
-        } else if ((key == 8 && cursor) || (key == TUI_DELETE && cursor < n)) {
-            if (key == 8) {
-                --cursor;
-            }
-            for (u32 i = cursor; i < n; ++i) {
-                buffer[i] = buffer[i + 1];
-            }
-            --n;
-        } else if (key >= 32 && key < 127 && n + 1 < capacity) {
-            for (u32 i = n + 1; i > cursor; --i) {
-                buffer[i] = buffer[i - 1];
-            }
-            buffer[cursor++] = key;
-            ++n;
-        }
+        tui_input_key(&input, key);
     }
 }
 
@@ -605,6 +588,8 @@ int tui_confirm(const char* label) {
     tui_fill(4, 10, 72, 4, TUI_POPUP);
     tui_textn(5, 10, label, 70, TUI_POPUP);
     tui_text(5, 12, "Y yes / any other key cancels", TUI_POPUP);
+    tui_button(51, 12, 10, "Yes [Y]", 0, 1);
+    tui_button(62, 12, 12, "Cancel", 1, 1);
     tui_present(79, 24);
     int key = tui_key(1);
     tui_modal_end();
@@ -622,4 +607,131 @@ void tui_path(char out[256], const char* directory, const char* name) {
 
 int tui_stat_path(const char* path, tui_stat* stat) {
     return syscall(11, (u32)path, 4, (u32)stat, 0);
+}
+
+int tui_input_key(tui_input* input, int key) {
+    if (!input || !input->text || !input->capacity) {
+        return 0;
+    }
+    u32 n = 0;
+    while (n + 1 < input->capacity && input->text[n]) {
+        ++n;
+    }
+    input->text[n] = 0;
+    if (input->cursor > n) {
+        input->cursor = n;
+    }
+    u32* cursor = &input->cursor;
+    if (key == TUI_LEFT && *cursor) {
+        --*cursor;
+    } else if (key == TUI_RIGHT && *cursor < n) {
+        ++*cursor;
+    } else if (key == TUI_HOME) {
+        *cursor = 0;
+    } else if (key == TUI_END) {
+        *cursor = n;
+    } else if ((key == 8 && *cursor) || (key == TUI_DELETE && *cursor < n)) {
+        if (key == 8) {
+            --*cursor;
+        }
+        for (u32 i = *cursor; i < n; ++i) {
+            input->text[i] = input->text[i + 1];
+        }
+        return 1;
+    } else if (key >= 32 && key < 127 && n + 1 < input->capacity) {
+        for (u32 i = n + 1; i > *cursor; --i) {
+            input->text[i] = input->text[i - 1];
+        }
+        input->text[(*cursor)++] = key;
+        return 1;
+    }
+    return 0;
+}
+
+void tui_input_draw(tui_input* input, int x, int y, int width, int focused) {
+    if (!input || !input->text || width < 1 || width > 80) {
+        return;
+    }
+    u32 n = tui_len(input->text);
+    if (input->cursor > n) {
+        input->cursor = n;
+    }
+    u32 start = input->cursor >= (u32)width ? input->cursor - width + 1 : 0;
+    tui_fill(x, y, width, 1, TUI_INPUT);
+    tui_textn(x, y, input->text + start, width, TUI_INPUT);
+    if (focused) {
+        char ch[2] = { input->cursor < n ? input->text[input->cursor] : ' ', 0 };
+        tui_text(x + input->cursor - start, y, ch, TUI_FOCUS);
+    }
+}
+
+void tui_button(int x, int y, int width, const char* label, int focused, int enabled) {
+    if (width < 2 || width > 80) {
+        return;
+    }
+    unsigned char color = !enabled ? TUI_DISABLED : focused ? TUI_FOCUS : TUI_BUTTON;
+    tui_fill(x, y, width, 1, color);
+    tui_text(x, y, "[", color);
+    tui_textn(x + 1, y, label, width - 2, color);
+    tui_text(x + width - 1, y, "]", color);
+}
+
+void tui_checkbox(int x, int y, const char* label, int checked, int focused) {
+    unsigned char color = focused ? TUI_FOCUS : TUI_POPUP;
+    tui_text(x, y, checked ? "[x] " : "[ ] ", color);
+    tui_textn(x + 4, y, label, 76, color);
+}
+
+void tui_radio(int x, int y, const char* label, int checked, int focused) {
+    unsigned char color = focused ? TUI_FOCUS : TUI_POPUP;
+    tui_text(x, y, checked ? "(*) " : "( ) ", color);
+    tui_textn(x + 4, y, label, 76, color);
+}
+
+int tui_toggle_key(int key, int* checked) {
+    if (key != ' ' || !checked) {
+        return 0;
+    }
+    *checked = !*checked;
+    return 1;
+}
+
+int tui_focus_key(int key, u32* focus, u32 count) {
+    if (!focus || !count) {
+        return 0;
+    }
+    if (*focus >= count) {
+        *focus = 0;
+    }
+    if (key != '\t') {
+        return 0;
+    }
+    *focus = (*focus + 1) % count;
+    return 1;
+}
+
+void tui_list_draw(
+    int x,
+    int y,
+    int width,
+    int height,
+    const char* const* items,
+    u32 count,
+    u32 selected,
+    u32 top,
+    int focused) {
+    if (width < 3 || width > 80 || height < 1 || height > 25) {
+        return;
+    }
+    for (int row = 0; row < height; ++row) {
+        u32 i = top + row;
+        tui_choice_row(
+            x,
+            y + row,
+            width - 1,
+            i < count ? items[i] : "",
+            focused && i < count && i == selected,
+            TUI_POPUP);
+    }
+    tui_scrollbar(x + width - 1, y, height, top, height, count);
 }

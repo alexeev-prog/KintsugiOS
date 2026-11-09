@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
         for (int i = top; i < count && i < (int)top + 14; ++i) {
             int y = i - top + 4;
             unsigned char color = i == (int)selected ? 0x70 : 0x1f;
-            tui_fill(1, y, 77, 1, color);
+            tui_choice_row(1, y, 77, "", i == (int)selected, 0x1f);
             tui_number(2, y, list[i].pid, color);
             tui_number(8, y, list[i].parent, color);
             tui_text(14, y, list[i].state < 5 ? states[list[i].state] : "?", color);
@@ -66,6 +66,11 @@ int main(int argc, char** argv) {
             tui_number(35, 6 + i * 2, values[i], 0x1e);
         }
         tui_gauge(3, 15, 70, info.clusters - info.free_clusters, info.clusters);
+        tui_text(
+            3,
+            18,
+            info.mounted ? "Volume online" : "Volume unavailable",
+            info.mounted ? TUI_SUCCESS : TUI_ERROR);
         tui_bar(23, "C check filesystem | No partitioning, formatting or repair operations");
 #else
         tui_bar(0, "KTUI - Kintsugi application launcher");
@@ -81,6 +86,12 @@ int main(int argc, char** argv) {
             paused ? "Paused | Space resume | H help | Q / Esc quit" : "Space pause | H help | Q / Esc quit");
         tui_present(79, 24);
         int key = tui_key(paused ? 1 : 2);
+        if (key == TUI_F1) {
+            key = 'h';
+        }
+        if (key == TUI_F10) {
+            key = 'q';
+        }
         if (key == 'q' || key == 27) {
             return 0;
         }
@@ -151,7 +162,26 @@ int main(int argc, char** argv) {
             }
         }
         if (key == 'h') {
-            tui_message("KTUI demo", "Clipped text, boxes, modal input and persistent settings.");
+            int checked = 1;
+            u32 focus = 0;
+            if (tui_modal_begin("Shared widgets - Tab focus / Space toggle / Esc close", 70, 13)) {
+                for (;;) {
+                    tui_checkbox(8, 9, "Example option", checked, focus == 0);
+                    tui_radio(8, 11, "Selected radio option", 1, focus == 1);
+                    tui_button(8, 14, 18, "Close", focus == 2, 1);
+                    tui_button(30, 14, 18, "Unavailable", 0, 0);
+                    tui_present(79, 24);
+                    int event = tui_key(1);
+                    if (event == 27 || (event == '\n' && focus == 2)) {
+                        break;
+                    }
+                    tui_focus_key(event, &focus, 3);
+                    if (focus == 0) {
+                        tui_toggle_key(event, &checked);
+                    }
+                }
+                tui_modal_end();
+            }
         }
 #endif
     }

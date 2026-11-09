@@ -59,6 +59,9 @@ static void keyboard_callback(registers_t registers) {
     }
     if (ext) {
         switch (code) {
+            case 0x52:
+                enqueue(KEY_INSERT);
+                break;
             case 0x49:
                 enqueue(KEY_PAGE_UP);
                 break;
@@ -89,7 +92,9 @@ static void keyboard_callback(registers_t registers) {
         }
         return;
     }
-    if (code == 0x1c) {
+    if (code >= 0x3b && code <= 0x44) {
+        enqueue(KEY_F1 + code - 0x3b);
+    } else if (code == 0x1c) {
         enqueue('\n');
     } else if (code == 1) {
         enqueue(27);

@@ -1,6 +1,7 @@
 /* Host-side tests: no QEMU, no kernel or hardware dependencies. */
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../src/user/tuiabi.h"
@@ -25,8 +26,72 @@ int syscall(u32 number, u32 a, u32 b, u32 c, u32 d) {
 /* runtime.h declares freestanding malloc with u32 size. Avoid libc conflicts. */
 #define USER_RUNTIME_H
 #include "../src/user/ktuilib.c"
+#define CAPACITY 1024u
+
+static void remember(const char* t, u32 n, u32 p) {
+    (void)t;
+    (void)n;
+    (void)p;
+}
+
+#include "../src/user/syntax.h"
+#include "../src/user/vikmode.h"
 
 int main(void) {
+    vik_state vim = { 0 };
+    char text[CAPACITY] = "one two\nthree\nfour\n";
+    u32 length = strlen(text), cursor = 0;
+    int insert = 0, dirty = 0;
+    assert(vik_key(&vim, text, &length, &cursor, 'd', 0, &insert, &dirty));
+    assert(vik_key(&vim, text, &length, &cursor, 'w', 0, &insert, &dirty));
+    assert(length == 15 && !memcmp(text, "two\nthree\nfour\n", length));
+    vik_key(&vim, text, &length, &cursor, 'p', 0, &insert, &dirty);
+    assert(length == 19);
+    cursor = 0;
+    vik_key(&vim, text, &length, &cursor, '2', 0, &insert, &dirty);
+    vik_key(&vim, text, &length, &cursor, 'y', 0, &insert, &dirty);
+    vik_key(&vim, text, &length, &cursor, 'y', 0, &insert, &dirty);
+    assert(vim.lines[0] && vim.sizes[0] == 14);
+    u32 before = length;
+    vik_key(&vim, text, &length, &cursor, 'd', 1, &insert, &dirty);
+    vik_key(&vim, text, &length, &cursor, 'd', 1, &insert, &dirty);
+    assert(length == before);
+    vik_key(&vim, text, &length, &cursor, 'v', 0, &insert, &dirty);
+    vik_key(&vim, text, &length, &cursor, 'l', 0, &insert, &dirty);
+    vik_key(&vim, text, &length, &cursor, 'c', 0, &insert, &dirty);
+    assert(insert && !vim.visual && length == before - 2);
+    for (int i = 0; i < 27; ++i) {
+        free(vim.registers[i]);
+    }
+    assert(syntax_language("/HOME/TEST.C") == SYN_C);
+    assert(syntax_language("x.asm") == SYN_ASM);
+    assert(syntax_language("x.txt") == SYN_TEXT);
+    syntax_state syntax = { .language = SYN_C };
+    const char* code = "int x; // comment\n\"hi\"";
+    assert(syntax_color(&syntax, code, strlen(code), 0, 7) == TUI_KEYWORD);
+    for (u32 i = 1; i < 7; ++i) {
+        syntax_color(&syntax, code, strlen(code), i, 7);
+    }
+    assert(syntax_color(&syntax, code, strlen(code), 7, 7) == TUI_COMMENT);
+    char value[5] = "ab";
+    tui_input input = { value, sizeof(value), 1 };
+    assert(tui_input_key(&input, 'X') && !strcmp(value, "aXb"));
+    assert(tui_input_key(&input, TUI_DELETE) && !strcmp(value, "aX"));
+    tui_input_key(&input, TUI_HOME);
+    assert(tui_input_key(&input, '1'));
+    assert(tui_input_key(&input, '2'));
+    assert(!tui_input_key(&input, '3') && !strcmp(value, "12aX"));
+    int checked = 0;
+    assert(tui_toggle_key(' ', &checked) && checked);
+    u32 focus = 2;
+    assert(tui_focus_key('\t', &focus, 3) && focus == 0);
+    assert(!tui_focus_key('\t', &focus, 0));
+    assert(tui_theme_parse("07=17\n73=30\n", 12));
+    assert(palette[TUI_INPUT] == 0x30 && palette[TUI_STRING] == 0x0a);
+    tui_input_draw(&input, 2, 2, 2, 1);
+    tui_checkbox(1, 3, "Enabled", checked, 1);
+    tui_radio(1, 4, "Choice", 1, 0);
+    tui_button(1, 5, 12, "Apply", 1, 1);
     char path[256];
     assert(tui_theme_path(path, "custom"));
     assert(!strcmp(path, "/ETC/THEMES/CUSTOM.THM"));
