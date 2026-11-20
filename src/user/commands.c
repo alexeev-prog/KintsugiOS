@@ -156,18 +156,44 @@ int main(int argc, char** argv) {
         return 2;
     }
     u32 cursor = 0;
-    dirent_t entry;
+    dirent_t entries[128];
+    u32 count = 0, max_name = 1, max_size = 1;
     int n;
-    while ((n = call(3, (u32)(argc == 2 ? argv[1] : "."), (u32)&cursor, (u32)&entry, 0)) > 0) {
-        print(entry.name);
-        print(entry.stat.directory ? " <DIR> " : " ");
-        number(entry.stat.size);
-        print(" bytes\n");
+    while (count < 128 && (n = call(3, (u32)(argc == 2 ? argv[1] : "."), (u32)&cursor,
+                                     (u32)&entries[count], 0)) > 0) {
+        u32 name = length(entries[count].name), size = entries[count].stat.size;
+        if (name > max_name) max_name = name;
+        u32 digits = 1;
+        while (size >= 10) { size /= 10; ++digits; }
+        if (digits > max_size) max_size = digits;
+        ++count;
     }
     if (n < 0) {
         print("ls: filesystem unavailable or invalid directory\n");
         return 1;
     }
+    /* Three fixed-width columns fit the 80-column terminal and remain stable
+     * when names and sizes have different lengths. */
+    u32 column_width = 4 + max_name + 2 + max_size + 2;
+    u32 columns = column_width ? 80 / column_width : 1;
+    if (!columns) columns = 1;
+    for (u32 i = 0; i < count; ++i) {
+        print(entries[i].stat.directory ? "[D] " : "    ");
+        print(entries[i].name);
+        for (u32 j = length(entries[i].name); j < max_name + 2; ++j) print(" ");
+        u32 size = entries[i].stat.size, digits = 1;
+        while (size >= 10) { size /= 10; ++digits; }
+        for (u32 j = digits; j < max_size; ++j) print(" ");
+        number(entries[i].stat.size);
+        print(" B");
+        if ((i + 1) % columns) {
+            u32 used = 4 + length(entries[i].name) + 2 + max_size + 2;
+            for (u32 j = used; j < column_width; ++j) print(" ");
+        } else {
+            print("\n");
+        }
+    }
+    if (count && count % columns) print("\n");
     return 0;
 #elif COMMAND == 4
     (void)argc;

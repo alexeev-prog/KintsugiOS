@@ -1,0 +1,10 @@
+KCALC(1)                      KintsugiOS                      KCALC(1)
+
+NAME
+    kcalc - calculate unsigned decimal or hexadecimal expressions
+
+SYNOPSIS
+    kcalc NUMBER [OP NUMBER]
+
+OPERATORS
+    +  -  *  /       Hexadecimal numbers use the 0x prefix.

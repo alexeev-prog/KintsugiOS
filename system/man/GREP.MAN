@@ -1,0 +1,10 @@
+GREP(1)                       KintsugiOS                       GREP(1)
+
+NAME
+    grep - print input lines containing a literal string
+
+SYNOPSIS
+    grep STRING [FILE]
+
+DESCRIPTION
+    With no FILE, grep reads standard input and can be used in a pipeline.

@@ -1,0 +1,4 @@
+# KintsugiOS interactive shell profile
+export PATH=/BIN:/USR/BIN
+export HOME=/HOME
+export TERM=kintsugi

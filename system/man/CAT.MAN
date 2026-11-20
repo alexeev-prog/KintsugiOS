@@ -1,0 +1,10 @@
+CAT(1)                        KintsugiOS                        CAT(1)
+
+NAME
+    cat - copy a file or standard input to standard output
+
+SYNOPSIS
+    cat [FILE]
+
+EXAMPLE
+    cat file.txt | grep Hello

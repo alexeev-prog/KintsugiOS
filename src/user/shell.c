@@ -327,6 +327,30 @@ too_long:
 static int execute_inner(char* text, command_frame* frame) {
     char quote = 0;
     int background = 0;
+    /* Command lists and a single parenthesized group are intentionally parsed
+     * before pipelines. This keeps each subcommand on the same shell context. */
+    for (char* p = text; *p; ++p) {
+        if (*p == '\\' && quote != '\'' && p[1]) { ++p; continue; }
+        if (*p == '\'' || *p == '"') {
+            if (!quote) quote = *p; else if (quote == *p) quote = 0;
+            continue;
+        }
+        if (!quote && *p == ';') {
+            *p = 0;
+            int result = execute_raw(text);
+            char* next = p + 1;
+            while (*next == ' ' || *next == '\t') ++next;
+            return *next ? execute_raw(next) : result;
+        }
+    }
+    char* begin = text;
+    while (*begin == ' ' || *begin == '\t') ++begin;
+    unsigned length = len(begin);
+    if (length >= 2 && begin[0] == '(' && begin[length - 1] == ')') {
+        begin[length - 1] = 0;
+        return execute_raw(begin + 1);
+    }
+    quote = 0;
     for (char* p = text; *p; ++p) {
         if (*p == '\\' && quote != '\'') {
             if (p[1]) {
@@ -345,7 +369,8 @@ static int execute_inner(char* text, command_frame* frame) {
         if (quote) {
             continue;
         }
-        if (*p == '|' && p[1] == '|') {
+        if ((*p == '|' || *p == '&') && p[1] == *p) {
+            char operator = *p;
             char* left = text;
             while (*left == ' ' || *left == '\t') {
                 ++left;
@@ -355,12 +380,13 @@ static int execute_inner(char* text, command_frame* frame) {
                 ++right;
             }
             if (left == p || !*right) {
-                print("Syntax error: missing command around ||\n");
+                print("Syntax error: missing command around operator\n");
                 return 2;
             }
             *p = 0;
             int result = execute_raw(text);
-            return result ? execute_raw(p + 2) : result;
+            return operator == '|' ? (result ? execute_raw(p + 2) : result)
+                                   : (result ? result : execute_raw(p + 2));
         }
         if (*p == '&') {
             char* tail = p + 1;
@@ -666,13 +692,20 @@ static void redraw(void) {
 
 int main(int argc, char** argv) {
     if (!getenv("PATH")) {
-        setenv("PATH", "/BIN");
+        setenv("PATH", "/BIN:/USR/BIN");
     }
     if (!getenv("HOME")) {
         setenv("HOME", "/HOME");
     }
     if (!getenv("TERM")) {
         setenv("TERM", "kintsugi");
+    }
+    if (argc == 1) {
+        int profile = open("/ETC/PROFILE", KOS_O_READ);
+        if (profile >= 0) {
+            close(profile);
+            run_script("/ETC/PROFILE", 0, (char**)0);
+        }
     }
     if (argc > 1) {
         return run_script(argv[1], argc - 1, argv + 1);

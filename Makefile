@@ -28,7 +28,7 @@ OBJS := $(BIN_DIR)/bootloader/kernel_entry.o $(BIN_DIR)/kernel/cpu/interrupt.o $
 
 all: $(BIN_DIR)/kintsugios.bin users
 
-USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG FDCHECK
+USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG FDCHECK KCALC
 USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
 USER_ELFS += $(BIN_DIR)/user/INIT.ELF
 USER_ELFS += $(BIN_DIR)/user/SHELL.ELF
@@ -39,6 +39,7 @@ $(BIN_DIR)/user/INIT.ELF: src/user/init.c src/user/runtime.h src/user/user.ld $(
 	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/INIT.o
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/INIT.o -o $@
 TUI_PROGRAMS := KUNED VIK KBSM KMEMMAN KC KPROCM KDISKMAN KTUI KTTE PAGER JOURNAL HIERO
+TUI_PROGRAMS += KTERM KMAN
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
@@ -62,6 +63,11 @@ $(eval $(call TUI_RULE,KTTE,ktte))
 $(eval $(call TUI_RULE,PAGER,pager))
 $(eval $(call TUI_RULE,JOURNAL,journal))
 $(eval $(call TUI_RULE,HIERO,hieroglyph))
+$(eval $(call TUI_RULE,KTERM,kterm))
+$(eval $(call TUI_RULE,KMAN,kman))
+$(BIN_DIR)/user/KCALC.ELF: src/user/kcalc.c src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/KCALC.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/KCALC.o -o $@
 $(BIN_DIR)/user/ktuilib.o: src/user/tuidoc.c
 define DIAG_RULE
 $(BIN_DIR)/user/$(1).ELF: src/user/diagnostics.c src/user/sysabi.h $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
