@@ -32,6 +32,17 @@ static void number(u32 n) {
     print(text + i);
 }
 
+static int name_compare(const char* a, const char* b) {
+    while (*a && *b) {
+        char ca = *a >= 'a' && *a <= 'z' ? *a - 32 : *a;
+        char cb = *b >= 'a' && *b <= 'z' ? *b - 32 : *b;
+        if (ca != cb) return (unsigned char)ca - (unsigned char)cb;
+        ++a;
+        ++b;
+    }
+    return (unsigned char)*a - (unsigned char)*b;
+}
+
 int main(int argc, char** argv) {
 #if COMMAND == 10
     (void)argc;
@@ -172,6 +183,15 @@ int main(int argc, char** argv) {
     if (n < 0) {
         print("ls: filesystem unavailable or invalid directory\n");
         return 1;
+    }
+    for (u32 i = 1; i < count; ++i) {
+        dirent_t value = entries[i];
+        u32 j = i;
+        while (j && name_compare(entries[j - 1].name, value.name) > 0) {
+            entries[j] = entries[j - 1];
+            --j;
+        }
+        entries[j] = value;
     }
     /* Unix-style grid: names only, with directories marked by a slash. */
     u32 column_width = max_name + 2;
