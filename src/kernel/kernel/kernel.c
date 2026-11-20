@@ -4,6 +4,7 @@
 #include "../drivers/ata_pio.h"
 #include "../drivers/screen_output_switch.h"
 #include "../drivers/terminal.h"
+#include "../drivers/framebuffer.h"
 #include "../fs/fat12.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
@@ -13,6 +14,7 @@
 #include "sysinfo.h"
 
 void kmain(void) {
+    framebuffer_init();
     log_init();
     log_write("[INFO] kernel entry\n");
     log_event("INFO", "boot", "KintsugiOS %s i386; debug journal enabled", VERSION);

@@ -29,7 +29,7 @@ def run(*arguments, probe=False):
     return True
 
 
-for directory in ("BIN", "BOOT", "ETC", "ETC/THEMES", "HOME", "TMP"):
+for directory in ("BIN", "BOOT", "ETC", "ETC/THEMES", "HOME", "TMP", "MAN"):
     print(f"Checking directory: {directory}", flush=True)
     if not run("mdir", "-i", image, f"::/{directory}/", probe=True):
         run("mmd", "-i", image, f"::/{directory}")
@@ -43,6 +43,9 @@ for filename in programs:
 run("mcopy", "-o", "-i", image, "bin/kernel.bin", "::/BOOT/KERNEL.BIN")
 for theme in sorted(Path("system/themes").glob("*.THM")):
     run("mcopy", "-o", "-i", image, str(theme), f"::/ETC/THEMES/{theme.name}")
+run("mcopy", "-o", "-i", image, "system/PROFILE", "::/ETC/PROFILE")
+for page in sorted(Path("system/man").glob("*.MAN")):
+    run("mcopy", "-o", "-i", image, str(page), f"::/MAN/{page.name}")
 if not run("mdir", "-i", image, "::/ETC/TUI.THM", probe=True):
     run("mcopy", "-i", image, "system/themes/DARK.THM", "::/ETC/TUI.THM")
 print("System installation completed.")
