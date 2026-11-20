@@ -32,6 +32,10 @@ enum {
 typedef kos_stat tui_stat;
 typedef kos_dirent tui_entry;
 
+#define TUI_HEADER 0x70
+#define TUI_FILE_COLOR 0x0f
+#define TUI_EXECUTABLE_COLOR 0x2f
+
 /* Bounded multiline editor. Capacity excludes the required trailing NUL byte.
  * Caller owns text[capacity+1]; widget owns up to eight undo/redo snapshots. */
 typedef struct {
@@ -137,6 +141,7 @@ int tui_prompt(const char* label, char* buffer, u32 capacity);
 int tui_confirm(const char* label);
 void tui_path(char out[256], const char* directory, const char* name);
 int tui_stat_path(const char* path, tui_stat* stat);
+int tui_readdir(const char* path, u32* cursor, tui_entry* entry);
 void tui_parent(char path[256]);
 void tui_fill(int x, int y, int width, int height, unsigned char color);
 void tui_textn(int x, int y, const char* text, u32 width, unsigned char color);

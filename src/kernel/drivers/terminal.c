@@ -17,6 +17,34 @@
 
 /* Глобальное состояние терминала */
 static terminal_state_t term_state;
+static u8 ansi_state;
+static u8 ansi_value;
+
+static int terminal_ansi(char c) {
+    if (!ansi_state && c == 27) { ansi_state = 1; return 1; }
+    if (ansi_state == 1) {
+        if (c == '[') { ansi_state = 2; ansi_value = 0; return 1; }
+        ansi_state = 0;
+        return 0;
+    }
+    if (ansi_state == 2) {
+        if (c >= '0' && c <= '9') {
+            ansi_value = ansi_value * 10 + c - '0';
+            return 1;
+        }
+        if (c == 'm') {
+            if (ansi_value == 0) terminal_reset_color();
+            else if (ansi_value >= 30 && ansi_value <= 37) {
+                static const u8 colors[] = { 0x04, 0x02, 0x06, 0x01, 0x04, 0x05, 0x03, 0x0f };
+                terminal_set_color(colors[ansi_value - 30]);
+            }
+            ansi_state = 0;
+            return 1;
+        }
+        ansi_state = 0;
+    }
+    return 0;
+}
 
 /* Инициализация терминала */
 void terminal_init(void) {
@@ -72,6 +100,7 @@ static void terminal_newline(void) {
 }
 
 void terminal_putchar(char c) {
+    if (terminal_ansi(c)) return;
     /* Move only: line editors erase explicitly by writing spaces. */
     if (c == '\b') {
         if (term_state.cursor_x) {

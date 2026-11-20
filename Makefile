@@ -39,7 +39,7 @@ $(BIN_DIR)/user/INIT.ELF: src/user/init.c src/user/runtime.h src/user/user.ld $(
 	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/INIT.o
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/INIT.o -o $@
 TUI_PROGRAMS := KUNED VIK KBSM KMEMMAN KC KPROCM KDISKMAN KTUI KTTE PAGER JOURNAL HIERO
-TUI_PROGRAMS += KTERM KMAN
+TUI_PROGRAMS += KTERM KMAN DIR
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
@@ -65,6 +65,7 @@ $(eval $(call TUI_RULE,JOURNAL,journal))
 $(eval $(call TUI_RULE,HIERO,hieroglyph))
 $(eval $(call TUI_RULE,KTERM,kterm))
 $(eval $(call TUI_RULE,KMAN,kman))
+$(eval $(call TUI_RULE,DIR,dir))
 $(BIN_DIR)/user/KCALC.ELF: src/user/kcalc.c src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
 	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/KCALC.o
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/KCALC.o -o $@

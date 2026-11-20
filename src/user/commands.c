@@ -162,6 +162,7 @@ int main(int argc, char** argv) {
     while (count < 128 && (n = call(3, (u32)(argc == 2 ? argv[1] : "."), (u32)&cursor,
                                      (u32)&entries[count], 0)) > 0) {
         u32 name = length(entries[count].name), size = entries[count].stat.size;
+        if (entries[count].stat.directory) ++name;
         if (name > max_name) max_name = name;
         u32 digits = 1;
         while (size >= 10) { size /= 10; ++digits; }
@@ -172,22 +173,25 @@ int main(int argc, char** argv) {
         print("ls: filesystem unavailable or invalid directory\n");
         return 1;
     }
-    /* Three fixed-width columns fit the 80-column terminal and remain stable
-     * when names and sizes have different lengths. */
-    u32 column_width = 4 + max_name + 2 + max_size + 2;
+    /* Unix-style grid: names only, with directories marked by a slash. */
+    u32 column_width = max_name + 2;
     u32 columns = column_width ? 80 / column_width : 1;
     if (!columns) columns = 1;
     for (u32 i = 0; i < count; ++i) {
-        print(entries[i].stat.directory ? "[D] " : "    ");
+        if (entries[i].stat.directory) print("\033[34m");
+        else {
+            u32 name_length = length(entries[i].name);
+            if (name_length > 4 && entries[i].name[name_length - 4] == '.'
+                && entries[i].name[name_length - 3] == 'E'
+                && entries[i].name[name_length - 2] == 'L'
+                && entries[i].name[name_length - 1] == 'F') print("\033[32m");
+            else print("\033[37m");
+        }
         print(entries[i].name);
-        for (u32 j = length(entries[i].name); j < max_name + 2; ++j) print(" ");
-        u32 size = entries[i].stat.size, digits = 1;
-        while (size >= 10) { size /= 10; ++digits; }
-        for (u32 j = digits; j < max_size; ++j) print(" ");
-        number(entries[i].stat.size);
-        print(" B");
+        if (entries[i].stat.directory) print("/");
+        print("\033[0m");
         if ((i + 1) % columns) {
-            u32 used = 4 + length(entries[i].name) + 2 + max_size + 2;
+            u32 used = length(entries[i].name) + (entries[i].stat.directory ? 1 : 0);
             for (u32 j = used; j < column_width; ++j) print(" ");
         } else {
             print("\n");

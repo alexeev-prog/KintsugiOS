@@ -410,13 +410,16 @@ void tui_box(int x, int y, int width, int height, const char* title, unsigned ch
         return;
     }
     tui_fill(x, y, width, height, color);
+    const char* h = "\xC4";
+    const char* tl = "\xDA", *tr = "\xBF", *bl = "\xC0", *br = "\xD9";
+    const char* v = "\xB3";
     for (int i = 0; i < width; ++i) {
-        tui_text(x + i, y, i && i < width - 1 ? "-" : "+", color);
-        tui_text(x + i, y + height - 1, i && i < width - 1 ? "-" : "+", color);
+        tui_text(x + i, y, i == 0 ? tl : i == width - 1 ? tr : h, color);
+        tui_text(x + i, y + height - 1, i == 0 ? bl : i == width - 1 ? br : h, color);
     }
     for (int i = 1; i < height - 1; ++i) {
-        tui_text(x, y + i, "|", color);
-        tui_text(x + width - 1, y + i, "|", color);
+        tui_text(x, y + i, v, color);
+        tui_text(x + width - 1, y + i, v, color);
     }
     if (width > 4 && title) {
         tui_textn(x + 2, y, title, width - 4, color);
@@ -609,6 +612,10 @@ void tui_path(char out[256], const char* directory, const char* name) {
 
 int tui_stat_path(const char* path, tui_stat* stat) {
     return syscall(11, (u32)path, 4, (u32)stat, 0);
+}
+
+int tui_readdir(const char* path, u32* cursor, tui_entry* entry) {
+    return syscall(3, (u32)path, (u32)cursor, (u32)entry, 0);
 }
 
 int tui_input_key(tui_input* input, int key) {
