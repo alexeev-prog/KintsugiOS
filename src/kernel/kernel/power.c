@@ -4,6 +4,7 @@
 #include "../drivers/lowlevel_io.h"
 #include "../drivers/terminal.h"
 #include "../fs/vfs.h"
+#include "../fs/block.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
 #include "../user/process.h"
@@ -135,7 +136,7 @@ static int acpi_poweroff(void) {
 }
 
 int system_sync(void) {
-    return ata_pio_flush() ? VFS_EIO : 0;
+    return block_sync() ? VFS_EIO : 0;
 }
 
 void system_shutdown(void) {

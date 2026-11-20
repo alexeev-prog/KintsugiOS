@@ -260,7 +260,7 @@ int fd_write(fd_table_t* table, int fd, const void* buffer, u32 size) {
     if (object->kind == FILE_OBJECT) {
         if (object->flags & KOS_O_APPEND) {
             vfs_stat_t stat;
-            int result = vfs_stat(object->file.path, &stat);
+            int result = vfs_file_stat(&object->file, &stat);
             if (!result) {
                 result = vfs_seek(&object->file, stat.size);
             }
@@ -310,8 +310,7 @@ int fd_truncate(fd_table_t* table, int fd, u32 size) {
     if (object->kind != FILE_OBJECT) {
         return KOS_ESPIPE;
     }
-    int result = vfs_seek(&object->file, object->file.offset);
-    return result ? result : vfs_truncate(object->file.path, size);
+    return vfs_file_truncate(&object->file, size);
 }
 
 int fd_stat(fd_table_t* table, int fd, kos_stat* stat) {
@@ -322,6 +321,5 @@ int fd_stat(fd_table_t* table, int fd, kos_stat* stat) {
     if (object->kind != FILE_OBJECT) {
         return KOS_ESPIPE;
     }
-    int result = vfs_seek(&object->file, object->file.offset);
-    return result ? result : vfs_stat(object->file.path, stat);
+    return vfs_file_stat(&object->file, stat);
 }
