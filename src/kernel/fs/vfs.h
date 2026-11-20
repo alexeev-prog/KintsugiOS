@@ -25,7 +25,7 @@ typedef kos_stat vfs_stat_t;
 typedef kos_dirent vfs_dirent_t;
 
 typedef struct {
-    char path[VFS_PATH_MAX];
+    void* object;
     u32 offset, generation;
     u8 open;
 } vfs_file_t;
@@ -33,12 +33,17 @@ typedef struct {
 int vfs_open(const char* path, vfs_file_t* file);
 int vfs_file_read(vfs_file_t* file, void* buffer, u32 capacity);
 int vfs_file_write(vfs_file_t* file, const void* buffer, u32 size);
+int vfs_file_stat(vfs_file_t* file, vfs_stat_t* stat);
+int vfs_file_truncate(vfs_file_t* file, u32 size);
+const char* vfs_file_path(const vfs_file_t* file);
+void vfs_file_clone(vfs_file_t* destination, const vfs_file_t* source);
 int vfs_seek(vfs_file_t* file, u32 offset);
 void vfs_close(vfs_file_t* file);
 
 typedef struct {
     int (*stat)(const char*, vfs_stat_t*);
     int (*read)(const char*, u32, void*, u32);
+    int (*write)(const char*, u32, const void*, u32);
     int (*replace)(const char*, const void*, u32);
     int (*create)(const char*, int);
     int (*remove)(const char*, int);

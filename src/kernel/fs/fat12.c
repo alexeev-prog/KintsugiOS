@@ -1,5 +1,6 @@
 #include "fat12.h"
 
+#include "block.h"
 #include "../drivers/ata_pio.h"
 #include "../kernel/log.h"
 #include "../kklibc/kklibc.h"
@@ -19,11 +20,11 @@ int fat12_is_mounted(void) {
 extern ata_disk_info_t ata_disks[2];
 
 static int read_sector(u32 sector, void* buffer) {
-    return ata_pio_read_sectors(ATA_MASTER, sector, 1, (u16*)buffer);
+    return block_read(sector, buffer);
 }
 
-static int write_sector(u32 sector, void* buffer) {
-    int result = ata_pio_write_sectors(ATA_MASTER, sector, 1, (u16*)buffer);
+static int write_sector(u32 sector, const void* buffer) {
+    int result = block_write(sector, buffer);
     if (result) {
         log_event(
             "ERROR", "fat12", "Sector write failed lba=%u error=%d; mutations disabled", sector, result);
@@ -48,6 +49,7 @@ int fat12_read_boot_sector(fat12_boot_sector_t* boot) {
 }
 
 void fat12_cleanup(void) {
+    if (mounted) block_sync();
     vfs_mount(NULL);
     mounted = 0;
     if (ctx.fat_buffer) {
@@ -55,6 +57,7 @@ void fat12_cleanup(void) {
     }
     memset(&ctx, 0, sizeof(ctx));
     memset(&boot_sector, 0, sizeof(boot_sector));
+    block_invalidate();
 }
 
 void fat12_init(void) {
@@ -521,6 +524,92 @@ static int driver_read(const char* path, u32 offset, void* buffer, u32 capacity)
     return done;
 }
 
+/* Write only the sectors covered by the requested range. Existing data outside
+ * the range is never copied through a temporary whole-file buffer. */
+static int driver_write(const char* path, u32 offset, const void* data, u32 size) {
+    fat_node_t node;
+    int result = resolve_node(path, &node, NULL, NULL);
+    if (result) return result;
+    if (node.entry.attributes & 0x10) return VFS_EISDIR;
+    if (node.entry.attributes & 1) return VFS_EROFS;
+    if (offset > 0x7fffffffu || size > 0x7fffffffu - offset) return VFS_EINVAL;
+    if (!size) return 0;
+
+    u32 cluster_bytes = boot_sector.sectors_per_cluster * 512u;
+    u32 old_size = node.entry.file_size;
+    if (offset > old_size) {
+        u8 zeros[512];
+        memset(zeros, 0, sizeof(zeros));
+        u32 position = old_size;
+        while (position < offset) {
+            u32 count = offset - position;
+            if (count > sizeof(zeros)) count = sizeof(zeros);
+            result = driver_write(path, position, zeros, count);
+            if (result < 0) return result;
+            position += count;
+        }
+        return driver_write(path, offset, data, size);
+    }
+    u32 new_size = offset + size;
+    u32 old_count, new_count = (new_size + cluster_bytes - 1) / cluster_bytes;
+    result = chain_length(node.entry.first_cluster, &old_count);
+    if (result) return result;
+    if (old_count != (old_size + cluster_bytes - 1) / cluster_bytes) return VFS_ECORRUPT;
+
+    u16 first = node.entry.first_cluster;
+    if (new_count && !first) {
+        result = reserve_chain(new_count, &first);
+        if (result) return result;
+        result = zero_chain(first);
+        if (result) return result;
+        node.entry.first_cluster = first;
+        old_count = 0;
+    } else if (new_count > old_count) {
+        u16 extra, last = first;
+        while (fat_get(last) < 0xff8) last = fat_get(last);
+        result = reserve_chain(new_count - old_count, &extra);
+        if (result) return result;
+        result = zero_chain(extra);
+        if (result) return result;
+        fat_set(last, extra);
+    }
+
+    /* Locate the first cluster and sector touched by the write. */
+    u32 cluster_index = offset / cluster_bytes;
+    u16 cluster = first;
+    for (u32 i = 0; i < cluster_index; ++i) cluster = fat_get(cluster);
+    u32 in_cluster = offset % cluster_bytes;
+    u32 left = size;
+    const u8* source = data;
+    u16 raw[256];
+    while (left) {
+        u32 sector = ctx.data_start_sector + (cluster - 2) * boot_sector.sectors_per_cluster
+                   + in_cluster / 512;
+        u32 in_sector = in_cluster % 512;
+        u32 count = 512 - in_sector;
+        if (count > left) count = left;
+        if (in_sector || count != 512) {
+            if (read_sector(sector, raw)) return VFS_EIO;
+        } else {
+            memset(raw, 0, sizeof(raw));
+        }
+        memcpy((u8*)raw + in_sector, source, count);
+        if (write_sector(sector, raw)) return VFS_EIO;
+        source += count;
+        left -= count;
+        in_cluster += count;
+        if (in_cluster == cluster_bytes && left) {
+            cluster = fat_get(cluster);
+            in_cluster = 0;
+        }
+    }
+    if (new_size > old_size) {
+        node.entry.file_size = new_size;
+        if (directory_entry(node.parent, node.slot, &node.entry, 1) < 0) return VFS_EIO;
+    }
+    return sync_fat() ? VFS_EIO : (int)size;
+}
+
 static int driver_replace(const char* path, const void* data, u32 size) {
     u16 parent;
     char name[11];
@@ -815,6 +904,7 @@ static int driver_rename(const char* source, const char* target) {
 
 static const vfs_ops_t fat_ops = { .stat = driver_stat,
                                    .read = driver_read,
+                                   .write = driver_write,
                                    .replace = driver_replace,
                                    .create = driver_create,
                                    .remove = driver_remove,

@@ -7,6 +7,13 @@ static const vfs_ops_t* backend;
 static u32 generation;
 static char cwd[VFS_PATH_MAX] = "/";
 
+typedef struct {
+    u32 references;
+    u32 mount_generation;
+    const vfs_ops_t* backend;
+    char path[VFS_PATH_MAX];
+} vfs_open_object_t;
+
 void vfs_mount(const vfs_ops_t* ops) {
     backend = ops;
     ++generation;
@@ -23,6 +30,7 @@ int vfs_open(const char* path, vfs_file_t* file) {
         return VFS_EINVAL;
     }
     file->open = 0;
+    file->object = NULL;
     vfs_stat_t stat;
     int result = vfs_stat(path, &stat);
     if (result) {
@@ -31,10 +39,18 @@ int vfs_open(const char* path, vfs_file_t* file) {
     if (stat.directory) {
         return VFS_EISDIR;
     }
-    result = vfs_normalize(path, file->path);
+    char normalized[VFS_PATH_MAX];
+    result = vfs_normalize(path, normalized);
     if (result) {
         return result;
     }
+    vfs_open_object_t* object = kmalloc(sizeof(*object));
+    if (!object) return VFS_ENOMEM;
+    object->references = 1;
+    object->mount_generation = generation;
+    object->backend = backend;
+    strcpy(object->path, normalized);
+    file->object = object;
     file->offset = 0;
     file->generation = generation;
     file->open = 1;
@@ -42,10 +58,12 @@ int vfs_open(const char* path, vfs_file_t* file) {
 }
 
 int vfs_file_read(vfs_file_t* file, void* buffer, u32 capacity) {
-    if (!file || !file->open || file->generation != generation) {
+    if (!file || !file->open || !file->object
+        || ((vfs_open_object_t*)file->object)->mount_generation != generation) {
         return VFS_EINVAL;
     }
-    int result = vfs_read(file->path, file->offset, buffer, capacity);
+    vfs_open_object_t* object = file->object;
+    int result = object->backend->read(object->path, file->offset, buffer, capacity);
     if (result > 0) {
         file->offset += result;
     }
@@ -53,19 +71,21 @@ int vfs_file_read(vfs_file_t* file, void* buffer, u32 capacity) {
 }
 
 int vfs_file_write(vfs_file_t* file, const void* buffer, u32 size) {
-    if (!file || !file->open || file->generation != generation) {
+    if (!file || !file->open || !file->object
+        || ((vfs_open_object_t*)file->object)->mount_generation != generation) {
         return VFS_EINVAL;
     }
-    int result = vfs_write(file->path, file->offset, buffer, size);
-    if (!result) {
-        file->offset += size;
-        return size;
-    }
+    vfs_open_object_t* object = file->object;
+    int result = object->backend->write ? object->backend->write(object->path, file->offset, buffer, size)
+                                        : vfs_write(object->path, file->offset, buffer, size);
+    if (result >= 0) file->offset += result;
     return result;
 }
 
 int vfs_seek(vfs_file_t* file, u32 offset) {
-    if (!file || !file->open || file->generation != generation || offset > 0x7fffffffu) {
+    if (!file || !file->open || !file->object
+        || ((vfs_open_object_t*)file->object)->mount_generation != generation
+        || offset > 0x7fffffffu) {
         return VFS_EINVAL;
     }
     file->offset = offset;
@@ -73,9 +93,38 @@ int vfs_seek(vfs_file_t* file, u32 offset) {
 }
 
 void vfs_close(vfs_file_t* file) {
-    if (file) {
+    if (file && file->open) {
+        vfs_open_object_t* object = file->object;
+        if (object && --object->references == 0) kfree(object);
+        file->object = NULL;
         file->open = 0;
     }
+}
+
+void vfs_file_clone(vfs_file_t* destination, const vfs_file_t* source) {
+    *destination = *source;
+    if (destination->open && destination->object) {
+        ++((vfs_open_object_t*)destination->object)->references;
+    }
+}
+
+int vfs_file_stat(vfs_file_t* file, vfs_stat_t* stat) {
+    if (!file || !file->open || !file->object || !stat
+        || ((vfs_open_object_t*)file->object)->mount_generation != generation) return VFS_EINVAL;
+    vfs_open_object_t* object = file->object;
+    return object->backend->stat(object->path, stat);
+}
+
+int vfs_file_truncate(vfs_file_t* file, u32 size) {
+    if (!file || !file->open || !file->object
+        || ((vfs_open_object_t*)file->object)->mount_generation != generation) return VFS_EINVAL;
+    vfs_open_object_t* object = file->object;
+    return vfs_truncate(object->path, size);
+}
+
+const char* vfs_file_path(const vfs_file_t* file) {
+    if (!file || !file->open || !file->object) return NULL;
+    return ((vfs_open_object_t*)file->object)->path;
 }
 
 int vfs_normalize(const char* path, char out[VFS_PATH_MAX]) {
@@ -251,7 +300,6 @@ int vfs_unlink(const char* path) {
     RESOLVE(path);
     result = backend->remove(absolute, 0);
     if (!result) {
-        ++generation;
     }
     return result;
 }
@@ -276,7 +324,6 @@ int vfs_rename(const char* source, const char* destination) {
     }
     result = backend->rename(absolute, target);
     if (!result) {
-        ++generation;
     }
     return result;
 }
