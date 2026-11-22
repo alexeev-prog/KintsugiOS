@@ -82,11 +82,12 @@ int main(int argc, char** argv) {
         tui_text(11, 7, "1 Editor     2 Commander     3 Resource monitor", 0x1f);
         tui_text(11, 10, "4 Processes 5 Disks 6 Vik 7 Themes 8 Memory", 0x1f);
         tui_text(11, 14, "9 Hieroglyph documents | H widget demo", 0x1e);
-        tui_bar(23, "Choose application by number | Enter opens application menu");
+        tui_bar(23, "1-9 apps | W KiWi | P Paint | D Settings | I System info | Enter menu");
 #endif
         tui_bar(
             24,
             paused ? "Paused | Space resume | H help | Q / Esc quit" : "Space pause | H help | Q / Esc quit");
+        tui_status(22);
         tui_present(79, 24);
         int key = tui_key(paused ? 1 : 2);
         if (key == TUI_F1) {
@@ -109,7 +110,7 @@ int main(int argc, char** argv) {
         if (key == 's') {
             sort_ticks = !sort_ticks;
         }
-        if (key == 'k' && count && tui_confirm("Terminate selected process? Shell/init are protected.")) {
+        if (key == 'k' && count && tui_confirm("Terminate selected process? Only init is protected.")) {
             int result = kill(list[selected].pid);
             tui_message("Terminate process", result ? kos_error(result) : "Termination requested");
         }
@@ -132,7 +133,7 @@ int main(int argc, char** argv) {
             }
         }
         if (key == 'h') {
-            tui_message("Process manager", "Arrows/Home/End select. Read-only; no unsafe kill operation.");
+            tui_message("Process manager", "Arrows select; K terminates any process except init, including this manager.");
         }
 #elif APP == 2
         (void)selected;
@@ -153,6 +154,12 @@ int main(int argc, char** argv) {
                                         : "FAT12 allocation and directory structure are consistent");
         }
 #elif APP == 3
+        if (key == 'w' || key == 'p' || key == 'D' || key == 'i') {
+            const char* path = key == 'w' ? "/BIN/KIWI.ELF" : key == 'p' ? "/BIN/KPAINT.ELF"
+                : key == 'D' ? "/BIN/KSET.ELF" : "/BIN/KINFO.ELF";
+            int result = tui_launch(path, 0);
+            if (result < 0) tui_message("Launcher", kos_error(result));
+        }
         const char* programs[] = { "KUNED", "KC",   "KBSM",    "KPROCM", "KDISKMAN",
                                    "VIK",   "KTTE", "KMEMMAN", "HIERO" };
         const char* paths[] = { "/BIN/KUNED.ELF",  "/BIN/KC.ELF",       "/BIN/KBSM.ELF",

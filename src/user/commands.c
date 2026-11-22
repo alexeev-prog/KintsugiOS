@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
         || bytes[0] != 'K' || close(fd) || close(15)) {
         return 5;
     }
-    if (wait(0x7fffffff) != KOS_ECHILD || kill(getpid()) != KOS_EPERM || kill(0x7fffffff) != KOS_ESRCH) {
+    if (wait(0x7fffffff) != KOS_ECHILD || kill(1) != KOS_EPERM || kill(0x7fffffff) != KOS_ESRCH) {
         return 6;
     }
     for (int i = 0; i < 8; ++i) {

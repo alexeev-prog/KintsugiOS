@@ -14,11 +14,18 @@
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
 #include "screen.h"
+#include "framebuffer.h"
+#include "keyboard.h"
+#include "../../shared/text.h"
 
 /* Глобальное состояние терминала */
 static terminal_state_t term_state;
+/* Hardware-independent presentation snapshot for diagnostics/headless tests. */
+u16 console_cells[MAX_ROWS * MAX_COLS];
 static u8 ansi_state;
 static u8 ansi_value;
+static u32 utf_code, utf_min;
+static u8 utf_left;
 
 static int terminal_ansi(char c) {
     if (!ansi_state && c == 27) { ansi_state = 1; return 1; }
@@ -100,6 +107,25 @@ static void terminal_newline(void) {
 }
 
 void terminal_putchar(char c) {
+    u8 byte = (u8)c;
+    if (utf_left) {
+        if ((byte & 0xc0) == 0x80) {
+            utf_code = (utf_code << 6) | (byte & 63);
+            if (--utf_left) return;
+            c = utf_code >= utf_min && utf_code <= 0x10ffff
+                && !(utf_code >= 0xd800 && utf_code <= 0xdfff) ? text_glyph(utf_code) : '?';
+        } else {
+            utf_left = 0;
+            terminal_putchar('?');
+            terminal_putchar(c);
+            return;
+        }
+    } else if (byte >= 0xc2 && byte <= 0xf4) {
+        utf_left = byte < 0xe0 ? 1 : byte < 0xf0 ? 2 : 3;
+        utf_min = byte < 0xe0 ? 0x80 : byte < 0xf0 ? 0x800 : 0x10000;
+        utf_code = byte & (byte < 0xe0 ? 31 : byte < 0xf0 ? 15 : 7);
+        return;
+    }
     if (terminal_ansi(c)) return;
     /* Move only: line editors erase explicitly by writing spaces. */
     if (c == '\b') {
@@ -274,6 +300,7 @@ void terminal_reset_color(void) {
 
 /* Полная очистка буфера */
 void terminal_clear(void) {
+    utf_left = ansi_state = 0;
     for (u32 y = 0; y < TERMINAL_HEIGHT; y++) {
         for (u32 x = 0; x < TERMINAL_WIDTH; x++) {
             term_state.buffer[y][x].character = ' ';
@@ -303,6 +330,25 @@ void terminal_clear_line(u32 line) {
 /* Низкоуровневая отрисовка */
 static void terminal_direct_render(void) {
     volatile u16* vidmem = (volatile u16*)VIDEO_ADDRESS;
+    static u16 previous[MAX_ROWS][MAX_COLS];
+    static int initialized, old_cursor = -1;
+    static u32 last_generation;
+    int graphics = framebuffer_get_info()->available;
+    if (graphics) {
+        framebuffer_mouse_hide();
+        if (last_generation != framebuffer_generation()) {
+            initialized = 0;
+            last_generation = framebuffer_generation();
+        }
+    }
+    int cursor = -1;
+    if (term_state.cursor_y >= term_state.scroll_offset
+        && term_state.cursor_y < term_state.scroll_offset + MAX_ROWS
+        && term_state.cursor_x < MAX_COLS)
+        cursor = (term_state.cursor_y - term_state.scroll_offset) * MAX_COLS + term_state.cursor_x;
+    if (graphics && !initialized) framebuffer_clear(0x141820);
+    if (graphics) framebuffer_chrome(keyboard_russian(), term_state.scroll_offset
+        < (term_state.cursor_y >= MAX_ROWS ? term_state.cursor_y - MAX_ROWS + 1 : 0));
 
     u32 max_scroll = 0;
     if (TERMINAL_HEIGHT > SCREEN_HEIGHT) {
@@ -331,12 +377,20 @@ static void terminal_direct_render(void) {
 
             // Записываем напрямую в видеопамять
             u16 cell = (u8)character | ((u16)(u8)attribute << 8);
-            if (vidmem[offset / 2] != cell) {
+            console_cells[offset / 2] = cell;
+            if (graphics && (!initialized || previous[screen_row][screen_col] != cell
+                || (int)(offset / 2) == cursor || (int)(offset / 2) == old_cursor))
+                framebuffer_cell(screen_col, screen_row, character, attribute, (int)(offset / 2) == cursor);
+            previous[screen_row][screen_col] = cell;
+            if (!graphics && vidmem[offset / 2] != cell) {
                 vidmem[offset / 2] = cell;
             }
         }
     }
 
+    initialized = 1;
+    old_cursor = cursor;
+    if (graphics) framebuffer_mouse_show();
     u32 cursor_screen_row = 0;
     u8 cursor_visible = 0;
 
@@ -356,6 +410,10 @@ void terminal_refresh(void) {
     if (!term_state.dirty) {
         return;
     }
+    extern u32 tick;
+    static u32 refresh_tick = ~0u;
+    if (framebuffer_get_info()->available && tick && refresh_tick == tick) return;
+    refresh_tick = tick;
 
     terminal_direct_render();
 

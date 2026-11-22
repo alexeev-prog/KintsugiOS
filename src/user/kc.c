@@ -202,7 +202,17 @@ int main(int argc, char** argv) {
         tui_bar(23, status);
         tui_bar(24, "1 Help 2 Info 3 View 4 Edit 5 Copy 6 Move 7 Mkdir 8 Delete 9 Menu 10 Quit");
         tui_present(79, 24);
-        int key = tui_key(1);
+        tui_event event;
+        tui_event_read(&event, 1);
+        int key = event.key;
+        if ((event.pressed & 1) && event.mouse_y >= 4 && event.mouse_y < 22
+            && event.mouse_x >= 0 && event.mouse_x < 80) {
+            active = event.mouse_x >= 40;
+            tab* clicked = &panels[active].tabs[panels[active].active];
+            unsigned at = clicked->top + event.mouse_y - 4;
+            if (at < panels[active].entries_count) clicked->selected = at;
+        }
+        if ((event.pressed & 2) && event.mouse_y >= 4 && event.mouse_y < 22) key = '\n';
         static const int functions[] = { 'h', 'i', 'v', '\n', 'c', 'm', 'n', 'd', 'o', 'q' };
         if (key >= TUI_F1 && key <= TUI_F10) {
             key = functions[key - TUI_F1];
@@ -319,9 +329,12 @@ int main(int argc, char** argv) {
                     }
                     t->selected = t->top = 0;
                 } else {
-                    char* args[] = { "KUNED", source, 0 };
-                    int pid = spawn("/BIN/KUNED.ELF", 2, args);
-                    status = pid > 0 && wait(pid) == 0 ? "Editor closed" : "Editor failed";
+                    u32 n = tui_len(source);
+                    int executable = n > 4 && same(source + n - 4, ".ELF");
+                    int painting = n > 4 && same(source + n - 4, ".KPT");
+                    int result = tui_launch(executable ? source : painting ? "/BIN/KPAINT.ELF" : "/BIN/KUNED.ELF",
+                        executable ? 0 : source);
+                    status = result < 0 ? kos_error(result) : result ? "Application returned error" : "Application closed";
                 }
             } else if (key == 'n' && tui_prompt("New directory:", input, sizeof(input))) {
                 tui_path(dest, t->directory, input);

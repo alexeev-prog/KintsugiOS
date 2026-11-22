@@ -86,13 +86,13 @@ int tui_editor_key(tui_editor* e, int key) {
     }
     if (key == TUI_LEFT) {
         if (e->cursor) {
-            --e->cursor;
+            e->cursor = text_prev(e->text, e->cursor);
         }
         return 0;
     }
     if (key == TUI_RIGHT) {
         if (e->cursor < e->length) {
-            ++e->cursor;
+            e->cursor = text_next(e->text, e->cursor);
         }
         return 0;
     }
@@ -105,7 +105,8 @@ int tui_editor_key(tui_editor* e, int key) {
         return 0;
     }
     if (key == TUI_UP || key == TUI_DOWN || key == TUI_PAGE_UP || key == TUI_PAGE_DOWN) {
-        u32 col = e->cursor - doc_start(e->text, e->cursor);
+        u32 line_start = doc_start(e->text, e->cursor);
+        u32 col = text_columns(e->text + line_start, e->cursor - line_start);
         u32 steps = key == TUI_PAGE_UP || key == TUI_PAGE_DOWN ? 20 : 1;
         while (steps--) {
             u32 start = doc_start(e->text, e->cursor), end = doc_end(e->text, e->length, e->cursor);
@@ -122,12 +123,17 @@ int tui_editor_key(tui_editor* e, int key) {
                 start = end + 1;
                 end = doc_end(e->text, e->length, start);
             }
-            e->cursor = start + (col < end - start ? col : end - start);
+            e->cursor = start;
+            for (u32 c = 0; c < col && e->cursor < end; ++c)
+                e->cursor = text_next(e->text, e->cursor);
         }
         return 0;
     }
     int remove = (key == 8 && e->cursor) || (key == TUI_DELETE && e->cursor < e->length);
-    u32 add = key == '\t' ? 4 : key == '\n' || (key >= 32 && key < 127) ? 1 : 0;
+    char encoded[4] = {0};
+    u32 add = text_key(key, encoded);
+    if (key == '\n') { encoded[0] = '\n'; add = 1; }
+    if (key == '\t') { for (u32 i = 0; i < 4; ++i) encoded[i] = ' '; add = 4; }
     if (!remove && !add) {
         return 0;
     }
@@ -135,19 +141,21 @@ int tui_editor_key(tui_editor* e, int key) {
         return -1;
     }
     if (remove) {
+        u32 end = key == 8 ? e->cursor : text_next(e->text, e->cursor);
         if (key == 8) {
-            --e->cursor;
+            e->cursor = text_prev(e->text, e->cursor);
         }
-        for (u32 i = e->cursor; i < e->length; ++i) {
-            e->text[i] = e->text[i + 1];
+        u32 count = end - e->cursor;
+        for (u32 i = e->cursor; i <= e->length - count; ++i) {
+            e->text[i] = e->text[i + count];
         }
-        --e->length;
+        e->length -= count;
     } else {
         for (u32 i = e->length + 1; i > e->cursor; --i) {
             e->text[i + add - 1] = e->text[i - 1];
         }
         for (u32 i = 0; i < add; ++i) {
-            e->text[e->cursor++] = key == '\t' ? ' ' : key;
+            e->text[e->cursor++] = encoded[i];
         }
         e->length += add;
     }
@@ -181,7 +189,7 @@ void tui_editor_draw(tui_editor* e, int x, int y, int width, int height) {
         return;
     }
     u32 row = 0, col = 0, cr = 0, cc = 0;
-    for (u32 i = 0; i <= e->length; ++i) {
+    for (u32 i = 0; i <= e->length; i = text_next(e->text, i)) {
         if (i == e->cursor) {
             cr = row;
             cc = col;
@@ -202,10 +210,13 @@ void tui_editor_draw(tui_editor* e, int x, int y, int width, int height) {
     }
     tui_fill(x, y, width, height, 0x07);
     u32 r = 0, c = 0;
-    for (u32 i = 0; i < e->length; ++i) {
+    for (u32 i = 0; i < e->length; i = text_next(e->text, i)) {
         char ch = e->text[i];
         if (ch != '\n' && r >= e->top && r < e->top + height) {
-            char out[2] = { ch >= 32 && ch < 127 ? ch : ' ', 0 };
+            char out[5] = {0};
+            u32 count = text_next(e->text, i) - i;
+            if (count > 4) count = 1;
+            for (u32 j = 0; j < count; ++j) out[j] = e->text[i + j];
             tui_text(x + c, y + r - e->top, out, 0x07);
         }
         if (ch == '\n' || ++c == (u32)width) {
@@ -213,7 +224,12 @@ void tui_editor_draw(tui_editor* e, int x, int y, int width, int height) {
             c = 0;
         }
     }
-    char caret[2] = { e->cursor < e->length && e->text[e->cursor] >= 32 ? e->text[e->cursor] : ' ', 0 };
+    char caret[5] = { ' ', 0, 0, 0, 0 };
+    if (e->cursor < e->length && (unsigned char)e->text[e->cursor] >= 32) {
+        u32 count = text_next(e->text, e->cursor) - e->cursor;
+        if (count > 4) count = 1;
+        for (u32 j = 0; j < count; ++j) caret[j] = e->text[e->cursor + j];
+    }
     tui_text(x + cc, y + cr - e->top, caret, TUI_FOCUS);
     tui_scrollbar(x + width, y, height, e->top, height, row + 1);
 }
@@ -223,13 +239,13 @@ typedef struct {
     u32 top, row, col;
 } doc_layout;
 
-static void doc_put(doc_layout* d, char ch, unsigned char color) {
+static void doc_put(doc_layout* d, unsigned char ch, unsigned char color) {
     if (d->col == (u32)d->width) {
         ++d->row;
         d->col = 0;
     }
     if (d->row >= d->top && d->row - d->top < (u32)d->height) {
-        char out[2] = { ch >= 32 && ch < 127 ? ch : ' ', 0 };
+        char out[2] = { ch >= 32 ? ch : ' ', 0 };
         tui_text(d->x + d->col, d->y + d->row - d->top, out, color);
     }
     ++d->col;
@@ -365,8 +381,10 @@ u32 tui_markdown(const char* text, u32 length, int x, int y, int width, int heig
                         d.col = 0;
                     }
                 }
-                doc_put(&d, ch, code ? TUI_STRING : bold ? TUI_KEYWORD : italic ? TUI_WARNING : base);
-                ++p;
+                const char* next = text + p;
+                unsigned glyph = text_decode(&next);
+                doc_put(&d, glyph, code ? TUI_STRING : bold ? TUI_KEYWORD : italic ? TUI_WARNING : base);
+                p = next - text;
             }
         }
         ++d.row;

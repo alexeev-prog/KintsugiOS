@@ -5,6 +5,7 @@
 #include "../drivers/screen_output_switch.h"
 #include "../drivers/terminal.h"
 #include "../drivers/framebuffer.h"
+#include "../drivers/mouse.h"
 #include "../fs/fat12.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
@@ -36,9 +37,11 @@ void kmain(void) {
     process_init();
     log_event("INFO", "process", "Ring3, TSS and int80 ready; scheduler capacity=16");
     terminal_init();
-    log_event("INFO", "terminal", "VGA text 80x25; scrollback 200 lines");
+    log_event("INFO", "terminal", "%s; UTF-8 Cyrillic; scrollback 200 lines",
+        framebuffer_get_info()->available ? "Framebuffer 1280x800, 80x25 large cells" : "VGA text 80x25");
     output_set_mode(OUTPUT_MODE_TERMINAL);
     terminal_refresh();
+    mouse_init();
     irq_install();
     log_event("INFO", "drivers", "PIT 50 Hz and PS/2 keyboard IRQ handlers installed");
     detect_cpu();

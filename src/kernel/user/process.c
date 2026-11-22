@@ -7,6 +7,8 @@
 #include "../cpu/idt.h"
 #include "../drivers/ata_pio.h"
 #include "../drivers/keyboard.h"
+#include "../drivers/framebuffer.h"
+#include "../drivers/mouse.h"
 #include "../drivers/terminal.h"
 #include "../fs/fat12.h"
 #include "../fs/vfs.h"
@@ -883,8 +885,10 @@ void syscall_dispatch(syscall_regs_t* r) {
                 if (p->pid != r->ebx || !p->state || p->state == ZOMBIE) {
                     continue;
                 }
-                if (p == current || p->pid == init_pid || p->shell) {
+                if (p->pid == init_pid) {
                     r->eax = KOS_EPERM;
+                } else if (p == current) {
+                    process_exit(130);
                 } else {
                     p->interrupted = 1;
                     if (p->state == WAITING) {
@@ -920,6 +924,34 @@ void syscall_dispatch(syscall_regs_t* r) {
                                  : fd_write(&current->descriptors, r->ebx, (void*)r->ecx, r->edx);
             } while (result == KOS_EAGAIN);
             r->eax = result;
+            return;
+        }
+        case KOS_SYS_DISPLAY:
+            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            r->eax = framebuffer_mode(r->ebx);
+            terminal_get_state()->dirty = 1;
+            return;
+        case KOS_SYS_LAYOUT:
+            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            keyboard_set_layout(r->ebx);
+            r->eax = 0;
+            return;
+        case KOS_SYS_MOUSE:
+            if (!user_range(r->ebx, sizeof(kos_mouse), 1)) break;
+            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            memcpy((void*)r->ebx, mouse_state(), sizeof(kos_mouse));
+            r->eax = 0;
+            return;
+        case KOS_SYS_DESKTOP: {
+            if (!user_range(r->ebx, sizeof(kos_desktop_info), 1)) break;
+            const framebuffer_info_t* fb = framebuffer_get_info();
+            memory_stats_t m = memory_stats();
+            extern u32 tick;
+            kos_desktop_info out = {fb->width, fb->height, fb->available, framebuffer_mode_index(),
+                tick / 50, m.free_pages * 4, m.usable_kib, 0, keyboard_russian()};
+            for (int i = 0; i < PROCESS_MAX; ++i) if (processes[i].state) ++out.processes;
+            memcpy((void*)r->ebx, &out, sizeof(out));
+            r->eax = 0;
             return;
         }
         case 16: { /* Bounded process table snapshot. */

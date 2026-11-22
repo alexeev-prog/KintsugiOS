@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
         write_all(2, "pager: cannot open file\n", 24);
         return 1;
     }
-    char* data = malloc(LIMIT);
+    char* data = malloc(LIMIT + 1);
     if (!data) {
         return 1;
     }
@@ -25,10 +25,11 @@ int main(int argc, char** argv) {
         return 1;
     }
     u32 lines = 1, column = 0;
+    data[used] = 0;
     offsets[0] = 0;
-    for (u32 i = 0; i < used && lines < 32768; ++i) {
+    for (u32 i = 0; i < used && lines < 32768; i = text_next(data, i)) {
         if (data[i] == '\n' || ++column == 78) {
-            offsets[lines++] = i + 1;
+            offsets[lines++] = text_next(data, i);
             column = 0;
         }
     }
@@ -39,12 +40,11 @@ int main(int argc, char** argv) {
         for (u32 row = 0; row < 23 && top + row < lines; ++row) {
             u32 start = offsets[top + row], end = top + row + 1 < lines ? offsets[top + row + 1] : used;
             int x = 1;
-            for (u32 i = start; i < end && x < 79; ++i) {
-                char c[2] = { data[i] >= 32 && data[i] < 127 ? data[i] : ' ', 0 };
+            for (u32 i = start; i < end && x < 79; i = text_next(data, i)) {
                 if (data[i] == '\n' || data[i] == '\r') {
                     continue;
                 }
-                tui_text(x++, row + 1, c, 0x07);
+                tui_textn(x++, row + 1, data + i, 1, 0x07);
             }
         }
         tui_bar(

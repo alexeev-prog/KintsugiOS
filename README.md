@@ -30,6 +30,14 @@ KintsugiOS — это минималистичная x86 операционна�
 
 ## Быстрый старт
 
+Экран **1024×768**, крупный шрифт и ввод русских букв через **Alt+Shift**:
+[экран и кириллица](docs/DISPLAY_RU.md).
+
+**Рабочее пространство:** `kset` (режимы до 1600×900), `kpaint` (рисование),
+`kiwi` (экспериментальные TUI-окна), `kinfo` (система и ввод), PS/2-мышь.
+Раскладка переключается **F12**, Ctrl+Shift или Alt+Shift.
+[Управление, темы и ограничения](docs/DESKTOP_RU.md).
+
 ```sh
 sudo apt-get install build-essential binutils nasm python3 qemu-system-x86 dosfstools mtools genisoimage
 make -j4

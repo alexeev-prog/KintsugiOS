@@ -24,6 +24,14 @@ unsigned char port_byte_in(unsigned short port);
  * @param data данные
  **/
 void port_byte_out(unsigned short port, unsigned char data);
+static inline u32 port_dword_in(u16 port) {
+    u32 value;
+    __asm__ volatile("inl %1, %0" : "=a"(value) : "Nd"(port));
+    return value;
+}
+static inline void port_dword_out(u16 port, u32 value) {
+    __asm__ volatile("outl %0, %1" :: "a"(value), "Nd"(port));
+}
 
 /**
  * @brief Poort word in

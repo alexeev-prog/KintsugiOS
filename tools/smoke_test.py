@@ -18,6 +18,9 @@ def deadline(signum, frame):
 signal.signal(signal.SIGALRM, deadline)
 signal.alarm(240)
 started = time.monotonic()
+symbols = subprocess.check_output(["nm", "bin/kernel.elf"], text=True)
+console_address = next(int(line.split()[0], 16) for line in symbols.splitlines()
+                       if line.endswith(" console_cells"))
 
 Path("/tmp/opencode").mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as directory:
@@ -200,7 +203,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
 
         def screen():
             path = tmp / "vga.bin"
-            monitor(f'pmemsave 0xb8000 4000 "{path}"')
+            monitor(f'pmemsave {console_address:#x} 4000 "{path}"')
             return path.read_bytes()[::2].decode("ascii", errors="replace")
 
         def wait_for(text):
@@ -260,6 +263,77 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             time.sleep(0.01)
         assert "[INFO] shell ready" in (tmp / "serial.log").read_text()
         assert "[INFO] E820 PMM VMM paging ready" in (tmp / "serial.log").read_text()
+        if "--desktop" in sys.argv:
+            command("kinfo")
+            wait_for("PS/2 mouse online")
+            monitor("sendkey q 10")
+            time.sleep(0.2)
+            command("kset")
+            wait_for("Display resolution")
+            monitor("sendkey end 10")
+            monitor("sendkey ret 10")
+            time.sleep(0.2)
+            monitor("sendkey y 10")
+            time.sleep(0.2)
+            shot = tmp / "wide.ppm"
+            qmp("screendump", {"filename": str(shot)})
+            assert b"1600 900" in shot.read_bytes()[:64]
+            monitor("sendkey q 10")
+            time.sleep(0.2)
+            command("kiwi")
+            wait_for("KiWi / Kintsugi Window Interface")
+            monitor("sendkey f4 10")
+            time.sleep(0.2)
+            monitor("sendkey esc 10")
+            time.sleep(0.2)
+            command("kpaint")
+            wait_for("KPaint - Kintsugi Paint")
+            # PS/2 relative motion into canvas cell (4,3) at 1600x900.
+            qmp("input-send-event", {"events": [
+                {"type": "rel", "data": {"axis": "x", "value": -480}},
+                {"type": "rel", "data": {"axis": "y", "value": -240}}]})
+            time.sleep(0.2)
+            qmp("input-send-event", {"events": [{"type": "btn", "data": {"button": "left", "down": True}}]})
+            time.sleep(0.2)
+            qmp("input-send-event", {"events": [{"type": "btn", "data": {"button": "left", "down": False}}]})
+            monitor("sendkey spc 10")
+            monitor("sendkey s 10")
+            time.sleep(0.2)
+            command("/HOME/TEST.KPT")
+            wait_for("Drawing saved")
+            monitor("sendkey q 10")
+            time.sleep(0.2)
+            command("kuned /HOME/RU.TXT")
+            wait_for("kuned - Kintsugi Universal Editor")
+            for key in ["f12", "g", "h", "b", "d", "t", "n", "f12", "ctrl-s"]:
+                monitor(f"sendkey {key} 10")
+                time.sleep(0.07)
+            wait_for("Saved")
+            monitor("sendkey ctrl-q 10")
+            time.sleep(0.2)
+            qmp("quit")
+            proc.wait(timeout=10)
+            drawing = subprocess.check_output(["mtype", "-i", str(disk), "::/HOME/TEST.KPT"])
+            assert drawing[:8] == b"KPT1\x48\x11\0\0" and 10 in drawing[8:]
+            document = subprocess.check_output(["mtype", "-i", str(disk), "::/HOME/RU.TXT"])
+            assert document == "привет".encode()
+            print("PASS: mouse online, runtime 1600x900, KiWi, KPaint save, KUNED UTF-8 save")
+            sys.exit(0)
+        if "--display" in sys.argv:
+            assert "Framebuffer 1280x800" in (tmp / "serial.log").read_text()
+            for key in ["e", "c", "h", "o", "spc", "f12", "g", "h", "b", "d", "t", "n", "f12", "ret"]:
+                monitor(f"sendkey {key} 10")
+                time.sleep(0.07)
+            time.sleep(0.3)
+            screen()
+            assert "привет" in (tmp / "vga.bin").read_bytes()[::2].decode("cp866")
+            screenshot = Path("/tmp/opencode/kintsugi-display.ppm")
+            qmp("screendump", {"filename": str(screenshot)})
+            assert b"1280 800" in screenshot.read_bytes()[:64]
+            qmp("quit")
+            proc.wait(timeout=10)
+            print("PASS: 1280x800 framebuffer, F12 layout, Russian UTF-8 shell input/output")
+            sys.exit(0)
         command("memtest")
         wait_for("Memory self-test: PASS")
         command("meminfo")
@@ -399,6 +473,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         time.sleep(0.2)
         command("help bin")
         wait_for("KDISKMAN.ELF")
+        time.sleep(0.2)  # Allow the remaining listing and prompt to finish drawing.
         before_scroll = screen()
         monitor("sendkey x 10")
         time.sleep(0.1)
@@ -417,7 +492,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         command("proc")
         wait_for("PID PPID STATE TICKS")
         command("klog")
-        wait_for("[BOOT] BIOS loader")
+        assert "[BOOT] BIOS loader" in (tmp / "serial.log").read_text()
         command("grep boundary /readme.txt")
         wait_for("cluster boundary data")
         command("wc /readme.txt")
@@ -594,7 +669,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         command("cat readme.txt")
         wait_for("cluster boundary data")
         command("ls")
-        wait_for(str(len(payload)))
+        wait_for("README.TXT")
         command("write check.txt persistent-data")
         command("cat check.txt")
         wait_for("persistent-data")

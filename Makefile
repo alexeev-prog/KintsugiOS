@@ -11,6 +11,7 @@ PYTHON ?= python3
 QEMU ?= qemu-system-i386
 QEMU_FLAGS ?=
 MEMORY ?= 64
+VGA ?= std
 BIN_DIR := bin
 DISKIMG_DIR := diskimgs
 DISKIMG_NAME := kintsugi_floppy_i386.img
@@ -40,6 +41,7 @@ $(BIN_DIR)/user/INIT.ELF: src/user/init.c src/user/runtime.h src/user/user.ld $(
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/INIT.o -o $@
 TUI_PROGRAMS := KUNED VIK KBSM KMEMMAN KC KPROCM KDISKMAN KTUI KTTE PAGER JOURNAL HIERO
 TUI_PROGRAMS += KTERM KMAN DIR
+TUI_PROGRAMS += KSET KPAINT KIWI KINFO
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
@@ -66,6 +68,10 @@ $(eval $(call TUI_RULE,HIERO,hieroglyph))
 $(eval $(call TUI_RULE,KTERM,kterm))
 $(eval $(call TUI_RULE,KMAN,kman))
 $(eval $(call TUI_RULE,DIR,dir))
+$(eval $(call TUI_RULE,KSET,ksettings))
+$(eval $(call TUI_RULE,KPAINT,kpaint))
+$(eval $(call TUI_RULE,KIWI,kiwi))
+$(eval $(call TUI_RULE,KINFO,kinfo))
 $(BIN_DIR)/user/KCALC.ELF: src/user/kcalc.c src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
 	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/KCALC.o
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/KCALC.o -o $@
@@ -121,6 +127,7 @@ system-install: $(FATDISK) $(USER_ELFS) $(BIN_DIR)/kernel.bin
 .PHONY: users system-install
 
 # Compile and link the freestanding kernel
+$(BIN_DIR)/kernel/drivers/framebuffer.o: CFLAGS += -O2
 $(BIN_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -198,7 +205,7 @@ testfiles: $(FAT12_TEST_FILES)
 # Every normal launch has a filesystem disk; run_bin uses a full-size floppy.
 FLOPPY_DRIVE = -drive file=$(FLOPPY),format=raw,if=floppy,index=0
 FAT_DRIVE = -drive file=$(FATDISK),format=raw,if=ide,index=0
-RUN = $(QEMU) -m $(MEMORY) -name KintsugiOS $(QEMU_FLAGS)
+RUN = $(QEMU) -m $(MEMORY) -vga $(VGA) -name KintsugiOS $(QEMU_FLAGS)
 run: run_fat12
 run_bin run_fda run_hdd run_fat12: $(FLOPPY) $(FATDISK) system-install
 	$(RUN) $(FLOPPY_DRIVE) $(FAT_DRIVE) -boot order=a
@@ -235,6 +242,7 @@ test-tui:
 	$(HOSTCC) -Wall -Wextra -Werror -Wno-pointer-to-int-cast -no-pie tools/test_tui.c -o $(BIN_DIR)/test-tui
 	$(BIN_DIR)/test-tui
 test: $(FLOPPY) $(ISO) $(USER_ELFS) test-tui
+	$(PYTHON) tools/smoke_test.py --display
 	$(PYTHON) tools/smoke_test.py
 	$(PYTHON) tools/smoke_test.py --iso
 	$(PYTHON) tools/smoke_test.py --large-kernel

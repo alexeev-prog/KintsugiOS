@@ -7,6 +7,8 @@
 #include "../src/user/tuiabi.h"
 
 typedef unsigned int u32;
+int spawn(const char* path, int argc, char** argv) { (void)path; (void)argc; (void)argv; return -1; }
+int wait(int pid) { (void)pid; return 0; }
 static ktui_cell frame[2000];
 static int keys[32], position;
 
@@ -38,6 +40,22 @@ static void remember(const char* t, u32 n, u32 p) {
 #include "../src/user/vikmode.h"
 
 int main(void) {
+    const char* russian = "Привет, Ёж!";
+    assert(text_decode(&russian) == 0x8f);
+    assert(text_decode(&russian) == 0xe0);
+    assert(text_columns("Привет", 12) == 6);
+    tui_clear(0x07);
+    tui_textn(0, 0, "Привет", 2, 0x07);
+    assert(screen[0][0].character == 0x8f && screen[0][1].character == 0xe0);
+    assert(screen[0][2].character == ' ');
+    char utf_input[16] = "";
+    tui_input russian_input = { utf_input, sizeof(utf_input), 0 };
+    assert(tui_input_key(&russian_input, TEXT_UNICODE_KEY | 0x44f));
+    assert(!strcmp(utf_input, "я"));
+    tui_input_key(&russian_input, TUI_LEFT);
+    assert(russian_input.cursor == 0);
+    tui_input_key(&russian_input, TUI_DELETE);
+    assert(!utf_input[0]);
     char document[65] = "abc\nxyz";
     tui_editor editor = { .text = document, .length = 7, .capacity = 64, .cursor = 1 };
     assert(tui_editor_key(&editor, 'Q') == 1 && !strcmp(document, "aQbc\nxyz"));
@@ -205,7 +223,7 @@ int main(void) {
     tui_window_text(&w, -2, 0, "abcdefghijklm", 0x1e);
     assert(screen[3][3].character == 'c');
     assert(screen[3][10].character == 'j');
-    assert(screen[3][11].character == '|');
+    assert(screen[3][11].character == 0xb3);
     ktui_cell original[25][80];
     memcpy(original, screen, sizeof(screen));
     for (int i = 0; i < MODALS; ++i) {

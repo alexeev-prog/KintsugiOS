@@ -3,6 +3,19 @@
 #include "fsabi.h"
 #include "runtime.h"
 #include "tuiabi.h"
+#include "../shared/text.h"
+#include "desktopabi.h"
+
+#define TUI_COLUMNS 80
+#define TUI_ROWS 25
+typedef struct { int key, mouse_x, mouse_y; unsigned buttons, pressed, released; } tui_event;
+int tui_event_read(tui_event* event, int wait);
+int tui_hit(int x, int y, int width, int height, const tui_event* event);
+void tui_status(int y);
+int tui_launch(const char* path, const char* argument);
+void tui_tabs(int y, const char* const* labels, unsigned count, unsigned selected);
+void tui_progress(int x, int y, int width, unsigned value, unsigned total, const char* label);
+int tui_theme_export(const char* path);
 
 enum {
     TUI_UP = 256,

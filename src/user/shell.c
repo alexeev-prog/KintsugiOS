@@ -1,6 +1,7 @@
 #include "fsabi.h"
 #include "runtime.h"
 #include "shellabi.h"
+#include "../shared/text.h"
 
 static char line[256], history[16][256], draft[256];
 static unsigned length, cursor, rendered, histories, position;
@@ -669,21 +670,21 @@ static void complete(void) {
 
 static void redraw(void) {
     /* Keep the editing line on one physical row, including long commands. */
-    unsigned start = cursor > 73 ? cursor - 73 : 0;
-    unsigned visible = length - start;
-    if (visible > 74) {
-        visible = 74;
-    }
-    char frame[160] = "\r!#> ";
+    unsigned start = 0;
+    while (text_columns(line + start, cursor - start) > 73) start = text_next(line, start);
+    unsigned finish = start, visible = 0;
+    while (finish < length && visible < 74) { finish = text_next(line, finish); ++visible; }
+    char frame[512];
+    frame[0] = '\r'; frame[1] = '!'; frame[2] = '#'; frame[3] = '>'; frame[4] = ' ';
     unsigned n = 5;
-    for (unsigned i = 0; i < visible; ++i) {
-        frame[n++] = line[start + i];
+    for (unsigned i = start; i < finish; ++i) {
+        frame[n++] = line[i];
     }
     for (unsigned i = visible; i < rendered; ++i) {
         frame[n++] = ' ';
     }
     unsigned end = visible > rendered ? visible : rendered;
-    for (unsigned i = cursor - start; i < end; ++i) {
+    for (unsigned i = text_columns(line + start, cursor - start); i < end; ++i) {
         frame[n++] = '\b';
     }
     write_all(1, frame, n);
@@ -741,10 +742,12 @@ int main(int argc, char** argv) {
             line[0] = 0;
             continue;
         }
+        char encoded[4];
+        unsigned add = text_key(key, encoded);
         if (key == 258 && cursor) {
-            --cursor;
+            cursor = text_prev(line, cursor);
         } else if (key == 259 && cursor < length) {
-            ++cursor;
+            cursor = text_next(line, cursor);
         } else if (key == 260) {
             cursor = 0;
         } else if (key == 261) {
@@ -764,19 +767,21 @@ int main(int argc, char** argv) {
         } else if (key == '\t') {
             complete();
         } else if ((key == 8 && cursor) || (key == 262 && cursor < length)) {
+            unsigned end = key == 8 ? cursor : text_next(line, cursor);
             if (key == 8) {
-                --cursor;
+                cursor = text_prev(line, cursor);
             }
-            for (unsigned i = cursor; i < length; ++i) {
-                line[i] = line[i + 1];
+            unsigned count = end - cursor;
+            for (unsigned i = cursor; i <= length - count; ++i) {
+                line[i] = line[i + count];
             }
-            --length;
-        } else if (key >= 32 && key < 127 && length < 255) {
+            length -= count;
+        } else if (add && length + add < 256) {
             for (unsigned i = length + 1; i > cursor; --i) {
-                line[i] = line[i - 1];
+                line[i + add - 1] = line[i - 1];
             }
-            line[cursor++] = key;
-            ++length;
+            for (unsigned i = 0; i < add; ++i) line[cursor++] = encoded[i];
+            length += add;
         }
         redraw();
     }

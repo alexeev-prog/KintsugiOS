@@ -28,5 +28,7 @@ enum {
 
 void init_keyboard(void);
 int keyboard_read_event(void);
+int keyboard_russian(void);
+void keyboard_set_layout(int russian);
 
 #endif

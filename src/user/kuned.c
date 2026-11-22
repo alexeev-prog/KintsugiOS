@@ -144,7 +144,9 @@ int main(int argc, char** argv) {
         unsigned char color = settings[1] ? 0x17 : 0x07;
         u32 row = 0, col = 0;
         u32 logical_line = 1, logical_col = 1;
-        for (u32 i = 0; i < cursor; ++i) {
+        text[length] = 0;
+        while (cursor && cursor < length && ((unsigned char)text[cursor] & 0xc0) == 0x80) --cursor;
+        for (u32 i = 0; i < cursor; i = text_next(text, i)) {
             if (text[i] == '\n') {
                 ++logical_line;
                 logical_col = 1;
@@ -177,7 +179,7 @@ int main(int argc, char** argv) {
             tui_number(0, 1, line, 0x08);
         }
         int row_number_drawn = !top;
-        for (u32 i = 0; i < length && r < top + 22; ++i) {
+        for (u32 i = 0; i < length && r < top + 22; i = text_next(text, i)) {
             unsigned char ch = text[i];
             unsigned char ink = syntax_color(&syntax, text, length, i, color);
             if (VIK && vim.visual) {
@@ -206,8 +208,7 @@ int main(int argc, char** argv) {
                     tui_number(0, r - top + 1, line, 0x08);
                     row_number_drawn = 1;
                 }
-                char s[2] = { ch >= 32 && ch < 127 ? ch : '.', 0 };
-                tui_text(c + gutter, r - top + 1, s, ink);
+                tui_textn(c + gutter, r - top + 1, text + i, 1, ink);
             }
             if (++c == width) {
                 ++r;
@@ -236,6 +237,9 @@ int main(int argc, char** argv) {
         }
         tui_present(col + gutter, row - top + 1);
         int key = tui_key(1);
+        char encoded[4];
+        u32 add = text_key(key, encoded);
+        if (key == '\n') { encoded[0] = '\n'; add = 1; }
         if (VIK && !insert && key == 18) {
             if (!readonly) {
                 history_swap(text, &length, &cursor, 1);
@@ -249,10 +253,11 @@ int main(int argc, char** argv) {
         if (VIK && insert && key == 27) {
             insert = 0;
             if (cursor && text[cursor - 1] != '\n') {
-                --cursor;
+                cursor = text_prev(text, cursor);
             }
             continue;
         }
+        if (VIK && !insert && key >= TEXT_UNICODE_KEY) continue;
         if (VIK && !insert) {
             if (vik_key(&vim, text, &length, &cursor, key, readonly, &insert, &dirty)) {
                 continue;
@@ -560,9 +565,9 @@ int main(int argc, char** argv) {
                 }
             }
         } else if (key == TUI_LEFT && cursor) {
-            --cursor;
+            cursor = text_prev(text, cursor);
         } else if (key == TUI_RIGHT && cursor < length) {
-            ++cursor;
+            cursor = text_next(text, cursor);
         } else if (key == TUI_HOME) {
             while (cursor && text[cursor - 1] != '\n') {
                 --cursor;
@@ -582,7 +587,7 @@ int main(int argc, char** argv) {
                     --cursor;
                 }
                 while (n-- && cursor < length && text[cursor] != '\n') {
-                    ++cursor;
+                    cursor = text_next(text, cursor);
                 }
             }
         } else if (key == TUI_DOWN) {
@@ -594,17 +599,19 @@ int main(int argc, char** argv) {
                 ++cursor;
             }
             while (n-- && cursor < length && text[cursor] != '\n') {
-                ++cursor;
+                cursor = text_next(text, cursor);
             }
         } else if (!readonly && ((key == 8 && cursor) || (key == TUI_DELETE && cursor < length))) {
             remember(text, length, cursor);
+            u32 end = key == 8 ? cursor : text_next(text, cursor);
             if (key == 8) {
-                --cursor;
+                cursor = text_prev(text, cursor);
             }
-            for (u32 i = cursor; i + 1 < length; ++i) {
-                text[i] = text[i + 1];
+            u32 count = end - cursor;
+            for (u32 i = cursor; i + count < length; ++i) {
+                text[i] = text[i + count];
             }
-            --length;
+            length -= count;
             dirty = 1;
         } else if (!readonly && key == '\t' && length + 4 <= CAPACITY) {
             remember(text, length, cursor);
@@ -616,13 +623,13 @@ int main(int argc, char** argv) {
             }
             length += 4;
             dirty = 1;
-        } else if (!readonly && (key == '\n' || (key >= 32 && key < 127)) && length < CAPACITY) {
+        } else if (!readonly && (!VIK || insert) && add && length + add <= CAPACITY) {
             remember(text, length, cursor);
             for (u32 i = length; i > cursor; --i) {
-                text[i] = text[i - 1];
+                text[i + add - 1] = text[i - 1];
             }
-            text[cursor++] = key;
-            ++length;
+            for (u32 i = 0; i < add; ++i) text[cursor++] = encoded[i];
+            length += add;
             dirty = 1;
         }
     }

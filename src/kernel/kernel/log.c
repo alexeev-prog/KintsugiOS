@@ -1,6 +1,7 @@
 #include "log.h"
 
 #include "../drivers/lowlevel_io.h"
+#include "../drivers/framebuffer.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
 
@@ -83,7 +84,8 @@ __attribute__((noreturn)) void panic(const char* message, const registers_t* r) 
     char buffer[256];
     snprintf(buffer, sizeof(buffer), "PANIC: %s\n", message ? message : "Unknown failure");
     log_write(buffer);
-    volatile u16* vga = (volatile u16*)0xb8000;
+    extern u16 console_cells[2000];
+    volatile u16* vga = console_cells;
     for (u32 i = 0; i < 2000; ++i) {
         vga[i] = 0x4f20;
     }
@@ -111,6 +113,11 @@ __attribute__((noreturn)) void panic(const char* message, const registers_t* r) 
                 vga[position++] = 0x4f00 | (u8)*p;
             }
         }
+    }
+    for (u32 i = 0; i < 2000; ++i) {
+        u16 cell = console_cells[i];
+        if (framebuffer_get_info()->available) framebuffer_cell(i % 80, i / 80, cell, cell >> 8, 0);
+        else ((volatile u16*)0xb8000)[i] = cell;
     }
     for (;;) {
         __asm__ volatile("hlt");
