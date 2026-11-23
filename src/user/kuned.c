@@ -529,7 +529,7 @@ int main(int argc, char** argv) {
             char destination[256];
             tui_copy(destination, path, sizeof(destination));
             if ((key == 1 || !*path)
-                && !tui_prompt("Save as (8.3 path):", destination, sizeof(destination))) {
+                && !tui_prompt("Save as (path with long filename):", destination, sizeof(destination))) {
                 continue;
             }
             int result = syscall(10, (u32)destination, (u32)text, length, 0);

@@ -11,6 +11,13 @@ static ktui_cell themed[25][80];
 static unsigned char raw_cells[25][80];
 static unsigned char raw_backgrounds[MODALS][25][80];
 static unsigned mouse_buttons;
+static const char* toast_message;
+static unsigned toast_until;
+void tui_toast(const char* message, unsigned ticks) { toast_message = message; toast_until = ticks ? ticks : 1; }
+int tui_shortcut(int key, const char* label) {
+    (void)label;
+    return key;
+}
 
 int tui_hit(int x, int y, int width, int height, const tui_event* e) {
     return e && e->mouse_x >= x && e->mouse_x < x + width && e->mouse_y >= y && e->mouse_y < y + height;
@@ -26,7 +33,7 @@ int tui_event_read(tui_event* e, int wait) {
     int ch = info.height > 118 ? (info.height - 118) / 25 : 16;
     int ox = (info.width - cw * 80) / 2;
     e->mouse_x = mouse.x < ox ? -1 : (mouse.x - ox) / cw;
-    e->mouse_y = mouse.y < 58 ? -1 : (mouse.y - 58) / ch;
+    e->mouse_y = mouse.y < 44 ? -1 : (mouse.y - 44) / ch;
     e->buttons = mouse.buttons;
     e->pressed = mouse.buttons & ~mouse_buttons;
     e->released = mouse_buttons & ~mouse.buttons;
@@ -601,6 +608,13 @@ void tui_bar(int y, const char* text) {
 }
 
 void tui_present(int x, int y) {
+    if (toast_message && toast_until) {
+        tui_fill(2, 21, 76, 2, TUI_POPUP);
+        tui_box(2, 21, 76, 2, "Notification", TUI_BORDER);
+        tui_textn(5, 21, toast_message, 70, TUI_POPUP);
+        --toast_until;
+        if (!toast_until) toast_message = 0;
+    }
     for (int row = 0; row < 25; ++row) {
         for (int col = 0; col < 80; ++col) {
             themed[row][col] = screen[row][col];
@@ -679,6 +693,10 @@ int tui_stat_path(const char* path, tui_stat* stat) {
 
 int tui_readdir(const char* path, u32* cursor, tui_entry* entry) {
     return syscall(3, (u32)path, (u32)cursor, (u32)entry, 0);
+}
+
+int tui_readdir_long(const char* path, u32* cursor, tui_long_entry* entry) {
+    return syscall(KOS_SYS_READDIR_LONG, (u32)path, (u32)cursor, (u32)entry, 0);
 }
 
 int tui_input_key(tui_input* input, int key) {

@@ -4,11 +4,13 @@
 #include "../kklibc/function.h"
 #include "isr.h"
 #include "../drivers/terminal.h"
+#include "../drivers/audio.h"
 
 u32 tick = 0;
 
 static void timer_callback(registers_t regs) {
     tick++;
+    audio_tick();
     if (!(tick % 50)) terminal_get_state()->dirty = 1;
     terminal_refresh();
     UNUSED(regs);

@@ -336,6 +336,20 @@ int vfs_readdir(const char* path, u32* cursor, vfs_dirent_t* entry) {
     return backend->readdir(absolute, cursor, entry);
 }
 
+int vfs_readdir_long(const char* path, u32* cursor, vfs_long_dirent_t* entry) {
+    if (!cursor || !entry) return VFS_EINVAL;
+    RESOLVE(path);
+    if (backend->readdir_long) return backend->readdir_long(absolute, cursor, entry);
+    vfs_dirent_t legacy;
+    result = backend->readdir(absolute, cursor, &legacy);
+    if (result > 0) {
+        memset(entry, 0, sizeof(*entry));
+        memcpy(entry->name, legacy.name, sizeof(legacy.name));
+        entry->stat = legacy.stat;
+    }
+    return result;
+}
+
 int vfs_copy(const char* source, const char* destination) {
     vfs_stat_t stat;
     int result = vfs_stat(source, &stat);

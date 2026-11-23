@@ -3,7 +3,8 @@
 #include "../../user/fsabi.h"
 #include "../kklibc/ctypes.h"
 #define VFS_PATH_MAX 256
-#define VFS_NAME_MAX 13
+#define VFS_NAME_MAX 13 /* legacy FAT-compatible ABI */
+#define VFS_LONG_NAME_MAX KOS_LONG_NAME_MAX
 
 enum {
     VFS_OK = 0,
@@ -23,6 +24,7 @@ enum {
 
 typedef kos_stat vfs_stat_t;
 typedef kos_dirent vfs_dirent_t;
+typedef kos_long_dirent vfs_long_dirent_t;
 
 typedef struct {
     void* object;
@@ -49,6 +51,7 @@ typedef struct {
     int (*remove)(const char*, int);
     int (*rename)(const char*, const char*);
     int (*readdir)(const char*, u32*, vfs_dirent_t*);
+    int (*readdir_long)(const char*, u32*, vfs_long_dirent_t*);
 } vfs_ops_t;
 
 void vfs_mount(const vfs_ops_t* ops);
@@ -69,5 +72,6 @@ int vfs_rename(const char* source, const char* destination);
 int vfs_copy(const char* source, const char* destination);
 /* readdir: 1 entry, 0 end, negative error. Cursor is opaque to callers. */
 int vfs_readdir(const char* path, u32* cursor, vfs_dirent_t* entry);
+int vfs_readdir_long(const char* path, u32* cursor, vfs_long_dirent_t* entry);
 const char* vfs_error(int error);
 #endif

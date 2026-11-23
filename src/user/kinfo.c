@@ -21,5 +21,6 @@ int main(int argc, char** argv) {
         if (key == 'q' || key == 27) return 0;
         if (key == 's') tui_launch("/BIN/KSET.ELF", 0);
         if (key == 't') tui_theme_choose();
+        if (key == 'f') syscall(KOS_SYS_FRAMEBUFFER_THEME, (info.mode + 1) % KOS_FRAMEBUFFER_THEMES, 0, 0, 0);
     }
 }

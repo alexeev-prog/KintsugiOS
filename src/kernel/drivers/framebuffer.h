@@ -14,4 +14,10 @@ u32 framebuffer_generation(void);
 u32 framebuffer_mode_index(void);
 void framebuffer_mouse_hide(void);
 void framebuffer_mouse_show(void);
+void framebuffer_theme(u32 theme);
+void framebuffer_scale(u32 scale);
+void framebuffer_font(u32 font);
+u32 framebuffer_theme_index(void);
+u32 framebuffer_scale_index(void);
+u32 framebuffer_font_index(void);
 #endif

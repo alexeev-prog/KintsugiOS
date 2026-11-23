@@ -10,6 +10,7 @@ OBJCOPY := $(CROSS)objcopy
 PYTHON ?= python3
 QEMU ?= qemu-system-i386
 QEMU_FLAGS ?=
+AUDIO_FLAGS ?= -audiodev driver=sdl,id=kos-audio -machine pcspk-audiodev=kos-audio
 MEMORY ?= 64
 VGA ?= std
 BIN_DIR := bin
@@ -17,9 +18,11 @@ DISKIMG_DIR := diskimgs
 DISKIMG_NAME := kintsugi_floppy_i386.img
 HDDIMG_NAME := kintsugi_hdd_i386.img
 FAT12_HDD_NAME := kintsugi_fat12_hdd.img
+KFS2_HDD_NAME := kintsugi_kfs2_hdd.img
 ISO_NAME := KintsugiOS.iso
 FLOPPY := $(DISKIMG_DIR)/$(DISKIMG_NAME)
 FATDISK := $(DISKIMG_DIR)/$(FAT12_HDD_NAME)
+KFS2DISK := $(DISKIMG_DIR)/$(KFS2_HDD_NAME)
 ISO := $(DISKIMG_DIR)/$(ISO_NAME)
 FAT12_TEST_FILES := $(wildcard test_files/*)
 CFLAGS := -g -m32 -std=gnu11 -ffreestanding -nostdinc -fno-builtin -fno-stack-protector -fno-pie -fno-pic -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -msoft-float -mpreferred-stack-boundary=2 -Wall -Wextra -MMD -MP
@@ -29,7 +32,7 @@ OBJS := $(BIN_DIR)/bootloader/kernel_entry.o $(BIN_DIR)/kernel/cpu/interrupt.o $
 
 all: $(BIN_DIR)/kintsugios.bin users
 
-USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG FDCHECK KCALC
+USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG FDCHECK KCALC VOLUMECTL
 USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
 USER_ELFS += $(BIN_DIR)/user/INIT.ELF
 USER_ELFS += $(BIN_DIR)/user/SHELL.ELF
@@ -41,7 +44,8 @@ $(BIN_DIR)/user/INIT.ELF: src/user/init.c src/user/runtime.h src/user/user.ld $(
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/INIT.o -o $@
 TUI_PROGRAMS := KUNED VIK KBSM KMEMMAN KC KPROCM KDISKMAN KTUI KTTE PAGER JOURNAL HIERO
 TUI_PROGRAMS += KTERM KMAN DIR
-TUI_PROGRAMS += KSET KPAINT KIWI KINFO
+TUI_PROGRAMS += KSET KPAINT KIWI KINFO KRRAWL
+TUI_PROGRAMS += KMUSA KLISTEN SOUNDCTL
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(TUI_PROGRAMS)))
@@ -72,6 +76,16 @@ $(eval $(call TUI_RULE,KSET,ksettings))
 $(eval $(call TUI_RULE,KPAINT,kpaint))
 $(eval $(call TUI_RULE,KIWI,kiwi))
 $(eval $(call TUI_RULE,KINFO,kinfo))
+$(eval $(call TUI_RULE,KRRAWL,krrawl))
+$(BIN_DIR)/user/KMUSA.ELF: src/user/soundapps.c src/user/ktuilib.h src/user/user.ld $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -DSOUND_APP=1 -c $< -o $(BIN_DIR)/user/KMUSA.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/KMUSA.o -o $@
+$(BIN_DIR)/user/KLISTEN.ELF: src/user/soundapps.c src/user/ktuilib.h src/user/user.ld $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -DSOUND_APP=2 -c $< -o $(BIN_DIR)/user/KLISTEN.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/KLISTEN.o -o $@
+$(BIN_DIR)/user/SOUNDCTL.ELF: src/user/soundapps.c src/user/ktuilib.h src/user/user.ld $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -DSOUND_APP=3 -c $< -o $(BIN_DIR)/user/SOUNDCTL.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/SOUNDCTL.o -o $@
 $(BIN_DIR)/user/KCALC.ELF: src/user/kcalc.c src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
 	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/KCALC.o
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/KCALC.o -o $@
@@ -118,6 +132,7 @@ $(eval $(call USER_RULE,INPUT,7))
 $(eval $(call USER_RULE,SPIN,8))
 $(eval $(call USER_RULE,FDCHECK,10))
 $(eval $(call USER_RULE,KLOG,9))
+$(eval $(call USER_RULE,VOLUMECTL,11))
 users: $(USER_ELFS)
 list-user-programs:
 	@printf '%s\n' $(USER_ELFS)
@@ -205,10 +220,16 @@ testfiles: $(FAT12_TEST_FILES)
 # Every normal launch has a filesystem disk; run_bin uses a full-size floppy.
 FLOPPY_DRIVE = -drive file=$(FLOPPY),format=raw,if=floppy,index=0
 FAT_DRIVE = -drive file=$(FATDISK),format=raw,if=ide,index=0
-RUN = $(QEMU) -m $(MEMORY) -vga $(VGA) -name KintsugiOS $(QEMU_FLAGS)
-run: run_fat12
+RUN = $(QEMU) -m $(MEMORY) -vga $(VGA) -name KintsugiOS $(AUDIO_FLAGS) $(QEMU_FLAGS)
+run: run_kfs2
 run_bin run_fda run_hdd run_fat12: $(FLOPPY) $(FATDISK) system-install
 	$(RUN) $(FLOPPY_DRIVE) $(FAT_DRIVE) -boot order=a
+$(KFS2DISK): $(USER_ELFS) $(BIN_DIR)/kernel.bin
+	@mkdir -p $(dir $@)
+	$(PYTHON) tools/install_kfs2.py $@
+kfs2: $(KFS2DISK)
+run_kfs2: $(FLOPPY) $(KFS2DISK)
+	$(RUN) $(FLOPPY_DRIVE) -drive file=$(KFS2DISK),format=raw,if=ide,index=0 -boot order=a
 run_iso: $(ISO) $(FATDISK) system-install
 	$(RUN) -cdrom $(ISO) $(FAT_DRIVE) -boot order=d
 debug_fda debug_hdd debug_fat12: $(FLOPPY) $(FATDISK)
@@ -252,7 +273,7 @@ test: $(FLOPPY) $(ISO) $(USER_ELFS) test-tui
 	$(PYTHON) tools/smoke_test.py --full-disk
 	$(PYTHON) tools/smoke_test.py --panic
 	$(PYTHON) tools/smoke_test.py --fault
-.PHONY: test
+.PHONY: test kfs2 run_kfs2
 .PHONY: test-tui
 .PHONY: help disk-create disk-reset
 .PHONY: all diskimg hddimg fat12hdd iso testfiles run run_bin run_fda run_hdd run_fat12 run_iso debug_fda debug_hdd debug_fat12 debug_iso clean clean_all quick re info

@@ -6,7 +6,7 @@ static int save(tui_editor* editor, char path[256], int save_as) {
     char destination[256];
     tui_copy(destination, path, 256);
     if (save_as || !*path) {
-        if (!tui_prompt("Save document as (8.3 path, e.g. /HOME/NOTE.MD):", destination, 256)) {
+        if (!tui_prompt("Save document (FAT12: 8.3 names, e.g. /HOME/NOTE.MD):", destination, 256)) {
             return 0;
         }
         tui_stat stat;
@@ -25,7 +25,7 @@ static int save(tui_editor* editor, char path[256], int save_as) {
 
 int main(int argc, char** argv) {
     if (argc > 2) {
-        write_all(2, "Usage: hieroglyph [FILE.MD]\n", 27);
+        write_all(2, "Usage: hieroglyph [FILE.md]\n", 27);
         return 2;
     }
     tui_editor editor = { 0 };
@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
                                    "READ: arrows, PgUp/PgDn, Space, Home/End",
                                    "WRITE: arrows, Home/End, Tab, ^Z undo, ^R redo",
                                    "F3 previews the current buffer without saving",
-                                   "ASCII text, 64 KiB; LF output; no HTML or images" };
+                                    "UTF-8 text, 64 KiB; LF output; no HTML or images" };
             tui_menu("Hieroglyph - Markdown help", help, 10, 0);
         } else if (key == TUI_F3) {
             writing = !writing;

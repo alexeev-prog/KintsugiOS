@@ -8,6 +8,7 @@
 #include "../drivers/ata_pio.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/framebuffer.h"
+#include "../drivers/audio.h"
 #include "../drivers/mouse.h"
 #include "../drivers/terminal.h"
 #include "../fs/fat12.h"
@@ -936,6 +937,38 @@ void syscall_dispatch(syscall_regs_t* r) {
             keyboard_set_layout(r->ebx);
             r->eax = 0;
             return;
+        case KOS_SYS_FRAMEBUFFER_THEME:
+            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            if (r->ebx >= KOS_FRAMEBUFFER_THEMES) { r->eax = VFS_EINVAL; return; }
+            framebuffer_theme(r->ebx);
+            terminal_get_state()->dirty = 1;
+            r->eax = 0;
+            return;
+        case KOS_SYS_FRAMEBUFFER_INFO:
+            if (!user_range(r->ebx, 4 * sizeof(u32), 1)) break;
+            ((u32*)r->ebx)[0] = framebuffer_mode_index();
+            ((u32*)r->ebx)[1] = framebuffer_theme_index();
+            ((u32*)r->ebx)[2] = framebuffer_scale_index();
+            ((u32*)r->ebx)[3] = framebuffer_font_index();
+            r->eax = 0;
+            return;
+        case KOS_SYS_FRAMEBUFFER_SCALE:
+            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_SCALES) { r->eax = KOS_EPERM; return; }
+            framebuffer_scale(r->ebx); terminal_get_state()->dirty = 1; r->eax = 0; return;
+        case KOS_SYS_FRAMEBUFFER_FONT:
+            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_FONTS) { r->eax = KOS_EPERM; return; }
+            framebuffer_font(r->ebx); terminal_get_state()->dirty = 1; r->eax = 0; return;
+        case KOS_SYS_SOUND_TONE:
+            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            audio_tone(r->ebx, r->ecx); r->eax = 0; return;
+        case KOS_SYS_SOUND_VOLUME:
+            if (!process_foreground() || r->ebx > 100) { r->eax = VFS_EINVAL; return; }
+            audio_volume(r->ebx); r->eax = 0; return;
+        case KOS_SYS_SOUND_INFO:
+            if (!user_range(r->ebx, 2 * sizeof(u32), 1)) break;
+            ((u32*)r->ebx)[0] = audio_get_volume();
+            ((u32*)r->ebx)[1] = audio_is_enabled();
+            r->eax = 0; return;
         case KOS_SYS_MOUSE:
             if (!user_range(r->ebx, sizeof(kos_mouse), 1)) break;
             if (!process_foreground()) { r->eax = KOS_EPERM; return; }
@@ -1251,6 +1284,21 @@ void syscall_dispatch(syscall_regs_t* r) {
                 break;
             }
             r->eax = r->edx ? vfs_rename(path, destination) : vfs_copy(path, destination);
+            return;
+        }
+        case KOS_SYS_READDIR_LONG: {
+            char directory[VFS_PATH_MAX];
+            if (!user_path(r->ebx, directory)
+                || !user_range(r->ecx, sizeof(u32), 1)
+                || !user_range(r->edx, sizeof(kos_long_dirent), 1)) {
+                break;
+            }
+            vfs_long_dirent_t long_entry;
+            int result = vfs_readdir_long(directory, (u32*)r->ecx, &long_entry);
+            if (result > 0) {
+                memcpy((void*)r->edx, &long_entry, sizeof(long_entry));
+            }
+            r->eax = result;
             return;
         }
         case 5: { /* Grow-only page-backed user heap. malloc/free live in userspace. */

@@ -14,7 +14,8 @@ static int help(int argc, char** argv) {
     }
     if (!strcmp(argv[1], "bin")) {
         printf("Run: name [arguments] or /BIN/NAME.ELF [arguments]\n");
-        printf("kuned [file] editor; kc commander; kbsm resources; ktui launcher\n");
+        printf("kuned [file] editor; kc commander; kbsm resources; ktui launcher; krrawl game\n");
+        printf("kset display; soundctl audio mixer; kmusa generator; klisten player; volumectl volume\n");
         printf("kprocm processes; kdiskman volumes (read only); proc process list\n");
         printf("tree [dir]; find [dir] [name substring]; grep LITERAL FILE\n");
         printf("cat FILE; tail FILE (last 10 lines); wc FILE; sort FILE\n");

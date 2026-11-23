@@ -1,6 +1,7 @@
 /* Freestanding user programs: no kernel headers or direct device access. */
 #include "fsabi.h"
 #include "runtime.h"
+#include "desktopabi.h"
 
 typedef kos_stat stat_t;
 typedef kos_dirent dirent_t;
@@ -162,16 +163,26 @@ int main(int argc, char** argv) {
     }
     return 0;
 #elif COMMAND == 3
-    if (argc > 2) {
-        print("Usage: ls [path]\n");
+    if (argc > 3 || (argc == 3 && (argv[1][0] != '-' || argv[1][1] != 'l' || argv[1][2]))) {
+        print("Usage: ls [-l] [path]\n");
         return 2;
     }
+    int long_names = argc > 1 && argv[1][0] == '-';
+    const char* directory = argc == 3 ? argv[2] : (long_names ? "." : argc == 2 ? argv[1] : ".");
     u32 cursor = 0;
-    dirent_t entries[128];
+    /* The user stack is deliberately small.  A long dirent is 264 bytes;
+     * keeping 64 of them on the stack used to overwrite the return path and
+     * made the garbage appear after otherwise valid names. */
+    static kos_long_dirent entries[64];
+    for (u32 clear = 0; clear < 64; ++clear) {
+        entries[clear].name[0] = 0;
+        entries[clear].stat = (stat_t){0, 0, 0};
+    }
     u32 count = 0, max_name = 1, max_size = 1;
     int n;
-    while (count < 128 && (n = call(3, (u32)(argc == 2 ? argv[1] : "."), (u32)&cursor,
+    while (count < 64 && (n = call(KOS_SYS_READDIR_LONG, (u32)directory, (u32)&cursor,
                                      (u32)&entries[count], 0)) > 0) {
+        entries[count].name[KOS_LONG_NAME_MAX - 1] = 0;
         u32 name = length(entries[count].name), size = entries[count].stat.size;
         if (entries[count].stat.directory) ++name;
         if (name > max_name) max_name = name;
@@ -185,13 +196,21 @@ int main(int argc, char** argv) {
         return 1;
     }
     for (u32 i = 1; i < count; ++i) {
-        dirent_t value = entries[i];
+        kos_long_dirent value = entries[i];
         u32 j = i;
         while (j && name_compare(entries[j - 1].name, value.name) > 0) {
             entries[j] = entries[j - 1];
             --j;
         }
         entries[j] = value;
+    }
+    if (long_names) {
+        for (u32 i = 0; i < count; ++i) {
+            print(entries[i].name);
+            if (entries[i].stat.directory) print("/");
+            print("\n");
+        }
+        return 0;
     }
     /* Unix-style grid: names only, with directories marked by a slash. */
     u32 column_width = max_name + 2;
@@ -273,5 +292,16 @@ int main(int argc, char** argv) {
     }
     free(buffer);
     return n < 0 ? 1 : 0;
+#elif COMMAND == 11
+    if (argc < 2 || argc > 3) { print("Usage: volumectl up|down|set <0..100>\n"); return 2; }
+    u32 info[2] = {0}; syscall(KOS_SYS_SOUND_INFO, (u32)info, 0, 0, 0);
+    u32 value = info[0];
+    if (argv[1][0] == 'u' && argv[1][1] == 'p' && !argv[1][2]) value = value + 10 > 100 ? 100 : value + 10;
+    else if (argv[1][0] == 'd' && argv[1][1] == 'o' && !argv[1][2]) value = value < 10 ? 0 : value - 10;
+    else if (argv[1][0] == 's' && argv[1][1] == 'e' && argv[1][2] == 't' && argc == 3) {
+        value = 0; for (u32 i = 0; argv[2][i]; ++i) { if (argv[2][i] < '0' || argv[2][i] > '9') return 2; value = value * 10 + argv[2][i] - '0'; }
+        if (value > 100) return 2;
+    } else { print("Usage: volumectl up|down|set <0..100>\n"); return 2; }
+    syscall(KOS_SYS_SOUND_VOLUME, value, 0, 0, 0); print("Volume: "); number(value); print("%\n"); return 0;
 #endif
 }

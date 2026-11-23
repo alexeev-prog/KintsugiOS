@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
         tui_text(11, 7, "1 Editor     2 Commander     3 Resource monitor", 0x1f);
         tui_text(11, 10, "4 Processes 5 Disks 6 Vik 7 Themes 8 Memory", 0x1f);
         tui_text(11, 14, "9 Hieroglyph documents | H widget demo", 0x1e);
-        tui_bar(23, "1-9 apps | W KiWi | P Paint | D Settings | I System info | Enter menu");
+        tui_bar(23, "1-9 apps | W KiWi | P Paint | D Settings | I Info | R KRrawl | Enter menu");
 #endif
         tui_bar(
             24,
@@ -154,9 +154,9 @@ int main(int argc, char** argv) {
                                         : "FAT12 allocation and directory structure are consistent");
         }
 #elif APP == 3
-        if (key == 'w' || key == 'p' || key == 'D' || key == 'i') {
+        if (key == 'w' || key == 'p' || key == 'D' || key == 'i' || key == 'r') {
             const char* path = key == 'w' ? "/BIN/KIWI.ELF" : key == 'p' ? "/BIN/KPAINT.ELF"
-                : key == 'D' ? "/BIN/KSET.ELF" : "/BIN/KINFO.ELF";
+                : key == 'D' ? "/BIN/KSET.ELF" : key == 'i' ? "/BIN/KINFO.ELF" : "/BIN/KRRAWL.ELF";
             int result = tui_launch(path, 0);
             if (result < 0) tui_message("Launcher", kos_error(result));
         }

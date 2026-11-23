@@ -6,14 +6,14 @@ typedef struct {
     char directory[256];
     char previous[256];
     u32 selected, top;
-    char marked[ENTRIES][13];
+    char marked[ENTRIES][256];
     u32 marks;
 } tab;
 
 typedef struct {
     tab tabs[TABS];
     u32 active, count, entries_count;
-    tui_entry entries[ENTRIES];
+    tui_long_entry entries[ENTRIES];
     char loaded_directory[256];
 } panel;
 
@@ -37,20 +37,20 @@ static int marked(tab* t, const char* name) {
     return -1;
 }
 
-static int is_parent(const tui_entry* e) {
+static int is_parent(const tui_long_entry* e) {
     return same(e->name, "..");
 }
 
-static void toggle(tab* t, const tui_entry* e) {
+static void toggle(tab* t, const tui_long_entry* e) {
     if (is_parent(e)) {
         return;
     }
     int at = marked(t, e->name);
     if (at >= 0) {
         --t->marks;
-        tui_copy(t->marked[at], t->marked[t->marks], 13);
+        tui_copy(t->marked[at], t->marked[t->marks], sizeof(t->marked[at]));
     } else if (t->marks < ENTRIES) {
-        tui_copy(t->marked[t->marks++], e->name, 13);
+        tui_copy(t->marked[t->marks++], e->name, sizeof(t->marked[0]));
     }
 }
 
@@ -67,7 +67,7 @@ static const char* batch(panel* p, panel* other, int key) {
     }
     u32 failed = 0, done = 0;
     for (u32 i = 0; i < p->entries_count; ++i) {
-        tui_entry* e = &p->entries[i];
+        tui_long_entry* e = &p->entries[i];
         if (is_parent(e) || (t->marks ? marked(t, e->name) < 0 : i != t->selected)) {
             continue;
         }
@@ -90,11 +90,11 @@ static const char* batch(panel* p, panel* other, int key) {
     return done ? "Group operation completed" : "No actionable entries";
 }
 
-static int compare(const tui_entry* a, const tui_entry* b) {
+static int compare(const tui_long_entry* a, const tui_long_entry* b) {
     if (settings[1] && a->stat.directory != b->stat.directory) {
         return b->stat.directory - a->stat.directory;
     }
-    for (u32 i = 0; i < 13; ++i) {
+    for (u32 i = 0; i < 256; ++i) {
         if (a->name[i] != b->name[i]) {
             return (unsigned char)a->name[i] - (unsigned char)b->name[i];
         }
@@ -115,19 +115,19 @@ static int refresh(panel* p) {
     int result = 0;
     p->entries_count = 0;
     if (tui_len(p->tabs[p->active].directory) > 1) {
-        tui_entry* parent = &p->entries[p->entries_count++];
+        tui_long_entry* parent = &p->entries[p->entries_count++];
         tui_copy(parent->name, "..", sizeof(parent->name));
         parent->stat = (tui_stat){ 0, 1, 1 };
     }
     while (p->entries_count < ENTRIES
-           && (result = syscall(
-                   3, (u32)p->tabs[p->active].directory, (u32)&cursor, (u32)&p->entries[p->entries_count], 0))
+           && (result = tui_readdir_long(p->tabs[p->active].directory, &cursor,
+                   (tui_long_entry*)&p->entries[p->entries_count]))
                > 0) {
         ++p->entries_count;
     }
     u32 first = tui_len(p->tabs[p->active].directory) > 1 ? 1 : 0;
     for (u32 i = first + 1; i < p->entries_count; ++i) {
-        tui_entry value = p->entries[i];
+        tui_long_entry value = p->entries[i];
         u32 j = i;
         while (j > first && compare(&value, &p->entries[j - 1]) < 0) {
             p->entries[j] = p->entries[j - 1];
@@ -169,7 +169,7 @@ static void draw(panel* p, int x, int active) {
                 : p->entries[i].stat.directory ? "/"
                                                : " ",
             active && i == t->selected ? 0x70 : color);
-        tui_textn(x + 4, y, p->entries[i].name, 13, active && i == t->selected ? 0x70 : color);
+            tui_textn(x + 4, y, p->entries[i].name, 21, active && i == t->selected ? 0x70 : color);
         if (settings[0]) {
             tui_number(x + 26, y, p->entries[i].stat.size, active && i == t->selected ? 0x70 : color);
         }
@@ -255,15 +255,15 @@ int main(int argc, char** argv) {
                 }
             }
         } else if (key == 'i' && p->entries_count) {
-            tui_entry* e = &p->entries[t->selected];
+            tui_long_entry* e = &p->entries[t->selected];
             tui_message(
                 e->name,
                 e->stat.directory      ? "Directory; deletion requires it to be empty"
                     : e->stat.readonly ? "Read-only file"
                                        : "Writable file; V preview / Enter edit");
         } else if (key == 'o') {
-            const char* items[] = { "Toggle sizes", "Toggle directories first", "Save settings" };
-            int c = tui_menu("Commander settings", items, 3, 0);
+            const char* items[] = { "Toggle sizes", "Toggle directories first", "Save settings", "Sort by name", "Sort by size" };
+            int c = tui_menu("Commander settings", items, 5, 0);
             if (c == 0) {
                 settings[0] ^= 1;
             }
@@ -274,6 +274,10 @@ int main(int argc, char** argv) {
                 status = tui_save_settings("/ETC/KC.CFG", settings, sizeof(settings))
                     ? "Settings saved"
                     : "Settings save failed";
+            }
+            if (c == 3 || c == 4) {
+                settings[1] = c == 3;
+                status = c == 3 ? "Name sort selected" : "Size view selected";
             }
         } else if (key == 't' && p->count < TABS) {
             p->tabs[p->count] = *t;
@@ -304,7 +308,7 @@ int main(int argc, char** argv) {
             t->selected = t->top = 0;
         } else {
             char source[256], dest[256], input[128];
-            tui_entry* e = p->entries_count ? &p->entries[t->selected] : 0;
+            tui_long_entry* e = p->entries_count ? &p->entries[t->selected] : 0;
             if (e) {
                 tui_path(source, t->directory, e->name);
             }

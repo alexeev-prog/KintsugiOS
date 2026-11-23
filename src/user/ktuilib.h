@@ -16,6 +16,8 @@ int tui_launch(const char* path, const char* argument);
 void tui_tabs(int y, const char* const* labels, unsigned count, unsigned selected);
 void tui_progress(int x, int y, int width, unsigned value, unsigned total, const char* label);
 int tui_theme_export(const char* path);
+void tui_toast(const char* message, unsigned ticks);
+int tui_shortcut(int key, const char* label);
 
 enum {
     TUI_UP = 256,
@@ -44,6 +46,7 @@ enum {
 
 typedef kos_stat tui_stat;
 typedef kos_dirent tui_entry;
+typedef kos_long_dirent tui_long_entry;
 
 #define TUI_HEADER 0x70
 #define TUI_FILE_COLOR 0x0f
@@ -155,6 +158,7 @@ int tui_confirm(const char* label);
 void tui_path(char out[256], const char* directory, const char* name);
 int tui_stat_path(const char* path, tui_stat* stat);
 int tui_readdir(const char* path, u32* cursor, tui_entry* entry);
+int tui_readdir_long(const char* path, u32* cursor, tui_long_entry* entry);
 void tui_parent(char path[256]);
 void tui_fill(int x, int y, int width, int height, unsigned char color);
 void tui_textn(int x, int y, const char* text, u32 width, unsigned char color);

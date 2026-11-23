@@ -10,6 +10,17 @@ static int script_argc, script_depth;
 static char** script_argv;
 static int execute(char* text);
 static void print(const char* s);
+static void copy(char* d, const char* s);
+
+static void prompt(void) {
+    char cwd[256];
+    if (syscall(4, (u32)cwd, sizeof(cwd), 0, 0)) {
+        copy(cwd, "?");
+    }
+    print("\n[ ");
+    print(cwd);
+    print(" ]\n!#> ");
+}
 
 static int run_script(const char* file, int argc, char** argv) {
     if (script_depth == 8) {
@@ -209,6 +220,20 @@ typedef struct {
 
 static int execute_inner(char* text, command_frame* frame);
 
+static int find_unquoted(char* text, const char* token) {
+    char quote = 0;
+    u32 width = len(token);
+    for (u32 i = 0; text[i]; ++i) {
+        if ((text[i] == '\'' || text[i] == '"')) {
+            if (!quote) quote = text[i]; else if (quote == text[i]) quote = 0;
+        }
+        int same = !quote;
+        for (u32 j = 0; same && j < width; ++j) if (text[i + j] != token[j]) same = 0;
+        if (same) return (int)i;
+    }
+    return -1;
+}
+
 static int execute_raw(char* text) {
     command_frame* frame = malloc(sizeof(*frame));
     if (!frame) {
@@ -330,6 +355,18 @@ static int execute_inner(char* text, command_frame* frame) {
     int background = 0;
     /* Command lists and a single parenthesized group are intentionally parsed
      * before pipelines. This keeps each subcommand on the same shell context. */
+    int conditional = find_unquoted(text, "||");
+    if (conditional >= 0) {
+        text[conditional] = 0; text[conditional + 1] = 0;
+        int result = execute_raw(text);
+        return result ? execute_raw(text + conditional + 2) : result;
+    }
+    conditional = find_unquoted(text, "&&");
+    if (conditional >= 0) {
+        text[conditional] = 0; text[conditional + 1] = 0;
+        int result = execute_raw(text);
+        return result ? result : execute_raw(text + conditional + 2);
+    }
     for (char* p = text; *p; ++p) {
         if (*p == '\\' && quote != '\'' && p[1]) { ++p; continue; }
         if (*p == '\'' || *p == '"') {
@@ -711,7 +748,9 @@ int main(int argc, char** argv) {
     if (argc > 1) {
         return run_script(argv[1], argc - 1, argv + 1);
     }
-    print("Keramika Shell - userspace - type help\n!#> ");
+    print("\033[36m+-- KintsugiOS / Keramika Shell - userspace -------------------------------+\033[0m\n");
+    print("  help: commands | Tab: complete | Ctrl+C: cancel | kiwi: desktop\n");
+    prompt();
     syscall(KOS_SYS_SESSION, 1, 0, 0, 0);
     for (;;) {
         int key = syscall(8, 1, 0, 0, 0);
@@ -733,11 +772,12 @@ int main(int argc, char** argv) {
             length = cursor = rendered = 0;
             line[0] = 0;
             position = histories;
-            print("\n!#> ");
+            prompt();
             continue;
         }
         if (key == 3) {
-            print("^C\n!#> ");
+            print("^C");
+            prompt();
             length = cursor = rendered = 0;
             line[0] = 0;
             continue;

@@ -785,6 +785,17 @@ static int driver_readdir(const char* path, u32* cursor, vfs_dirent_t* output) {
     }
 }
 
+static int driver_readdir_long(const char* path, u32* cursor, vfs_long_dirent_t* output) {
+    vfs_dirent_t legacy;
+    int result = driver_readdir(path, cursor, &legacy);
+    if (result > 0) {
+        memset(output, 0, sizeof(*output));
+        memcpy(output->name, legacy.name, sizeof(legacy.name));
+        output->stat = legacy.stat;
+    }
+    return result;
+}
+
 static int driver_remove(const char* path, int directory) {
     if (!strcmp(path, "/")) {
         return VFS_EBUSY;
@@ -909,7 +920,8 @@ static const vfs_ops_t fat_ops = { .stat = driver_stat,
                                    .create = driver_create,
                                    .remove = driver_remove,
                                    .rename = driver_rename,
-                                   .readdir = driver_readdir };
+                                    .readdir = driver_readdir,
+                                    .readdir_long = driver_readdir_long };
 
 /* Reject cross-links before allowing writes: a local chain check alone cannot
  * prevent deleting clusters owned by another file. Orphans are rejected too. */

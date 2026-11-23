@@ -4,9 +4,11 @@
 #include "../drivers/ata_pio.h"
 #include "../drivers/screen_output_switch.h"
 #include "../drivers/terminal.h"
+#include "../drivers/audio.h"
 #include "../drivers/framebuffer.h"
 #include "../drivers/mouse.h"
 #include "../fs/fat12.h"
+#include "../fs/kfs2.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
 #include "../shell/shell.h"
@@ -16,6 +18,8 @@
 
 void kmain(void) {
     framebuffer_init();
+    framebuffer_theme(1);
+    audio_init();
     log_init();
     log_write("[INFO] kernel entry\n");
     log_event("INFO", "boot", "KintsugiOS %s i386; debug journal enabled", VERSION);
@@ -43,16 +47,21 @@ void kmain(void) {
     terminal_refresh();
     mouse_init();
     irq_install();
-    log_event("INFO", "drivers", "PIT 50 Hz and PS/2 keyboard IRQ handlers installed");
+    log_event("INFO", "drivers", "PIT 50 Hz, PC speaker audio and PS/2 keyboard IRQ handlers installed");
     detect_cpu();
     detect_memory();
     log_event("DEBUG", "ata", "Probing primary legacy ATA channel, polling LBA28");
     ata_pio_init();
-    log_event("DEBUG", "filesystem", "Mounting FAT12 backend at /");
-    fat12_init();
-    log_write(fat12_is_mounted() ? "[INFO] FAT12 mounted\n" : "[WARN] FAT12 unavailable\n");
+    log_event("DEBUG", "filesystem", "Mounting KFS2 native backend at /");
+    if (!kfs2_init()) {
+        log_event("WARN", "filesystem", "KFS2 unavailable; trying legacy FAT12 backend");
+        fat12_init();
+    }
+    log_write(kfs2_is_mounted() ? "[INFO] KFS2 mounted\n" :
+              fat12_is_mounted() ? "[INFO] FAT12 compatibility backend mounted\n" :
+              "[WARN] filesystem unavailable\n");
     printf("KintsugiOS %s\n", VERSION);
-    if (fat12_is_mounted()) {
+    if (kfs2_is_mounted() || fat12_is_mounted()) {
         log_event("INFO", "init", "Starting /BIN/INIT.ELF");
         int status = process_boot_init();
         printf("init unavailable or exited (%d); rescue shell\n", status);
