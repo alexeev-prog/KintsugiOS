@@ -17,6 +17,8 @@ void tui_tabs(int y, const char* const* labels, unsigned count, unsigned selecte
 void tui_progress(int x, int y, int width, unsigned value, unsigned total, const char* label);
 int tui_theme_export(const char* path);
 void tui_toast(const char* message, unsigned ticks);
+/* UI feedback tones: 0 select, 1 confirm, 2 error, 3 cancel. Honors volume. */
+void tui_sound(int kind);
 int tui_shortcut(int key, const char* label);
 
 enum {

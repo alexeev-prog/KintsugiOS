@@ -9,7 +9,7 @@ static u32 used[FRAMES / 32], owned[FRAMES / 32];
 static u32 directory[1024] __attribute__((aligned(4096)));
 /* Direct physical window: supervisor-only, never returned as heap memory. */
 static u32 direct[64][1024] __attribute__((aligned(4096)));
-static u32 video_table[2][1024] __attribute__((aligned(4096)));
+static u32 video_table[3][1024] __attribute__((aligned(4096)));
 static memory_region_t regions[64];
 static memory_stats_t stats;
 static u32 cursor = 256;
@@ -187,8 +187,9 @@ void memory_init(void) {
     direct[0][0] = 0; /* Null dereferences fault. */
     const framebuffer_info_t* fb = framebuffer_get_info();
     if (fb->available) {
-        /* Supervisor-only MMIO, uncached; inherited by every process. */
-        for (u32 d = 0; d < 2; ++d) {
+        /* Supervisor-only MMIO, uncached; inherited by every process.
+         * 12 MiB covers the largest mode (1920x1200x4 = 9.2 MiB). */
+        for (u32 d = 0; d < 3; ++d) {
             for (u32 i = 0; i < 1024; ++i) video_table[d][i] = (fb->address + (d * 1024 + i) * PAGE_SIZE) | 0x1b;
             directory[(0xe0000000u >> 22) + d] = (u32)video_table[d] | 3;
         }

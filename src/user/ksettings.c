@@ -6,7 +6,7 @@ int main(int argc, char** argv) {
     syscall(KOS_SYS_DESKTOP, (u32)&info, 0, 0, 0);
     u32 selected = info.mode, top = 0;
     u32 framebuffer_theme = 1, scale = 1, font = 0;
-    u32 display_info[4] = {0};
+    u32 display_info[8] = {0};
     if (syscall(KOS_SYS_FRAMEBUFFER_INFO, (u32)display_info, 0, 0, 0) == 0) {
         framebuffer_theme = display_info[1];
         scale = display_info[2];

@@ -14,6 +14,11 @@ static unsigned mouse_buttons;
 static const char* toast_message;
 static unsigned toast_until;
 void tui_toast(const char* message, unsigned ticks) { toast_message = message; toast_until = ticks ? ticks : 1; }
+void tui_sound(int kind) {
+    static const unsigned freq[4] = { 660, 880, 220, 330 };
+    static const unsigned dur[4] = { 40, 60, 120, 60 };
+    if (kind >= 0 && kind < 4) syscall(KOS_SYS_SOUND_TONE, freq[kind], dur[kind], 0, 0);
+}
 int tui_shortcut(int key, const char* label) {
     (void)label;
     return key;
@@ -26,14 +31,16 @@ int tui_event_read(tui_event* e, int wait) {
     if (!e) return 0;
     e->key = tui_key(wait ? 2 : 0);
     kos_mouse mouse = {0};
-    kos_desktop_info info = {0};
     syscall(KOS_SYS_MOUSE, (u32)&mouse, 0, 0, 0);
-    syscall(KOS_SYS_DESKTOP, (u32)&info, 0, 0, 0);
-    int cw = info.width > 64 ? (info.width - 64) / 80 : 8;
-    int ch = info.height > 118 ? (info.height - 118) / 25 : 16;
-    int ox = (info.width - cw * 80) / 2;
+    /* Ask the kernel for the real cell geometry: it depends on resolution
+     * AND the user-selected cell scale, so recomputing it here drifts. */
+    u32 fb[8] = {0};
+    int cw = 12, ch = 26, ox = 32, oy = 44;
+    if (syscall(KOS_SYS_FRAMEBUFFER_INFO, (u32)fb, 0, 0, 0) == 0 && fb[4] && fb[5]) {
+        cw = (int)fb[4]; ch = (int)fb[5]; ox = (int)fb[6]; oy = (int)fb[7];
+    }
     e->mouse_x = mouse.x < ox ? -1 : (mouse.x - ox) / cw;
-    e->mouse_y = mouse.y < 44 ? -1 : (mouse.y - 44) / ch;
+    e->mouse_y = mouse.y < oy ? -1 : (mouse.y - oy) / ch;
     e->buttons = mouse.buttons;
     e->pressed = mouse.buttons & ~mouse_buttons;
     e->released = mouse_buttons & ~mouse.buttons;
@@ -432,10 +439,12 @@ int tui_menu(const char* title, const char* const* items, int count, int initial
             if (at < (u32)count) { selected = at; key = '\n'; }
         }
         if (key == 27 || key == 3) {
+            tui_sound(3);
             tui_modal_end();
             return -1;
         }
         if (key == '\n') {
+            tui_sound(0);
             tui_modal_end();
             return selected;
         }
@@ -497,6 +506,7 @@ void tui_box(int x, int y, int width, int height, const char* title, unsigned ch
 }
 
 void tui_message(const char* title, const char* message) {
+    tui_sound(2);
     if (!tui_modal_begin(title, 70, 7)) {
         return;
     }
@@ -675,7 +685,9 @@ int tui_confirm(const char* label) {
     tui_present(79, 24);
     int key = tui_key(1);
     tui_modal_end();
-    return key == 'y' || key == 'Y';
+    int yes = key == 'y' || key == 'Y';
+    tui_sound(yes ? 1 : 3);
+    return yes;
 }
 
 void tui_path(char out[256], const char* directory, const char* name) {

@@ -10,7 +10,7 @@ OBJCOPY := $(CROSS)objcopy
 PYTHON ?= python3
 QEMU ?= qemu-system-i386
 QEMU_FLAGS ?=
-AUDIO_FLAGS ?= -audiodev driver=sdl,id=kos-audio -machine pcspk-audiodev=kos-audio
+AUDIO_FLAGS ?= -audiodev driver=sdl,id=kos-audio -device adlib,audiodev=kos-audio -machine pcspk-audiodev=kos-audio
 MEMORY ?= 64
 VGA ?= std
 BIN_DIR := bin

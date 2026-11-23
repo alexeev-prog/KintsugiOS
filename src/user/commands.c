@@ -294,7 +294,7 @@ int main(int argc, char** argv) {
     return n < 0 ? 1 : 0;
 #elif COMMAND == 11
     if (argc < 2 || argc > 3) { print("Usage: volumectl up|down|set <0..100>\n"); return 2; }
-    u32 info[2] = {0}; syscall(KOS_SYS_SOUND_INFO, (u32)info, 0, 0, 0);
+    u32 info[3] = {0}; syscall(KOS_SYS_SOUND_INFO, (u32)info, 0, 0, 0);
     u32 value = info[0];
     if (argv[1][0] == 'u' && argv[1][1] == 'p' && !argv[1][2]) value = value + 10 > 100 ? 100 : value + 10;
     else if (argv[1][0] == 'd' && argv[1][1] == 'o' && !argv[1][2]) value = value < 10 ? 0 : value - 10;

@@ -20,4 +20,6 @@ void framebuffer_font(u32 font);
 u32 framebuffer_theme_index(void);
 u32 framebuffer_scale_index(void);
 u32 framebuffer_font_index(void);
+/* Actual cell geometry: width, height, origin x, origin y (pixels). */
+void framebuffer_geometry(u32 out[4]);
 #endif

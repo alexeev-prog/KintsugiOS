@@ -13,5 +13,6 @@ typedef struct {
     unsigned int mounted, sectors, cluster_bytes, clusters, free_clusters;
     unsigned int disk_sectors;
     char model[41];
+    char fs[8];
 } kos_disk_info;
 #endif

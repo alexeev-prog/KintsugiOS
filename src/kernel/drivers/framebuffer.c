@@ -28,7 +28,9 @@ void framebuffer_theme(u32 theme) {
     static const u32 amber[16] = {0x17120d,0x52351f,0x566b3f,0x8c8f5b,0x9e493f,0x77536e,0xb17c3f,0xd9c7a1,0x554238,0x8b6f47,0x7fa15a,0xaab878,0xd36c4e,0xae83a8,0xe3af62,0xfff1c2};
     static const u32 forest[16] = {0x101a15,0x234b35,0x39734c,0x5d9b62,0xb85c5c,0x87679b,0xb5a642,0xd7e8c5,0x44584b,0x61b878,0x7bd58a,0x93d9a0,0xe47d72,0xc79bde,0xe3d268,0xf4fae9};
     static const u32 sakura[16] = {0x1b1420,0x54304f,0x89506e,0xc2799c,0xd95d78,0xa77bbd,0xd0a05e,0xf6e6ed,0x594457,0xc078a5,0xf096b7,0xedafd0,0xff8d9d,0xd6b1ed,0xffd47c,0xfff5fb};
-    const u32* source = theme == 1 ? ocean : theme == 2 ? amber : theme == 3 ? forest : theme == 4 ? sakura : colors;
+    /* Minimal grayscale: no hue, dark background, clean ramp. Default theme. */
+    static const u32 mono[16] = {0x0a0a0a,0x262626,0x3c3c3c,0x545454,0x6e6e6e,0x8a8a8a,0xa8a8a8,0xc8c8c8,0x4a4a4a,0x9a9a9a,0xb4b4b4,0xc4c4c4,0xd8d8d8,0xe6e6e6,0xf2f2f2,0xffffff};
+    const u32* source = theme == 1 ? ocean : theme == 2 ? amber : theme == 3 ? forest : theme == 4 ? sakura : theme == 5 ? mono : colors;
     for (u32 i = 0; i < 16; ++i) theme_colors[i] = source[i];
     active_theme = theme;
     ++generation;
@@ -53,7 +55,7 @@ int framebuffer_mode(u32 mode) {
     if (cell_height < 12) cell_height = 12;
     /* Never allow an oversized cell grid to wrap unsigned coordinates. */
     if (cell_width * 80 > info.width) cell_width = info.width / 80;
-    if (cell_height * 25 > info.height - 44) cell_height = (info.height - 44) / 25;
+    if (cell_height * 25 > info.height - 88) cell_height = (info.height - 88) / 25;
     if (cell_width < 1) cell_width = 1;
     if (cell_height < 1) cell_height = 1;
     origin_x = cell_width * 80 < info.width ? (info.width - cell_width * 80) / 2 : 0;
@@ -73,6 +75,9 @@ void framebuffer_font(u32 font) {
     font_index = font;
     ++generation;
 }
+void framebuffer_geometry(u32 out[4]) {
+    out[0] = cell_width; out[1] = cell_height; out[2] = origin_x; out[3] = origin_y;
+}
 void framebuffer_init(void) {
     port_word_out(0x1ce, 0);
     u16 id = port_word_in(0x1cf);
@@ -88,7 +93,7 @@ void framebuffer_init(void) {
         info.address = bar & ~15u;
         info.bpp = 32;
         info.available = 1;
-        framebuffer_theme(0);
+        framebuffer_theme(5);
         framebuffer_mode(mode_index);
         return;
     }

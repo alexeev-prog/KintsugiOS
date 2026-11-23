@@ -945,11 +945,13 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case KOS_SYS_FRAMEBUFFER_INFO:
-            if (!user_range(r->ebx, 4 * sizeof(u32), 1)) break;
+            /* mode, theme, scale, font, then actual cell geometry in pixels. */
+            if (!user_range(r->ebx, 8 * sizeof(u32), 1)) break;
             ((u32*)r->ebx)[0] = framebuffer_mode_index();
             ((u32*)r->ebx)[1] = framebuffer_theme_index();
             ((u32*)r->ebx)[2] = framebuffer_scale_index();
             ((u32*)r->ebx)[3] = framebuffer_font_index();
+            framebuffer_geometry((u32*)r->ebx + 4);
             r->eax = 0;
             return;
         case KOS_SYS_FRAMEBUFFER_SCALE:
@@ -960,15 +962,27 @@ void syscall_dispatch(syscall_regs_t* r) {
             framebuffer_font(r->ebx); terminal_get_state()->dirty = 1; r->eax = 0; return;
         case KOS_SYS_SOUND_TONE:
             if (!process_foreground()) { r->eax = KOS_EPERM; return; }
-            audio_tone(r->ebx, r->ecx); r->eax = 0; return;
+            audio_tone_inst(r->ebx, r->ecx, r->edx); r->eax = 0; return;
         case KOS_SYS_SOUND_VOLUME:
             if (!process_foreground() || r->ebx > 100) { r->eax = VFS_EINVAL; return; }
             audio_volume(r->ebx); r->eax = 0; return;
         case KOS_SYS_SOUND_INFO:
-            if (!user_range(r->ebx, 2 * sizeof(u32), 1)) break;
+            if (!user_range(r->ebx, 3 * sizeof(u32), 1)) break;
             ((u32*)r->ebx)[0] = audio_get_volume();
             ((u32*)r->ebx)[1] = audio_is_enabled();
+            ((u32*)r->ebx)[2] = audio_is_opl2();
             r->eax = 0; return;
+        case KOS_SYS_SLEEP: {
+            extern u32 tick;
+            u32 ms = r->ebx > 10000 ? 10000 : r->ebx;
+            u32 deadline = tick + (ms + 19) / 20;
+            while (tick < deadline) {
+                current->state = WAITING;
+                schedule();
+                if (current->interrupted) process_exit(130);
+            }
+            r->eax = 0; return;
+        }
         case KOS_SYS_MOUSE:
             if (!user_range(r->ebx, sizeof(kos_mouse), 1)) break;
             if (!process_foreground()) { r->eax = KOS_EPERM; return; }

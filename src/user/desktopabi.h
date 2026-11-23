@@ -11,13 +11,14 @@
 #define KOS_SYS_SOUND_TONE 49
 #define KOS_SYS_SOUND_VOLUME 50
 #define KOS_SYS_SOUND_INFO 51
+#define KOS_SYS_SLEEP 52
 typedef struct { unsigned width, height; } kos_video_mode;
 typedef struct {
     unsigned width, height, graphics, mode, uptime, free_kib, ram_kib, processes, russian;
 } kos_desktop_info;
 typedef struct { int x, y; unsigned buttons, sequence, available; } kos_mouse;
 #define KOS_VIDEO_MODES 7
-#define KOS_FRAMEBUFFER_THEMES 5
+#define KOS_FRAMEBUFFER_THEMES 6
 #define KOS_FRAMEBUFFER_SCALES 3
 #define KOS_FRAMEBUFFER_FONTS 3
 static const kos_video_mode kos_video_modes[KOS_VIDEO_MODES] = {

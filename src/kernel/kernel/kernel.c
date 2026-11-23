@@ -18,10 +18,10 @@
 
 void kmain(void) {
     framebuffer_init();
-    framebuffer_theme(1);
-    audio_init();
+    framebuffer_theme(5);
     log_init();
     log_write("[INFO] kernel entry\n");
+    audio_init();
     log_event("INFO", "boot", "KintsugiOS %s i386; debug journal enabled", VERSION);
     log_event("DEBUG", "cpu", "Installing GDT/IDT exception vectors and PIC IRQ routing");
     isr_install();
