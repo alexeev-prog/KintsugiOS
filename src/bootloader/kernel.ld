@@ -10,6 +10,6 @@ SECTIONS
     __bss_start = .;
     .bss : { *(.bss*) *(COMMON) } :data
     __bss_end = .;
-    ASSERT(__bss_end < 0x88000, "Kernel overlaps protected-mode stack guard (32 KiB)")
+    ASSERT(__bss_end < 0x97000, "Kernel overlaps protected-mode stack guard (32 KiB)")
     /DISCARD/ : { *(.eh_frame*) *(.comment*) *(.note*) }
 }

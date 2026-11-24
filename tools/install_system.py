@@ -29,7 +29,7 @@ def run(*arguments, probe=False):
     return True
 
 
-for directory in ("BIN", "BOOT", "ETC", "ETC/THEMES", "HOME", "TMP", "MAN"):
+for directory in ("BIN", "BOOT", "ETC", "ETC/THEMES", "ETC/MUSIC", "HOME", "TMP", "MAN", "VAR", "VAR/LOG"):
     print(f"Checking directory: {directory}", flush=True)
     if not run("mdir", "-i", image, f"::/{directory}/", probe=True):
         run("mmd", "-i", image, f"::/{directory}")
@@ -38,14 +38,19 @@ programs = subprocess.check_output(
 ).split()
 for filename in programs:
     program = Path(filename)
-    run("mcopy", "-o", "-i", image, str(program), f"::/BIN/{program.name}")
+    run("mcopy", "-o", "-i", image, str(program), f"::/bin/{program.name}")
     print(f"Installed program: {program.name}")
-run("mcopy", "-o", "-i", image, "bin/kernel.bin", "::/BOOT/KERNEL.BIN")
+run("mcopy", "-o", "-i", image, "bin/kernel.bin", "::/boot/KERNEL.BIN")
 for theme in sorted(Path("system/themes").glob("*.THM")):
-    run("mcopy", "-o", "-i", image, str(theme), f"::/ETC/THEMES/{theme.name}")
-run("mcopy", "-o", "-i", image, "system/PROFILE", "::/ETC/PROFILE")
+    run("mcopy", "-o", "-i", image, str(theme), f"::/etc/THEMES/{theme.name}")
+run("mcopy", "-o", "-i", image, "system/PROFILE", "::/etc/PROFILE")
+for extra in ("system/SERVICES", "system/VOLUME.CFG"):
+    if Path(extra).is_file():
+        run("mcopy", "-o", "-i", image, extra, f"::/etc/{Path(extra).name}")
+for music in sorted(Path("system/music").glob("*.kms")):
+    run("mcopy", "-o", "-i", image, str(music), f"::/etc/MUSIC/{music.name}")
 for page in sorted(Path("system/man").glob("*.MAN")):
-    run("mcopy", "-o", "-i", image, str(page), f"::/MAN/{page.name}")
-if not run("mdir", "-i", image, "::/ETC/TUI.THM", probe=True):
-    run("mcopy", "-i", image, "system/themes/DARK.THM", "::/ETC/TUI.THM")
+    run("mcopy", "-o", "-i", image, str(page), f"::/man/{page.name}")
+if not run("mdir", "-i", image, "::/etc/TUI.THM", probe=True):
+    run("mcopy", "-i", image, "system/themes/DARK.THM", "::/etc/TUI.THM")
 print("System installation completed.")

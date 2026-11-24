@@ -18,4 +18,18 @@ int process_foreground(void);
 char* process_cwd(void);
 void process_shutdown(void);
 __attribute__((noreturn)) void process_exit(int status);
+
+/* POSIX-like credentials and /proc introspection. */
+u32 process_pid(void);
+u32 process_euid(void);
+u32 process_egid(void);
+int process_set_credentials(u32 uid, u32 gid);
+void process_set_pending_uid(u32 uid);
+int process_take_pending_uid(u32* uid);
+u32 process_ticks(void);
+u32 process_pid_exists(u32 pid);
+u32 process_pid_at(u32 index);
+int process_proc_status(u32 pid, char* out, u32 capacity);
+int process_proc_cmdline(u32 pid, char* out, u32 capacity);
+int process_proc_name(u32 pid, char* out, u32 capacity);
 #endif

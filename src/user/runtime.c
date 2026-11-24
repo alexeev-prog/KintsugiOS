@@ -21,6 +21,9 @@ int sync(void) {
 int kill(int pid) {
     return syscall(KOS_SYS_KILL, pid, 0, 0, 0);
 }
+int kill_sig(int pid, int signal) {
+    return syscall(KOS_SYS_KILL, pid, signal, 0, 0);
+}
 
 static kos_env_entry env_cache[KOS_ENV_MAX];
 

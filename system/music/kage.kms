@@ -1,0 +1,26 @@
+# Kage no Meikyu (shadow labyrinth) - boss/dungeon drone theme
+# name Kage no Meikyu
+# freq duration_ms instrument ; 0 = rest, 0 koto 1 flute 2 bell 3 bass
+tempo 260
+147 260 3
+0 130 0
+175 260 3
+196 260 0
+0 130 0
+233 260 3
+196 260 0
+175 260 3
+0 130 0
+147 260 3
+196 260 0
+233 260 3
+262 260 1
+0 130 0
+233 260 3
+196 260 0
+175 260 3
+147 260 0
+0 200 0
+131 400 3
+0 200 0
+196 300 2

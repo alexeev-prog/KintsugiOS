@@ -137,7 +137,7 @@ int main(void) {
     for (int i = 0; i < 27; ++i) {
         free(vim.registers[i]);
     }
-    assert(syntax_language("/HOME/TEST.C") == SYN_C);
+    assert(syntax_language("/home/TEST.C") == SYN_C);
     assert(syntax_language("x.asm") == SYN_ASM);
     assert(syntax_language("x.txt") == SYN_TEXT);
     syntax_state syntax = { .language = SYN_C };
@@ -168,10 +168,11 @@ int main(void) {
     tui_button(1, 5, 12, "Apply", 1, 1);
     char path[256];
     assert(tui_theme_path(path, "custom"));
-    assert(!strcmp(path, "/ETC/THEMES/CUSTOM.THM"));
-    assert(tui_theme_path(path, "/HOME/test.thm"));
-    assert(!strcmp(path, "/ETC/THEMES/TEST.THM"));
-    assert(!tui_theme_path(path, "too-long-name"));
+    assert(!strcmp(path, "/etc/THEMES/custom.THM"));
+    assert(tui_theme_path(path, "/home/test.thm"));
+    assert(!strcmp(path, "/etc/THEMES/test.THM"));
+    assert(tui_theme_path(path, "too-long-name"));
+    assert(!strcmp(path, "/etc/THEMES/too-long-name.THM"));
     assert(!tui_theme_path(path, "test.txt"));
     tui_clear(0x07);
     assert(tui_theme_parse("70=70\n71=70\n", 12));

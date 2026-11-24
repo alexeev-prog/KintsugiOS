@@ -5,6 +5,7 @@
 typedef struct {
     unsigned int pid, parent, state, ticks, heap_bytes;
     unsigned int group;
+    unsigned int uid, gid;
     unsigned int open_fds;
     char name[32];
 } kos_process_info;

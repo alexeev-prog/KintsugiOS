@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
         write_all(1, "Usage: kman TOPIC\n", 18);
         return 2;
     }
-    copy(path, "/MAN/");
+    copy(path, "/man/");
     u32 n = tui_len(path);
     for (u32 i = 0; argv[1][i] && n + i + 5 < sizeof(path); ++i) {
         char c = argv[1][i];
@@ -19,6 +19,6 @@ int main(int argc, char** argv) {
     n += tui_len(argv[1]);
     copy(path + n, ".MAN");
     char* args[] = { "PAGER", path, 0 };
-    int pid = spawn("/BIN/PAGER.ELF", 2, args);
+    int pid = spawn("/bin/PAGER.ELF", 2, args);
     return pid < 0 ? 1 : wait(pid);
 }

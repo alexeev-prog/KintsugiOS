@@ -8,7 +8,7 @@
 
 #define TUI_COLUMNS 80
 #define TUI_ROWS 25
-typedef struct { int key, mouse_x, mouse_y; unsigned buttons, pressed, released; } tui_event;
+typedef struct { int key, mouse_x, mouse_y; unsigned buttons, pressed, released; int wheel; } tui_event;
 int tui_event_read(tui_event* event, int wait);
 int tui_hit(int x, int y, int width, int height, const tui_event* event);
 void tui_status(int y);
@@ -119,7 +119,7 @@ void tui_list_draw(
     u32 selected,
     u32 top,
     int focused);
-/* Normalize a short name or path to /ETC/THEMES/NAME.THM; ASCII 8.3 only. */
+/* Long names are supported; themes are resolved under /etc/THEMES. */
 int tui_theme_path(char out[256], const char* name);
 
 /* Windows use screen coordinates; content coordinates are clipped to the client area. */
@@ -167,7 +167,7 @@ void tui_textn(int x, int y, const char* text, u32 width, unsigned char color);
 void tui_box(int x, int y, int width, int height, const char* title, unsigned char color);
 void tui_message(const char* title, const char* message);
 void tui_gauge(int x, int y, int width, u32 used, u32 total);
-/* Small per-application settings file, stored under /ETC (8.3 names). */
+/* Per-application settings files are stored under /ETC. */
 int tui_load_settings(const char* path, void* data, u32 size);
 int tui_save_settings(const char* path, const void* data, u32 size);
 #endif

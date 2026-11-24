@@ -1,7 +1,14 @@
 #include "../fs/fat12.h"
+#include "../fs/kfs3.h"
 #include "../fs/vfs.h"
 #include "../kklibc/kklibc.h"
 #include "shell.h"
+
+static int permit(const char* path, int write) {
+    char absolute[VFS_PATH_MAX];
+    if (vfs_normalize(path, absolute)) return 0;
+    return kfs3_permit(absolute, write);
+}
 
 static int report(int result) {
     if (result >= 0) {
@@ -14,6 +21,10 @@ static int report(int result) {
 static int list(int argc, char** argv) {
     if (argc > 2) {
         return SHELL_USAGE;
+    }
+    if (argc == 2 && !permit(argv[1], 0)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
     }
     u32 cursor = 0;
     vfs_dirent_t entry;
@@ -29,6 +40,10 @@ static int cat(int argc, char** argv) {
     if (argc != 2) {
         return SHELL_USAGE;
     }
+    if (!permit(argv[1], 0)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
+    }
     char buffer[513];
     u32 offset = 0;
     int result;
@@ -41,18 +56,34 @@ static int cat(int argc, char** argv) {
 }
 
 static int create(int argc, char** argv) {
+    if (argc == 2 && !permit(argv[1], 1)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
+    }
     return argc == 2 ? report(vfs_create(argv[1])) : SHELL_USAGE;
 }
 
 static int remove_file(int argc, char** argv) {
+    if (argc == 2 && !permit(argv[1], 1)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
+    }
     return argc == 2 ? report(vfs_unlink(argv[1])) : SHELL_USAGE;
 }
 
 static int mkdir_command(int argc, char** argv) {
+    if (argc == 2 && !permit(argv[1], 1)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
+    }
     return argc == 2 ? report(vfs_mkdir(argv[1])) : SHELL_USAGE;
 }
 
 static int rmdir_command(int argc, char** argv) {
+    if (argc == 2 && !permit(argv[1], 1)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
+    }
     return argc == 2 ? report(vfs_rmdir(argv[1])) : SHELL_USAGE;
 }
 
@@ -72,6 +103,10 @@ static int pwd(int argc, char** argv) {
 static int text_write(int argc, char** argv, int append) {
     if (argc < 3) {
         return SHELL_USAGE;
+    }
+    if (!permit(argv[1], 1)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
     }
     char text[SHELL_LINE_SIZE];
     u32 length = 0;
@@ -101,16 +136,28 @@ static int append_file(int argc, char** argv) {
 }
 
 static int copy(int argc, char** argv) {
+    if (argc == 3 && (!permit(argv[1], 0) || !permit(argv[2], 1))) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
+    }
     return argc == 3 ? report(vfs_copy(argv[1], argv[2])) : SHELL_USAGE;
 }
 
 static int move(int argc, char** argv) {
+    if (argc == 3 && (!permit(argv[1], 1) || !permit(argv[2], 1))) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
+    }
     return argc == 3 ? report(vfs_rename(argv[1], argv[2])) : SHELL_USAGE;
 }
 
 static int truncate_file(int argc, char** argv) {
     if (argc != 3 || !*argv[2]) {
         return SHELL_USAGE;
+    }
+    if (!permit(argv[1], 1)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
     }
     u32 size = 0;
     for (const char* p = argv[2]; *p; ++p) {
@@ -125,6 +172,10 @@ static int truncate_file(int argc, char** argv) {
 static int stat_file(int argc, char** argv) {
     if (argc != 2) {
         return SHELL_USAGE;
+    }
+    if (!permit(argv[1], 0)) {
+        printf("FS: Permission denied\n");
+        return SHELL_ERROR;
     }
     vfs_stat_t stat;
     int result = vfs_stat(argv[1], &stat);

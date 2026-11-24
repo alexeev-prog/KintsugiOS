@@ -13,7 +13,7 @@ static int help(int argc, char** argv) {
         return SHELL_OK;
     }
     if (!strcmp(argv[1], "bin")) {
-        printf("Run: name [arguments] or /BIN/NAME.ELF [arguments]\n");
+        printf("Run: name [arguments] or /bin/NAME.ELF [arguments]\n");
         printf("kuned [file] editor; kc commander; kbsm resources; ktui launcher; krrawl game\n");
         printf("kset display; soundctl audio mixer; kmusa generator; klisten player; volumectl volume\n");
         printf("kprocm processes; kdiskman volumes (read only); proc process list\n");
@@ -24,13 +24,13 @@ static int help(int argc, char** argv) {
         u32 cursor = 0;
         vfs_dirent_t entry;
         int result;
-        while ((result = vfs_readdir("/BIN", &cursor, &entry)) > 0) {
+        while ((result = vfs_readdir("/bin", &cursor, &entry)) > 0) {
             if (!entry.stat.directory) {
                 printf("  %s\n", entry.name);
             }
         }
         if (result < 0) {
-            printf("/BIN unavailable: %s\n", vfs_error(result));
+            printf("/bin unavailable: %s\n", vfs_error(result));
         }
         return SHELL_OK;
     }

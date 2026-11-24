@@ -58,7 +58,7 @@ init_pm:					; в PM, наши старые сегменты бесполезн�
 	mov fs, ax
 	mov gs, ax
 
-	mov ebp, 0x90000		; Stack in conventional RAM, not BIOS ROM
+	mov ebp, 0x9f000		; Stack in conventional RAM, not BIOS ROM
 	mov esp, ebp			; верху свободного места
 
 	call BEGIN_PM

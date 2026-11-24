@@ -10,6 +10,7 @@ int ftruncate(int fd, unsigned int size);
 int fstat(int fd, kos_stat* stat);
 int sync(void);
 int kill(int pid);
+int kill_sig(int pid, int signal);
 const char* kos_error(int error);
 int open(const char* path, unsigned int flags);
 int close(int fd);

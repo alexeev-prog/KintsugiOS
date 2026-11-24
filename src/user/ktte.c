@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
         if (tui_theme_load(argv[1])) {
             tui_theme_get(colors);
             tui_copy(path, argv[1], sizeof(path));
-            tui_theme_load("/ETC/TUI.THM");
+            tui_theme_load("/etc/TUI.THM");
         } else {
             status = "Cannot open theme";
         }
@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
         tui_text(50, 15, "Live preview:", 0x1e);
         tui_sample(50, 17, " Normal text / sample 123 ", colors[attribute]);
         tui_text(50, 19, "m: simple / advanced", 0x1e);
-        tui_bar(21, *path ? path : "[New theme - save under /ETC/THEMES/NAME.THM]");
+        tui_bar(21, *path ? path : "[New theme - save under /etc/THEMES/NAME.THM]");
         tui_bar(22, dirty ? "Modified" : "Unmodified");
         tui_bar(23, status);
         tui_bar(24, "N new O open S save W save as A apply U undo C contrast H help Q quit");
@@ -246,7 +246,7 @@ int main(int argc, char** argv) {
                     tui_theme_get(colors);
                     tui_copy(path, next, sizeof(path));
                     dirty = 0;
-                    tui_theme_load("/ETC/TUI.THM");
+                    tui_theme_load("/etc/TUI.THM");
                     status = "Theme loaded";
                 } else {
                     status = "Cannot load theme (invalid file or path)";
@@ -257,7 +257,7 @@ int main(int argc, char** argv) {
             tui_copy(next, path, sizeof(next));
             if (key == 'w' || !*next) {
                 char input[256];
-                if (!tui_prompt("Save theme: name (stored in /ETC/THEMES)", input, sizeof(input))) {
+                if (!tui_prompt("Save theme: name (stored in /etc/THEMES)", input, sizeof(input))) {
                     continue;
                 }
                 if (!tui_theme_path(next, input)) {
@@ -284,8 +284,8 @@ int main(int argc, char** argv) {
                 status = "Save failed; changes kept in editor";
             }
         } else if (key == 'A') {
-            if (save("/ETC/TUI.THM")) {
-                tui_theme_load("/ETC/TUI.THM");
+            if (save("/etc/TUI.THM")) {
+                tui_theme_load("/etc/TUI.THM");
                 status = "Shared theme applied";
             } else {
                 status = "Cannot save active theme";

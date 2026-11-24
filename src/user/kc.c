@@ -180,7 +180,7 @@ static void draw(panel* p, int x, int active) {
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
-    tui_load_settings("/ETC/KC.CFG", settings, sizeof(settings));
+    tui_load_settings("/etc/KC.CFG", settings, sizeof(settings));
     settings[0] = !!settings[0];
     settings[1] = !!settings[1];
     for (int i = 0; i < 2; ++i) {
@@ -271,7 +271,7 @@ int main(int argc, char** argv) {
                 settings[1] ^= 1;
             }
             if (c == 2) {
-                status = tui_save_settings("/ETC/KC.CFG", settings, sizeof(settings))
+                status = tui_save_settings("/etc/KC.CFG", settings, sizeof(settings))
                     ? "Settings saved"
                     : "Settings save failed";
             }
@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
             }
             if (key == 'v' && e && !e->stat.directory) {
                 char* args[] = { "KUNED", source, "--readonly", 0 };
-                int pid = spawn("/BIN/KUNED.ELF", 3, args);
+                int pid = spawn("/bin/KUNED.ELF", 3, args);
                 status = pid > 0 && wait(pid) == 0 ? "Viewer closed" : "Viewer failed";
             } else if (key == 'r' && e && tui_prompt("New name (same directory):", input, sizeof(input))) {
                 tui_path(dest, t->directory, input);
@@ -336,7 +336,7 @@ int main(int argc, char** argv) {
                     u32 n = tui_len(source);
                     int executable = n > 4 && same(source + n - 4, ".ELF");
                     int painting = n > 4 && same(source + n - 4, ".KPT");
-                    int result = tui_launch(executable ? source : painting ? "/BIN/KPAINT.ELF" : "/BIN/KUNED.ELF",
+                    int result = tui_launch(executable ? source : painting ? "/bin/KPAINT.ELF" : "/bin/KUNED.ELF",
                         executable ? 0 : source);
                     status = result < 0 ? kos_error(result) : result ? "Application returned error" : "Application closed";
                 }

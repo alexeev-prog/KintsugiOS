@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
     int insert = !VIK, pending = 0;
     int dirty = 0;
     unsigned char settings[2] = { 1, 0 }; /* line numbers, dark blue theme */
-    tui_load_settings("/ETC/KUNED.CFG", settings, sizeof(settings));
+    tui_load_settings("/etc/KUNED.CFG", settings, sizeof(settings));
     settings[0] = !!settings[0];
     settings[1] = !!settings[1];
     const char* status =
@@ -276,6 +276,20 @@ int main(int argc, char** argv) {
                 if (command[0] == 't' && command[1] == 'h' && command[2] == 'e' && command[3] == 'm'
                     && command[4] == 'e' && !command[5]) {
                     tui_theme_choose();
+                    continue;
+                }
+                if (command[0] == 's' && command[1] == 'e' && command[2] == 't' && command[3] == ' ') {
+                    if (command[4] == 'n' && command[5] == 'u') {
+                        settings[0] = 1; status = "Line numbers on";
+                    } else if (command[4] == 'n' && command[5] == 'o' && command[6] == 'n') {
+                        settings[0] = 0; status = "Line numbers off";
+                    } else {
+                        status = ":set nu | nonu";
+                    }
+                    continue;
+                }
+                if (command[0] == 'h' && command[1] == 'e' && command[2] == 'l' && command[3] == 'p') {
+                    status = "VIK: hjkl move i/a/o insert v/V select d/c/y p/P :w :q :set nu";
                     continue;
                 }
                 if (command[0] == 'q' && (!command[1] || (command[1] == '!' && !command[2]))) {
@@ -507,7 +521,7 @@ int main(int argc, char** argv) {
                 settings[1] ^= 1;
             }
             if (choice == 2) {
-                status = tui_save_settings("/ETC/KUNED.CFG", settings, sizeof(settings))
+                status = tui_save_settings("/etc/KUNED.CFG", settings, sizeof(settings))
                     ? "Settings saved"
                     : "Cannot save settings";
             }

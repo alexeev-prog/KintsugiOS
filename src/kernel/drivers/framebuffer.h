@@ -17,9 +17,13 @@ void framebuffer_mouse_show(void);
 void framebuffer_theme(u32 theme);
 void framebuffer_scale(u32 scale);
 void framebuffer_font(u32 font);
+void framebuffer_font_size(u32 size);
 u32 framebuffer_theme_index(void);
 u32 framebuffer_scale_index(void);
 u32 framebuffer_font_index(void);
+u32 framebuffer_font_size_index(void);
 /* Actual cell geometry: width, height, origin x, origin y (pixels). */
 void framebuffer_geometry(u32 out[4]);
+/* Fixed DOS-era palette for games, independent of user themes. */
+void framebuffer_game_palette(int enabled);
 #endif

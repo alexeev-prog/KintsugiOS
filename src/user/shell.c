@@ -1,16 +1,52 @@
 #include "fsabi.h"
 #include "runtime.h"
 #include "shellabi.h"
+#include "authabi.h"
 #include "../shared/text.h"
 
 static char line[256], history[16][256], draft[256];
 static unsigned length, cursor, rendered, histories, position;
 static int status;
+static char prompt_mark = '$';
 static int script_argc, script_depth;
 static char** script_argv;
 static int execute(char* text);
 static void print(const char* s);
 static void copy(char* d, const char* s);
+
+static unsigned current_uid(void) {
+    return (unsigned)syscall(KOS_SYS_GETUID, 0, 0, 0, 0);
+}
+
+static const char* current_user(void) {
+    static char name[32];
+    name[0] = 0;
+    if (syscall(KOS_SYS_GETUSER, (u32)name, sizeof(name), 0, 0)) copy(name, "user");
+    return name;
+}
+
+static void read_secret(char* buffer, unsigned capacity) {
+    unsigned n = 0;
+    buffer[0] = 0;
+    for (;;) {
+        int key = syscall(8, 1, 0, 0, 0);
+        if (key == '\n' || key == '\r') break;
+        if (key == 3) { n = 0; break; }
+        if (key == 8) {
+            if (n) {
+                --n;
+                write_all(1, "\b \b", 3);
+            }
+            continue;
+        }
+        if (key >= 32 && key < 127 && n + 1 < capacity) {
+            buffer[n++] = (char)key;
+            write_all(1, "*", 1);
+        }
+    }
+    buffer[n] = 0;
+    write_all(1, "\n", 1);
+}
 
 static void prompt(void) {
     char cwd[256];
@@ -18,8 +54,12 @@ static void prompt(void) {
         copy(cwd, "?");
     }
     print("\n[ ");
+    print(current_user());
+    print("@kintsugi ");
     print(cwd);
-    print(" ]\n!#> ");
+    print(" ]\n");
+    { char mark[2] = { prompt_mark, 0 }; print(mark); }
+    print(" ");
 }
 
 static int run_script(const char* file, int argc, char** argv) {
@@ -169,11 +209,11 @@ static int parse(char* text, char** argv, int capacity) {
 
 static void path(char* out, const char* name) {
     if (equal(name, "hieroglyph")) {
-        copy(out, "/BIN/HIERO.ELF");
+        copy(out, "/bin/HIERO.ELF");
         return;
     }
     if (equal(name, "sh")) {
-        copy(out, "/BIN/SHELL.ELF");
+        copy(out, "/bin/SHELL.ELF");
         return;
     }
     for (const char* p = name; *p; ++p) {
@@ -208,7 +248,7 @@ static void path(char* out, const char* name) {
             }
         }
     }
-    copy(out, "/BIN/");
+    copy(out, "/bin/");
     copy(out + 5, name);
     copy(out + len(out), ".ELF");
 }
@@ -350,7 +390,147 @@ too_long:
     return 2;
 }
 
+/* ---- shell control flow ------------------------------------------------- */
+
+static char* skip_ws(char* p) {
+    while (*p == ' ' || *p == '\t') ++p;
+    return p;
+}
+
+static int starts_word(char* text, const char* word) {
+    text = skip_ws(text);
+    unsigned n = 0;
+    while (word[n]) ++n;
+    for (unsigned i = 0; i < n; ++i) if (text[i] != word[i]) return 0;
+    char after = text[n];
+    return after == 0 || after == ' ' || after == '\t' || after == ';';
+}
+
+/* Splits a command line on top-level semicolons, honouring quotes. */
+static int split_semi(char* text, char** parts, int capacity) {
+    int count = 0;
+    char quote = 0;
+    parts[count++] = skip_ws(text);
+    for (char* p = text; *p && count < capacity; ++p) {
+        if (*p == '\\' && quote != '\'' && p[1]) { ++p; continue; }
+        if (*p == '\'' || *p == '"') {
+            if (!quote) quote = *p; else if (quote == *p) quote = 0;
+            continue;
+        }
+        if (!quote && *p == ';') {
+            *p = 0;
+            parts[count++] = skip_ws(p + 1);
+        }
+    }
+    return count;
+}
+
+static void join_parts(char** parts, int from, int to, char* out, u32 capacity) {
+    u32 used = 0;
+    out[0] = 0;
+    for (int i = from; i < to; ++i) {
+        if (!parts[i] || !*parts[i]) continue;
+        if (used) { if (used + 1 >= capacity) break; out[used++] = ' '; out[used] = 0; }
+        const char* p = parts[i];
+        while (*p && used + 1 < capacity) out[used++] = *p++;
+        out[used] = 0;
+    }
+}
+
+static int decimal(const char* text) {
+    int value = 0, negative = 0;
+    if (*text == '-') { negative = 1; ++text; }
+    if (!*text) return 0;
+    for (const char* p = text; *p; ++p) {
+        if (*p < '0' || *p > '9') return 0;
+        value = value * 10 + (*p - '0');
+    }
+    return negative ? -value : value;
+}
+
+static int exec_control(char* text) {
+    char* parts[64];
+    int count = split_semi(text, parts, 64);
+    if (!count) return 0;
+
+    if (starts_word(parts[0], "if")) {
+        int then_at = -1, else_at = -1, fi_at = -1;
+        for (int i = 1; i < count; ++i) {
+            if (starts_word(parts[i], "then")) then_at = i;
+            else if (starts_word(parts[i], "else")) else_at = i;
+            else if (starts_word(parts[i], "fi")) fi_at = i;
+        }
+        if (then_at < 0 || fi_at < 0 || fi_at <= then_at) return 2;
+        char condition[512];
+        join_parts(parts, 1, then_at, condition, sizeof(condition));
+        int status = execute(condition);
+        int from = status == 0 ? then_at + 1 : (else_at >= 0 ? else_at + 1 : fi_at);
+        int to = status == 0 ? (else_at >= 0 ? else_at : fi_at) : fi_at;
+        char branch[1024];
+        join_parts(parts, from, to, branch, sizeof(branch));
+        if (!*branch) return status;
+        return execute(branch);
+    }
+
+    if (starts_word(parts[0], "while")) {
+        int do_at = -1, done_at = -1;
+        for (int i = 1; i < count; ++i) {
+            if (starts_word(parts[i], "do")) do_at = i;
+            else if (starts_word(parts[i], "done")) done_at = i;
+        }
+        if (do_at < 0 || done_at < 0 || done_at <= do_at) return 2;
+        char condition[512], body[1024];
+        join_parts(parts, 1, do_at, condition, sizeof(condition));
+        join_parts(parts, do_at + 1, done_at, body, sizeof(body));
+        int status = 1;
+        for (int guard = 0; guard < 1000; ++guard) {
+            if (execute(condition) != 0) break;
+            status = execute(body);
+        }
+        return status;
+    }
+
+    if (starts_word(parts[0], "for")) {
+        int in_at = -1, do_at = -1, done_at = -1;
+        for (int i = 1; i < count; ++i) {
+            if (starts_word(parts[i], "in")) in_at = i;
+            else if (starts_word(parts[i], "do")) do_at = i;
+            else if (starts_word(parts[i], "done")) done_at = i;
+        }
+        if (in_at < 0 || do_at < 0 || done_at < 0 || do_at <= in_at || done_at <= do_at) return 2;
+        char variable[32] = "";
+        char* head = skip_ws(parts[0] + 3);
+        u32 n = 0;
+        while (*head && *head != ' ' && *head != '\t' && n + 1 < sizeof(variable)) variable[n++] = *head++;
+        variable[n] = 0;
+        if (!variable[0]) return 2;
+        char values[512], body[1024];
+        join_parts(parts, in_at + 1, do_at, values, sizeof(values));
+        join_parts(parts, do_at + 1, done_at, body, sizeof(body));
+        int status = 0;
+        char* cursor = values;
+        while (*cursor) {
+            cursor = skip_ws(cursor);
+            if (!*cursor) break;
+            char* start = cursor;
+            while (*cursor && *cursor != ' ' && *cursor != '\t') ++cursor;
+            char saved = *cursor;
+            *cursor = 0;
+            setenv(variable, start);
+            status = execute(body);
+            if (!saved) break;
+            ++cursor;
+        }
+        return status;
+    }
+    return -1; /* not a control-flow statement */
+}
+
 static int execute_inner(char* text, command_frame* frame) {
+    if (starts_word(text, "if") || starts_word(text, "for") || starts_word(text, "while")) {
+        int result = exec_control(text);
+        if (result >= 0) return result;
+    }
     char quote = 0;
     int background = 0;
     /* Command lists and a single parenthesized group are intentionally parsed
@@ -522,7 +702,7 @@ static int execute_inner(char* text, command_frame* frame) {
             if (argc < 2) {
                 return 2;
             }
-            request.paths[0] = "/BIN/SHELL.ELF";
+            request.paths[0] = "/bin/SHELL.ELF";
             int result = syscall(KOS_SYS_LAUNCH, (u32)&request, 0, 0, 0);
             return result < 0 ? 126 : result;
         }
@@ -534,11 +714,83 @@ static int execute_inner(char* text, command_frame* frame) {
             for (int i = 0; i < argc; ++i) {
                 script_args[i + 1] = argv[i];
             }
-            request.paths[0] = "/BIN/SHELL.ELF";
+            request.paths[0] = "/bin/SHELL.ELF";
             request.argv[0] = script_args;
             request.argc[0] = argc + 1;
             int result = syscall(KOS_SYS_LAUNCH, (u32)&request, 0, 0, 0);
             return result < 0 ? 126 : result;
+        }
+        if (equal(argv[0], "true")) return 0;
+        if (equal(argv[0], "false")) return 1;
+        if (equal(argv[0], "test") || equal(argv[0], "[")) {
+            int start = equal(argv[0], "[") ? 1 : 0;
+            int end = argc;
+            if (start && end > start && equal(argv[end - 1], "]")) --end;
+            int items = end - start;
+            if (items <= 0) return 1;
+            char** v = argv + start;
+            if (items == 1) return *v[0] ? 0 : 1;
+            if (items == 2) {
+                if (equal(v[0], "-n")) return *v[1] ? 0 : 1;
+                if (equal(v[0], "-z")) return *v[1] ? 1 : 0;
+                if (v[0][0] == '-' && (v[0][1] == 'e' || v[0][1] == 'f' || v[0][1] == 'd')) {
+                    kos_stat status;
+                    int result = syscall(11, (u32)v[1], 4, (u32)&status, 0);
+                    if (result) return 1;
+                    if (v[0][1] == 'f') return status.directory ? 1 : 0;
+                    if (v[0][1] == 'd') return status.directory ? 0 : 1;
+                    return 0;
+                }
+                return 2;
+            }
+            if (items == 3) {
+                if (equal(v[1], "=")) return equal(v[0], v[2]) ? 0 : 1;
+                if (equal(v[1], "!=")) return equal(v[0], v[2]) ? 1 : 0;
+                int a = decimal(v[0]), b = decimal(v[2]);
+                if (equal(v[1], "-eq")) return a == b ? 0 : 1;
+                if (equal(v[1], "-ne")) return a != b ? 0 : 1;
+                if (equal(v[1], "-lt")) return a < b ? 0 : 1;
+                if (equal(v[1], "-le")) return a <= b ? 0 : 1;
+                if (equal(v[1], "-gt")) return a > b ? 0 : 1;
+                if (equal(v[1], "-ge")) return a >= b ? 0 : 1;
+            }
+            return 2;
+        }
+        if (equal(argv[0], "help")) {
+            print("Keramika Shell Help\n");
+            if (argc == 2 && equal(argv[1], "bin")) {
+                print("Installed /BIN entries:\n");
+                kos_dirent entry;
+                u32 cursor_bin = 0;
+                while (syscall(3, (u32)"/bin", (u32)&cursor_bin, (u32)&entry, 0) > 0) {
+                    if (!entry.stat.directory) { print("  "); print(entry.name); print("\n"); }
+                }
+            } else if (argc == 2 && equal(argv[1], "fs")) {
+                print("write <file> <text>       Replace file contents\n");
+                print("read <file>               Print file contents\n");
+                print("mkdir <dir>               Create directory\n");
+                print("rm <path>                 Remove file or directory\n");
+                print("copy <src> <dst>          Copy a file\n");
+                print("move <src> <dst>          Move or rename a file\n");
+                print("cat <file>                Show file contents\n");
+                print("cd <dir>                  Change directory\n");
+            } else {
+                print("Commands: cd pwd echo help source sh env export unset exit true false test [\n");
+                print("Identity: whoami id sugo [shell|<command>]\n");
+                print("Users:   useradd userpswd rootpswd userchange (root)\n");
+                print("Files:   ls cat write read mkdir rm copy move\n");
+                print("Tools:   tree find grep tail wc sort kfck proc posixinfo kill df du\n");
+                print("Coreutils: basename dirname printf date uname sleep touch head seq\n");
+                print("           printenv cut tr nl rev tac uniq tee yes expr factor\n");
+                print("           cksum od strings cmp realpath truncate mktemp df du\n");
+                print("Perms:   chmod <mode> <path>  chown <user|uid> <path>\n");
+                print("Apps:    ktui kiwi kc kuned kcsv kservices ksersys klisten kfetch\n");
+                print("         krrawl kcalc kman kset kpaint kinfo kterm ktmux\n");
+                print("Control: if COND; then CMD; else CMD; fi | for V in A B; do CMD; done\n");
+                print("         while COND; do CMD; done | CMD && CMD | CMD || CMD | CMD; CMD\n");
+                print("Launch: name [args] or /bin/NAME.ELF [args]\n");
+            }
+            return 0;
         }
         if (equal(argv[0], "env")) {
             kos_env_entry* entries = malloc(KOS_ENV_MAX * sizeof(kos_env_entry));
@@ -581,6 +833,68 @@ static int execute_inner(char* text, command_frame* frame) {
             const char* home = getenv("HOME");
             return syscall(11, (u32)(home ? home : "/"), 3, 0, 0) ? 1 : 0;
         }
+        if (equal(argv[0], "whoami")) {
+            print(current_user());
+            print("\n");
+            return 0;
+        }
+        if (equal(argv[0], "id")) {
+            print("uid=");
+            number(current_uid());
+            print(" gid=");
+            number((unsigned)syscall(KOS_SYS_GETGID, 0, 0, 0, 0));
+            print(" user=");
+            print(current_user());
+            print("\n");
+            return 0;
+        }
+        if (equal(argv[0], "sugo")) {
+            if (current_uid() != 0) {
+                char password[64];
+                print("Password for root: ");
+                read_secret(password, sizeof(password));
+                if (syscall(KOS_SYS_ELEVATE, (u32)"root", (u32)password, 0, 0)) {
+                    print("sugo: authentication failed\n");
+                    return 1;
+                }
+            }
+            /* Kernel builtins are not ELFs. Ask the kernel to run this one
+             * with the elevation that was just armed; 127 means "no such
+             * builtin", so fall through to the normal /BIN lookup. */
+            if (argc > 1) {
+                int builtin = syscall(KOS_SYS_BUILTIN, 3, argc - 1, (u32)(argv + 1), 0);
+                if (builtin != 127) {
+                    if (builtin < 0) {
+                        print("sugo: ");
+                        print(kos_error(builtin));
+                        print("\n");
+                    }
+                    return builtin;
+                }
+            }
+            char target[256];
+            request.count = 1;
+            if (argc == 1 || equal(argv[1], "shell") || equal(argv[1], "sh")) {
+                copy(target, "/bin/SHELL.ELF");
+                args[0][0] = "shell";
+                args[0][1] = 0;
+                request.argc[0] = 1;
+            } else {
+                path(target, argv[1]);
+                request.argc[0] = argc - 1;
+                for (int i = 1; i < argc; ++i) args[0][i - 1] = argv[i];
+                args[0][argc - 1] = 0;
+            }
+            request.paths[0] = target;
+            request.argv[0] = args[0];
+            int result = syscall(KOS_SYS_LAUNCH, (u32)&request, 0, 0, 0);
+            if (result < 0) {
+                syscall(KOS_SYS_CANCEL_ELEVATE, 0, 0, 0, 0);
+                print("sugo: launch failed\n");
+                return 126;
+            }
+            return result;
+        }
         if (equal(args[0][0], "status")) {
             print("status=");
             number(status);
@@ -609,7 +923,9 @@ static int execute_inner(char* text, command_frame* frame) {
         kos_stat st;
         if (equal(args[0][0], "fault") || syscall(11, (u32)names[0], 4, (u32)&st, 0)) {
             int result = syscall(KOS_SYS_BUILTIN, 0, request.argc[0], (u32)args[0], 0);
-            if (result == 127) {
+            if (result == KOS_EPERM) {
+                print("permission denied (root only) - use 'sugo <command>'\n");
+            } else if (result == 127) {
                 print("Unknown command\n");
             }
             return result;
@@ -641,7 +957,7 @@ static void complete(void) {
     unsigned matches = 0, common_length = 0;
     int command = start == 0;
     if (command) {
-        copy(directory, "/BIN");
+        copy(directory, "/bin");
     }
     for (unsigned i = start; i < cursor; ++i) {
         if (line[i] == '/') {
@@ -711,9 +1027,11 @@ static void redraw(void) {
     while (text_columns(line + start, cursor - start) > 73) start = text_next(line, start);
     unsigned finish = start, visible = 0;
     while (finish < length && visible < 74) { finish = text_next(line, finish); ++visible; }
+    /* The editing row must keep exactly the same mark as the printed prompt:
+     * '$' for a user, '#' for root. It used to flip to the legacy '!#>'. */
     char frame[512];
-    frame[0] = '\r'; frame[1] = '!'; frame[2] = '#'; frame[3] = '>'; frame[4] = ' ';
-    unsigned n = 5;
+    frame[0] = '\r'; frame[1] = prompt_mark; frame[2] = ' ';
+    unsigned n = 3;
     for (unsigned i = start; i < finish; ++i) {
         frame[n++] = line[i];
     }
@@ -730,19 +1048,34 @@ static void redraw(void) {
 
 int main(int argc, char** argv) {
     if (!getenv("PATH")) {
-        setenv("PATH", "/BIN:/USR/BIN");
+        setenv("PATH", "/bin:/usr/bin");
+    }
+    unsigned uid = current_uid();
+    prompt_mark = uid == 0 ? '#' : '$';
+    char account[32];
+    account[0] = 0;
+    if (syscall(KOS_SYS_GETUSER, (u32)account, sizeof(account), 0, 0)) copy(account, uid ? "user" : "root");
+    if (uid == 0) {
+        setenv("USER", "root");
+        setenv("LOGNAME", "root");
+        setenv("HOME", "/root");
+    } else if (!getenv("USER")) {
+        setenv("USER", account);
+        setenv("LOGNAME", account);
     }
     if (!getenv("HOME")) {
-        setenv("HOME", "/HOME");
+        setenv("HOME", uid ? "/home/user" : "/root");
     }
     if (!getenv("TERM")) {
         setenv("TERM", "kintsugi");
     }
     if (argc == 1) {
-        int profile = open("/ETC/PROFILE", KOS_O_READ);
+        const char* home = getenv("HOME");
+        if (home) syscall(11, (u32)home, 3, 0, 0);
+        int profile = open("/etc/PROFILE", KOS_O_READ);
         if (profile >= 0) {
             close(profile);
-            run_script("/ETC/PROFILE", 0, (char**)0);
+            run_script("/etc/PROFILE", 0, (char**)0);
         }
     }
     if (argc > 1) {

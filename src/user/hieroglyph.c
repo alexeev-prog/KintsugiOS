@@ -6,7 +6,7 @@ static int save(tui_editor* editor, char path[256], int save_as) {
     char destination[256];
     tui_copy(destination, path, 256);
     if (save_as || !*path) {
-        if (!tui_prompt("Save document (FAT12: 8.3 names, e.g. /HOME/NOTE.MD):", destination, 256)) {
+        if (!tui_prompt("Save document (path):", destination, 256)) {
             return 0;
         }
         tui_stat stat;
@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
             tui_text(67, 23, "/", 0x70);
             tui_number(69, 23, (total + ROWS - 1) / ROWS, 0x70);
         }
-        tui_bar(24, "F1 Help F2 Save F3 Read/Write F4 Save as F10 Quit | ^Z Undo ^R Redo ^T Theme");
+        tui_bar(24, "F1 Help F2 Save F3 View F4 Save as F5 Open F10 Quit | ^Z Undo ^R Redo ^T Theme");
         tui_present(79, 24);
         int key = tui_key(1);
         if (key == TUI_F10 || key == 27) {
@@ -134,6 +134,30 @@ int main(int argc, char** argv) {
             tui_menu("Hieroglyph - Markdown help", help, 10, 0);
         } else if (key == TUI_F3) {
             writing = !writing;
+        } else if (key == TUI_F5 || key == 14) {
+            char load[256] = "";
+            if (tui_prompt("Open document (path):", load, 256)) {
+                tui_stat st;
+                int r = tui_stat_path(load, &st);
+                if (!r && !st.directory && st.size <= LIMIT) {
+                    int fd = open(load, KOS_O_READ);
+                    if (fd >= 0) {
+                        editor.length = 0;
+                        while (editor.length < st.size) {
+                            int n = read(fd, editor.text + editor.length, st.size - editor.length);
+                            if (n <= 0) break;
+                            editor.length += n;
+                        }
+                        close(fd);
+                        editor.text[editor.length] = 0;
+                        tui_copy(path, load, 256);
+                        writing = 0; dirty = 0; top = 0;
+                        status = "Document opened";
+                    }
+                } else {
+                    tui_message("Open failed", r ? kos_error(r) : "Invalid document size");
+                }
+            }
         } else if (key == TUI_F2 || key == TUI_F4) {
             if (save(&editor, path, key == TUI_F4)) {
                 dirty = 0;

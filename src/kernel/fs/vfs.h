@@ -3,7 +3,7 @@
 #include "../../user/fsabi.h"
 #include "../kklibc/ctypes.h"
 #define VFS_PATH_MAX 256
-#define VFS_NAME_MAX 13 /* legacy FAT-compatible ABI */
+#define VFS_NAME_MAX 256 /* long names; FAT12 enforces 8.3 inside its own driver */
 #define VFS_LONG_NAME_MAX KOS_LONG_NAME_MAX
 
 enum {
@@ -73,5 +73,7 @@ int vfs_copy(const char* source, const char* destination);
 /* readdir: 1 entry, 0 end, negative error. Cursor is opaque to callers. */
 int vfs_readdir(const char* path, u32* cursor, vfs_dirent_t* entry);
 int vfs_readdir_long(const char* path, u32* cursor, vfs_long_dirent_t* entry);
+/* Read-only change journal exposed as /proc/events. */
+int vfs_events_read(char* buffer, u32 capacity);
 const char* vfs_error(int error);
 #endif

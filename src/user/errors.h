@@ -6,7 +6,7 @@ static inline const char* kos_error_text(int error) {
     static const char* const errors[] = { "Success",
                                           "Not found",
                                           "Disk I/O error or filesystem unavailable",
-                                          "Invalid path or argument (8.3 names required)",
+                                          "Invalid path or argument",
                                           "Disk or directory full",
                                           "Already exists",
                                           "Not a directory",

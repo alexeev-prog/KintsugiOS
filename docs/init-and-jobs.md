@@ -5,10 +5,17 @@ executable automatically. If it cannot be loaded, or exits, the kernel
 falls back to the rescue shell. A missing filesystem also uses the rescue
 shell directly.
 
-Init runs in ring 3, spawns `/BIN/SHELL.ELF`, waits for it and restarts it
-after exit. The normal command interpreter, parser, history, line editor and
-filesystem completion run in userspace. The kernel shell is retained only as
-a rescue fallback. This is not yet a configurable service manager.
+Init runs in ring 3. It first starts `/BIN/KSERSYS.ELF --supervise` (respawning
+it if it dies), then presents the full-screen TUI login, spawns
+`/BIN/SHELL.ELF` with the selected account's credentials, waits for it and
+shows the login again after exit. The normal command interpreter, parser,
+history, line editor and filesystem completion run in userspace. The kernel
+shell is retained only as a rescue fallback.
+
+Service definitions are persisted in `/etc/services` and supervised by
+`ksersys`; see `docs/DESKTOP_RU.md` for the file format, autostart, restart
+policy and the management commands. Shell `&` jobs remain interactive
+short-lived children; long-lived daemons should be registered with ksersys.
 
 Syscall 32 performs session cleanup; 33 accepts a bounded pipeline launch
 description (all user strings are copied and checked); 34 exposes legacy

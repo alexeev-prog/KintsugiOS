@@ -41,7 +41,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
                 "-i",
                 str(disk),
                 "system/themes/LIGHT.THM",
-                "::/ETC/TUI.THM",
+                "::/etc/TUI.THM",
             ],
             check=True,
         )
@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         )
         script = tmp / "DEMO.SH"
         script.write_text(
-            '#!/BIN/SHELL.ELF\n# script regression\necho "script-$1-$#-$DEMO" > /script.txt\nexport DEMO=child\n'
+            '#!/bin/SHELL.ELF\n# script regression\necho "script-$1-$#-$DEMO" > /script.txt\nexport DEMO=child\n'
         )
         subprocess.run(
             ["mcopy", "-i", str(disk), str(script), "::/DEMO.SH"], check=True
@@ -288,8 +288,8 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             time.sleep(0.2)
             qmp("quit")
             proc.wait(timeout=10)
-            subprocess.run(["mdir", "-i", str(disk), "::/HOME/WORK/"], check=True)
-            assert subprocess.check_output(["mtype", "-i", str(disk), "::/HOME/NEW.TXT"]) == b""
+            subprocess.run(["mdir", "-i", str(disk), "::/home/WORK/"], check=True)
+            assert subprocess.check_output(["mtype", "-i", str(disk), "::/home/NEW.TXT"]) == b""
             print("PASS: KiWi exclusive file creation, mkdir, KRrawl launch/attack/exit")
             sys.exit(0)
         if "--desktop" in sys.argv:
@@ -328,11 +328,11 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             monitor("sendkey spc 10")
             monitor("sendkey s 10")
             time.sleep(0.2)
-            command("/HOME/TEST.KPT")
+            command("/home/TEST.KPT")
             wait_for("Drawing saved")
             monitor("sendkey q 10")
             time.sleep(0.2)
-            command("kuned /HOME/RU.TXT")
+            command("kuned /home/RU.TXT")
             wait_for("kuned - Kintsugi Universal Editor")
             for key in ["f12", "g", "h", "b", "d", "t", "n", "f12", "ctrl-s"]:
                 monitor(f"sendkey {key} 10")
@@ -342,9 +342,9 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             time.sleep(0.2)
             qmp("quit")
             proc.wait(timeout=10)
-            drawing = subprocess.check_output(["mtype", "-i", str(disk), "::/HOME/TEST.KPT"])
+            drawing = subprocess.check_output(["mtype", "-i", str(disk), "::/home/TEST.KPT"])
             assert drawing[:8] == b"KPT1\x48\x11\0\0" and 10 in drawing[8:]
-            document = subprocess.check_output(["mtype", "-i", str(disk), "::/HOME/RU.TXT"])
+            document = subprocess.check_output(["mtype", "-i", str(disk), "::/home/RU.TXT"])
             assert document == "привет".encode()
             print("PASS: mouse online, runtime 1600x900, KiWi, KPaint save, KUNED UTF-8 save")
             sys.exit(0)
@@ -680,7 +680,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
         command("/bin/check.elf")
         wait_for("User syscall checks: PASS")
         wait_for("User malloc checks: PASS")
-        command("./BIN/ECHO.ELF path-exec-ok")
+        command("./bin/ECHO.ELF path-exec-ok")
         wait_for("path-exec-ok")
         command("/bin/input.elf")
         wait_for("stdin> ")
@@ -800,7 +800,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             == b"vik-content\n"
         )
         theme = subprocess.check_output(
-            ["mtype", "-i", str(disk), "::/ETC/THEMES/TEST.THM"]
+            ["mtype", "-i", str(disk), "::/etc/THEMES/TEST.THM"]
         )
         boot_log = subprocess.check_output(["mtype", "-i", str(disk), "::/BOOT.LOG"])
         assert b"[DEBUG] [fat12] BPB" in boot_log and b"[INFO] [ata]" in boot_log
@@ -809,7 +809,7 @@ with tempfile.TemporaryDirectory(prefix="kintsugi-", dir="/tmp/opencode") as dir
             == b"source-ok\n"
         )
         picked = subprocess.check_output(
-            ["mtype", "-i", str(disk), "::/ETC/THEMES/PICK.THM"]
+            ["mtype", "-i", str(disk), "::/etc/THEMES/PICK.THM"]
         )
         expected_background = b"72=80\n" if "--light-theme" in sys.argv else b"72=27\n"
         assert expected_background in picked, (

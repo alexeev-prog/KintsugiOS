@@ -39,9 +39,11 @@ KintsugiOS — это минималистичная x86 операционна�
 [Управление, темы и ограничения](docs/DESKTOP_RU.md).
 
 ```sh
-sudo apt-get install build-essential binutils nasm python3 qemu-system-x86 dosfstools mtools genisoimage
+sudo apt-get install build-essential binutils nasm python3 qemu-system-x86 dosfstools mtools genisoimage e2fsprogs
 make -j4
-make run                  # загрузка + сохранённый FAT12-диск
+make run                  # загрузка с KFS2-образом (совместимый режим)
+make kfs3                 # собрать ext2-образ для POSIX-слоя KFS3
+make run_kfs3             # загрузка с ext2 как основной ФС
 make test                 # QEMU: shell, ФС, перезапуск, panic
 make help
 ```
@@ -64,6 +66,19 @@ GitHub Actions выполняет сборку и headless QEMU-тесты на 
 Редактор: ↑/↓ — история (16 строк), ←/→, Home/End, Delete/Backspace, Ctrl+C —
 сброс строки; Shift+↑/↓ — прокрутка. Tab дополняет команды и имена файлов
 корня FAT12, включая `/имя`; при нескольких совпадениях — общий префикс.
+
+Поддерживается управление потоком в стиле bash (в одну строку):
+```sh
+if test -e /etc/passwd; then echo yes; else echo no; fi
+for x in alpha beta gamma; do echo $x; done
+while test 1 = 2; do echo never; done
+```
+Встроенные `test` / `[`, `true`, `false` и `$?` работают с условиями; `&&`, `||`
+и `;` уже доступны. Добавлены coreutils-подобные утилиты: `basename`, `dirname`,
+`printf`, `date`, `uname`, `sleep`, `touch`, `head`, `seq`, `printenv`, `du`,
+а также `df`, `chmod`, `chown`, `kill`, `posixinfo`. `kintsugifetch` (`kfetch`)
+выводит neofetch-карточку с ANSI-цветами и ASCII-артом в обычный терминал —
+он не занимает весь экран и его можно перенаправлять.
 
 ```text
 write /hello.txt "Hello world" escaped\ space
@@ -242,11 +257,13 @@ TUI-приложения: `kuned [file]` (редактор с undo/поиско�
    - Удаление директорий
    - Перемеинование файлов, директорий
    - Перемещение и копирование файлов, директорий
- - [ ] Файловая система ext2
-   - Исследование структуры ext2
-   - Чтение суперблока и групповых дескрипторов
-   - Работа с inode и блоками данных
-   - Поддержка каталогов и длинных имён
+ - [x] Файловая система ext2 (основная для KFS3)
+   - [x] Суперблок, групповые дескрипторы, bitmap inode и блоков
+   - [x] Прямые, одинарные, двойные и тройные косвенные блоки
+   - [x] Чтение/запись, создание, удаление, rename, truncate
+   - [x] Каталоги, длинные имена, dir_index (линейный обход), 64-bit дескрипторы
+   - [x] Конвертер образа и миграция KFS2 → ext2
+   - [ ] ext4 extents и metadata_csum (требуется отдельный драйвер)
  - [ ] Планировщик задач
    - Структуры данных для описания процессов
    - Механизм переключения контекста
@@ -372,9 +389,16 @@ TUI-приложения: `kuned [file]` (редактор с undo/поиско�
 make quick
 ```
 
-### Создание образа диска (hdd) и запуск в QEMU
+### Создание ext2-образа и запуск KFS3
 ```bash
-make run
+make kfs3
+make run_kfs3
+```
+
+Миграция старого KFS2-образа:
+```bash
+python3 tools/migrate_kfs2.py diskimgs/kintsugi_kfs2_hdd.img /tmp/kfs2-export
+python3 tools/mkfs_ext2.py diskimgs/kintsugi_ext2_hdd.img --from /tmp/kfs2-export
 ```
 
 ### Создание образа диска fda и запуск в QEMU
@@ -507,7 +531,7 @@ KKLibc является живым, развивающимся проектом 
   - Поддержка вкладок и нескольких виртуальных терминалов
   - Цветовая палитра и темы
   - Поддержка мыши в текстовом режиме
-- **Файловые системы:** Реализация FAT12 и ext2
+- **Файловые системы:** Реализация FAT12, KFS2 и ext2 (ext2 — основная для KFS3)
 - **Многозадачность:** Планировщик задач и механизмы IPC
 - **Пользовательский режим:** Разграничение привилегий
 - **Сетевой стек:** Базовая поддержка сетевых протоколов

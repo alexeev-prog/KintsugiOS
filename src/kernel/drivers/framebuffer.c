@@ -10,15 +10,37 @@
 /* QEMU standard VGA / Bochs DISPI. Unsupported adapters retain VGA text mode. */
 #define FB_WINDOW 0xe0000000u
 static framebuffer_info_t info;
-static u32 generation, mode_index = 1, scale_index = 1, font_index;
+static u32 generation, mode_index = 1, scale_index = 1, font_index, font_size_index = 1;
+static const u32 font_percent[KOS_FRAMEBUFFER_FONT_SIZES] = { 75, 100, 125, 150 };
 static u32 origin_x, origin_y, cell_width, cell_height;
 static u32 theme_colors[16];
 static u32 active_theme;
+static u32 saved_theme_colors[16];
+static int game_palette;
+void framebuffer_game_palette(int enabled) {
+    if (enabled == game_palette) return;
+    if (enabled) {
+        for (u32 i = 0; i < 16; ++i) saved_theme_colors[i] = theme_colors[i];
+        /* Classic DOS VGA: dark navy, blue, green, cyan, red, magenta, brown,
+         * silver, then bright variants. Predictable road/grass/sky colors. */
+        static const u32 dos[16] = {
+            0x000000,0x0000aa,0x00aa00,0x00aaaa,0xaa0000,0xaa00aa,0xaa5500,0xaaaaaa,
+            0x555555,0x5555ff,0x55ff55,0x55ffff,0xff5555,0xff55ff,0xffff55,0xffffff
+        };
+        for (u32 i = 0; i < 16; ++i) theme_colors[i] = dos[i];
+        game_palette = 1;
+    } else {
+        for (u32 i = 0; i < 16; ++i) theme_colors[i] = saved_theme_colors[i];
+        game_palette = 0;
+    }
+    ++generation;
+}
 u32 framebuffer_generation(void) { return generation; }
 u32 framebuffer_mode_index(void) { return mode_index; }
 u32 framebuffer_theme_index(void) { return active_theme; }
 u32 framebuffer_scale_index(void) { return scale_index; }
 u32 framebuffer_font_index(void) { return font_index; }
+u32 framebuffer_font_size_index(void) { return font_size_index; }
 static const u32 colors[16] = {
     0x141820, 0x304c78, 0x69a879, 0x66adb5, 0xc66e72, 0xa88bbd, 0xc5a36a, 0xcbd0d8,
     0x687383, 0x729bd0, 0x95c69c, 0x94d5dc, 0xed9696, 0xc6ade0, 0xebce91, 0xf3f2ed
@@ -48,9 +70,9 @@ int framebuffer_mode(u32 mode) {
     u32 usable_width = info.width > 64 ? info.width - 64 : info.width;
     u32 usable_height = info.height > 118 ? info.height - 118 : info.height;
     u32 base_width = usable_width / 80, base_height = usable_height / 25;
-    if (scale_index == 0) { cell_width = base_width * 3 / 4; cell_height = base_height * 3 / 4; }
-    else if (scale_index == 2) { cell_width = base_width * 5 / 4; cell_height = base_height * 5 / 4; }
-    else { cell_width = base_width; cell_height = base_height; }
+    u32 percent = font_percent[font_size_index];
+    cell_width = base_width * percent / 100;
+    cell_height = base_height * percent / 100;
     if (cell_width < 8) cell_width = 8;
     if (cell_height < 12) cell_height = 12;
     /* Never allow an oversized cell grid to wrap unsigned coordinates. */
@@ -68,6 +90,13 @@ int framebuffer_mode(u32 mode) {
 void framebuffer_scale(u32 scale) {
     if (scale >= KOS_FRAMEBUFFER_SCALES) return;
     scale_index = scale;
+    font_size_index = scale; /* legacy alias: small/normal/large */
+    framebuffer_mode(mode_index);
+}
+void framebuffer_font_size(u32 size) {
+    if (size >= KOS_FRAMEBUFFER_FONT_SIZES) return;
+    font_size_index = size;
+    scale_index = size < KOS_FRAMEBUFFER_SCALES ? size : KOS_FRAMEBUFFER_SCALES - 1;
     framebuffer_mode(mode_index);
 }
 void framebuffer_font(u32 font) {

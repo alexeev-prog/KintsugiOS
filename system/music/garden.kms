@@ -1,0 +1,27 @@
+# Kintsugi Music (.KMS) - freq duration_ms instrument
+# freq 0 is a rest; instrument is 0..3 (0 koto, 1 flute, 2 bell, 3 bass).
+# name Moonlit garden
+294 220 0
+330 220 0
+392 220 1
+0 220 0
+440 220 0
+392 220 0
+330 220 1
+0 220 0
+294 220 0
+330 220 0
+392 220 1
+440 220 0
+523 240 2
+0 120 0
+440 220 0
+392 220 1
+330 220 0
+294 220 0
+262 220 3
+0 220 0
+294 220 0
+330 220 1
+294 220 0
+0 240 0

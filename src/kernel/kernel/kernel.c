@@ -9,14 +9,19 @@
 #include "../drivers/mouse.h"
 #include "../fs/fat12.h"
 #include "../fs/kfs2.h"
+#include "../fs/kfs3.h"
+#include "../user/auth.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
+#include "../fs/ext2.h"
 #include "../shell/shell.h"
 #include "../user/process.h"
+#include "../user/vfs_meta.h"
 #include "log.h"
 #include "sysinfo.h"
 
 void kmain(void) {
+    int fs_ready = 0;
     framebuffer_init();
     framebuffer_theme(5);
     log_init();
@@ -52,17 +57,27 @@ void kmain(void) {
     detect_memory();
     log_event("DEBUG", "ata", "Probing primary legacy ATA channel, polling LBA28");
     ata_pio_init();
-    log_event("DEBUG", "filesystem", "Mounting KFS2 native backend at /");
-    if (!kfs2_init()) {
+    fs_ready = ext2_init();
+    if (!fs_ready) {
+        log_event("WARN", "filesystem", "ext2 unavailable; trying KFS2 native backend");
+        fs_ready = kfs2_init();
+    }
+    if (!fs_ready) {
         log_event("WARN", "filesystem", "KFS2 unavailable; trying legacy FAT12 backend");
         fat12_init();
     }
-    log_write(kfs2_is_mounted() ? "[INFO] KFS2 mounted\n" :
+    log_write(ext2_is_mounted() ? "[INFO] ext2 mounted as root\n" :
+              kfs2_is_mounted() ? "[INFO] KFS2 mounted\n" :
               fat12_is_mounted() ? "[INFO] FAT12 compatibility backend mounted\n" :
               "[WARN] filesystem unavailable\n");
+    if (fs_ready) {
+        auth_init();
+        kfs3_init();
+        vfs_meta_load();
+    }
     printf("KintsugiOS %s\n", VERSION);
-    if (kfs2_is_mounted() || fat12_is_mounted()) {
-        log_event("INFO", "init", "Starting /BIN/INIT.ELF");
+    if (fs_ready) {
+        log_event("INFO", "init", "Starting /bin/INIT.ELF");
         int status = process_boot_init();
         printf("init unavailable or exited (%d); rescue shell\n", status);
     }

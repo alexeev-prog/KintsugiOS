@@ -1,0 +1,29 @@
+# Matsuri no Yoru (festival night) - bright, rhythmic shamisen-like motif
+# name Matsuri no Yoru
+# freq duration_ms instrument ; 0 = rest, 0 koto 1 flute 2 bell 3 bass
+tempo 180
+523 150 0
+587 150 0
+659 180 1
+0 120 0
+784 150 0
+659 150 0
+587 150 0
+523 180 1
+0 120 0
+440 150 3
+523 150 0
+587 150 0
+659 150 1
+784 200 2
+0 120 0
+880 150 1
+784 150 0
+659 150 0
+587 150 1
+523 180 0
+0 120 0
+392 150 3
+440 150 3
+523 150 0
+587 200 1

@@ -12,15 +12,20 @@
 #define KOS_SYS_SOUND_VOLUME 50
 #define KOS_SYS_SOUND_INFO 51
 #define KOS_SYS_SLEEP 52
+#define KOS_SYS_GAME_PALETTE 53
+#define KOS_SYS_SETPRIORITY 54
+#define KOS_SYS_SERVICE 55
+#define KOS_SYS_FRAMEBUFFER_FONT_SIZE 67
 typedef struct { unsigned width, height; } kos_video_mode;
 typedef struct {
     unsigned width, height, graphics, mode, uptime, free_kib, ram_kib, processes, russian;
 } kos_desktop_info;
-typedef struct { int x, y; unsigned buttons, sequence, available; } kos_mouse;
+typedef struct { int x, y; unsigned buttons, sequence, available; int wheel; } kos_mouse;
 #define KOS_VIDEO_MODES 7
 #define KOS_FRAMEBUFFER_THEMES 6
 #define KOS_FRAMEBUFFER_SCALES 3
 #define KOS_FRAMEBUFFER_FONTS 3
+#define KOS_FRAMEBUFFER_FONT_SIZES 4
 static const kos_video_mode kos_video_modes[KOS_VIDEO_MODES] = {
     {1024, 768}, {1280, 800}, {1440, 900}, {1600, 900},
     {1680, 1050}, {1920, 1080}, {1920, 1200}

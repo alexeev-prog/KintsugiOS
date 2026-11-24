@@ -24,7 +24,7 @@ static void stroke(int x0, int y0, int x1, int y1, unsigned color) {
     }
 }
 int main(int argc, char** argv) {
-    char path[256] = "/HOME/PAINT.KPT";
+    char path[256] = "/home/PAINT.KPT";
     if (argc > 1) tui_copy(path, argv[1], sizeof(path));
     int x = 0, y = 0, px = 0, py = 0, dragging = 0, dirty = 0, pen = 0;
     unsigned color = 10;

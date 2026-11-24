@@ -9,6 +9,8 @@ static unsigned char palette[256];
 static int theme_ready;
 static ktui_cell themed[25][80];
 static unsigned char raw_cells[25][80];
+static ktui_cell last_presented[25][80];
+static int last_presented_x = -1, last_presented_y = -1;
 static unsigned char raw_backgrounds[MODALS][25][80];
 static unsigned mouse_buttons;
 static const char* toast_message;
@@ -30,14 +32,15 @@ int tui_hit(int x, int y, int width, int height, const tui_event* e) {
 int tui_event_read(tui_event* e, int wait) {
     if (!e) return 0;
     e->key = tui_key(wait ? 2 : 0);
+    e->wheel = 0;
     kos_mouse mouse = {0};
     syscall(KOS_SYS_MOUSE, (u32)&mouse, 0, 0, 0);
     /* Ask the kernel for the real cell geometry: it depends on resolution
      * AND the user-selected cell scale, so recomputing it here drifts. */
-    u32 fb[8] = {0};
+    u32 fb[9] = {0};
     int cw = 12, ch = 26, ox = 32, oy = 44;
-    if (syscall(KOS_SYS_FRAMEBUFFER_INFO, (u32)fb, 0, 0, 0) == 0 && fb[4] && fb[5]) {
-        cw = (int)fb[4]; ch = (int)fb[5]; ox = (int)fb[6]; oy = (int)fb[7];
+    if (syscall(KOS_SYS_FRAMEBUFFER_INFO, (u32)fb, 0, 0, 0) == 0 && fb[5] && fb[6]) {
+        cw = (int)fb[5]; ch = (int)fb[6]; ox = (int)fb[7]; oy = (int)fb[8];
     }
     e->mouse_x = mouse.x < ox ? -1 : (mouse.x - ox) / cw;
     e->mouse_y = mouse.y < oy ? -1 : (mouse.y - oy) / ch;
@@ -45,6 +48,9 @@ int tui_event_read(tui_event* e, int wait) {
     e->pressed = mouse.buttons & ~mouse_buttons;
     e->released = mouse_buttons & ~mouse.buttons;
     mouse_buttons = mouse.buttons;
+    e->wheel = mouse.wheel;
+    /* Existing list/document widgets already understand TUI_SCROLL_*. */
+    if (mouse.wheel && !e->key) e->key = mouse.wheel > 0 ? TUI_SCROLL_UP : TUI_SCROLL_DOWN;
     return e->key || e->pressed || e->released || e->buttons;
 }
 void tui_status(int y) {
@@ -188,23 +194,23 @@ int tui_theme_load(const char* path) {
 }
 
 int tui_theme_choose(void) {
-    tui_entry entry;
+    tui_long_entry entry;
     u32 cursor = 0;
     int count = 0;
-    char names[64][13];
+    static char names[64][KOS_LONG_NAME_MAX];
     const char* items[64];
-    while (count < 64 && syscall(3, (u32) "/ETC/THEMES", (u32)&cursor, (u32)&entry, 0) > 0) {
+    while (count < 64 && tui_readdir_long("/etc/THEMES", &cursor, &entry) > 0) {
         u32 n = tui_len(entry.name);
         if (entry.stat.directory || n < 4 || entry.name[n - 4] != '.' || entry.name[n - 3] != 'T'
             || entry.name[n - 2] != 'H' || entry.name[n - 1] != 'M') {
             continue;
         }
-        tui_copy(names[count], entry.name, 13);
+        tui_copy(names[count], entry.name, sizeof(names[count]));
         items[count] = names[count];
         ++count;
     }
     if (!count) {
-        tui_message("Themes", "No themes in /ETC/THEMES");
+        tui_message("Themes", "No themes in /etc/THEMES");
         return 0;
     }
     int choice = tui_menu("Choose shared TUI theme", items, count, 0);
@@ -213,7 +219,7 @@ int tui_theme_choose(void) {
     }
     char path[256], text[2048];
     tui_stat st;
-    tui_path(path, "/ETC/THEMES", names[choice]);
+    tui_path(path, "/etc/THEMES", names[choice]);
     if (tui_stat_path(path, &st) || st.size > sizeof(text)
         || syscall(2, (u32)path, 0, (u32)text, st.size) != (int)st.size) {
         return 0;
@@ -226,7 +232,7 @@ int tui_theme_choose(void) {
         tui_message("Themes", "Invalid theme file");
         return 0;
     }
-    if (syscall(10, (u32) "/ETC/TUI.THM", (u32)text, st.size, 0)) {
+    if (syscall(10, (u32) "/etc/TUI.THM", (u32)text, st.size, 0)) {
         for (int i = 0; i < 256; ++i) {
             palette[i] = old[i];
         }
@@ -243,17 +249,14 @@ int tui_theme_path(char out[256], const char* name) {
             base = p + 1;
         }
     }
-    char file[13];
+    char file[232];
     u32 n = 0;
-    while (base[n] && base[n] != '.') {
+    while (base[n] && base[n] != '.' && n + 5 < sizeof(file)) {
         char c = base[n];
-        if (n == 8
-            || !(
-                (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
-                || c == '-')) {
+        if (c <= 32 || c >= 127 || c == '/' || c == '\\' || c == '*' || c == '?' || c == ':') {
             return 0;
         }
-        file[n++] = c >= 'a' && c <= 'z' ? c - 'a' + 'A' : c;
+        file[n++] = c;
     }
     if (!n) {
         return 0;
@@ -266,7 +269,7 @@ int tui_theme_path(char out[256], const char* name) {
         }
     }
     tui_copy(file + n, ".THM", sizeof(file) - n);
-    tui_path(out, "/ETC/THEMES", file);
+    tui_path(out, "/etc/THEMES", file);
     return 1;
 }
 
@@ -571,7 +574,7 @@ void tui_clear(unsigned char color) {
     }
     if (!theme_ready) {
         tui_theme_parse("", 0);
-        tui_theme_load("/ETC/TUI.THM");
+        tui_theme_load("/etc/TUI.THM");
     }
     for (u32 y = 0; y < 25; ++y) {
         for (u32 x = 0; x < 80; ++x) {
@@ -633,6 +636,21 @@ void tui_present(int x, int y) {
             }
         }
     }
+    /* Skip a full 2000-cell upload when neither pixels nor cursor changed. */
+    int changed = x != last_presented_x || y != last_presented_y;
+    for (int row = 0; row < 25 && !changed; ++row) {
+        for (int col = 0; col < 80; ++col) {
+            if (themed[row][col].character != last_presented[row][col].character
+                || themed[row][col].color != last_presented[row][col].color) {
+                changed = 1;
+                break;
+            }
+        }
+    }
+    if (!changed) return;
+    for (int row = 0; row < 25; ++row)
+        for (int col = 0; col < 80; ++col) last_presented[row][col] = themed[row][col];
+    last_presented_x = x; last_presented_y = y;
     syscall(7, (u32)themed, x, y, 0);
 }
 

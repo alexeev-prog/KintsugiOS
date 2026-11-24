@@ -1,9 +1,12 @@
 #include "process.h"
 
 #include "../../user/envabi.h"
+#include "../../user/authabi.h"
+#include "../../user/ioabi.h"
 #include "../../user/shellabi.h"
 #include "../../user/sysabi.h"
 #include "../../user/tuiabi.h"
+#include "../../shared/signal.h"
 #include "../cpu/idt.h"
 #include "../drivers/ata_pio.h"
 #include "../drivers/keyboard.h"
@@ -12,12 +15,17 @@
 #include "../drivers/mouse.h"
 #include "../drivers/terminal.h"
 #include "../fs/fat12.h"
+#include "../fs/kfs2.h"
+#include "../fs/kfs3.h"
+#include "../fs/ext2.h"
 #include "../fs/vfs.h"
 #include "../kernel/log.h"
 #include "../kernel/power.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
 #include "../shell/shell.h"
+#include "auth.h"
+#include "vfs_meta.h"
 #include "fd.h"
 
 #define STACK_BOTTOM (USER_TOP - 9 * PAGE_SIZE)
@@ -42,7 +50,9 @@ typedef struct {
     void* kernel_stack;
     fd_table_t descriptors;
     const void* waiting_on;
-    u32 group;
+    u32 group, quantum, priority;
+    u32 uid, gid, euid, egid, pending_uid;
+    int pending_elevation;
     int shell;
     char name[32];
     char cwd[VFS_PATH_MAX];
@@ -52,6 +62,7 @@ typedef struct {
 static process_t processes[PROCESS_MAX];
 static process_t* current;
 static u32 next_pid = 1, shell_context, foreground;
+static u32 boot_ticks;
 #define space (current->address_space)
 #define saved_terminal (current->terminal_snapshot)
 #define user_heap_end (current->heap_end)
@@ -75,6 +86,79 @@ void process_shutdown(void) {
 
 char* process_cwd(void) {
     return current ? current->cwd : NULL;
+}
+
+u32 process_pid(void) { return current ? current->pid : 0; }
+u32 process_euid(void) { return current ? current->euid : 0; }
+u32 process_egid(void) { return current ? current->egid : 0; }
+u32 process_ticks(void) { return boot_ticks; }
+
+int process_set_credentials(u32 uid, u32 gid) {
+    if (!current) return KOS_EPERM;
+    current->uid = current->euid = uid;
+    current->gid = current->egid = gid;
+    return 0;
+}
+
+void process_set_pending_uid(u32 uid) {
+    if (!current) return;
+    current->pending_uid = uid;
+    current->pending_elevation = 1;
+}
+
+int process_take_pending_uid(u32* uid) {
+    if (!current || !current->pending_elevation) return 0;
+    if (uid) *uid = current->pending_uid;
+    current->pending_elevation = 0;
+    return 1;
+}
+
+u32 process_pid_exists(u32 pid) {
+    if (!pid) return 0;
+    for (int i = 0; i < PROCESS_MAX; ++i) {
+        if (processes[i].state && processes[i].pid == pid) return pid;
+    }
+    return 0;
+}
+
+u32 process_pid_at(u32 index) {
+    for (int i = 0; i < PROCESS_MAX; ++i) {
+        if (!processes[i].state) continue;
+        if (!index--) return processes[i].pid;
+    }
+    return 0;
+}
+
+static process_t* process_by_pid(u32 pid) {
+    for (int i = 0; i < PROCESS_MAX; ++i) {
+        if (processes[i].state && processes[i].pid == pid) return &processes[i];
+    }
+    return NULL;
+}
+
+int process_proc_name(u32 pid, char* out, u32 capacity) {
+    process_t* p = process_by_pid(pid);
+    if (!p || !capacity) return 0;
+    u32 n = 0;
+    while (p->name[n] && n + 1 < capacity) { out[n] = p->name[n]; ++n; }
+    out[n] = 0;
+    return (int)n;
+}
+
+int process_proc_status(u32 pid, char* out, u32 capacity) {
+    process_t* p = process_by_pid(pid);
+    if (!p) return 0;
+    static const char* const states[] = { "unused", "ready", "running", "waiting", "zombie" };
+    const char* state = p->state <= ZOMBIE ? states[p->state] : "unknown";
+    return snprintf(out, capacity,
+                    "Name:\t%s\nState:\t%s\nPid:\t%u\nPPid:\t%u\nUid:\t%u\nGid:\t%u\nTicks:\t%u\n",
+                    p->name, state, p->pid, p->parent, p->euid, p->egid, p->ticks);
+}
+
+int process_proc_cmdline(u32 pid, char* out, u32 capacity) {
+    process_t* p = process_by_pid(pid);
+    if (!p || !capacity) return 0;
+    return snprintf(out, capacity, "%s\n", p->name);
 }
 
 void process_wake(const void* object) {
@@ -181,6 +265,10 @@ static void schedule(void) {
                 continue;
             }
             if (p == old) {
+                /* Priority-aware: keep the quantum for high-priority tasks,
+                 * but always yield after `priority` turns. */
+                if (p->quantum > 1 && p->priority > 1) --p->quantum;
+                else p->quantum = p->priority ? p->priority : 1;
                 p->state = RUNNING;
                 return;
             }
@@ -206,14 +294,42 @@ static void schedule(void) {
     }
 }
 
+/* Minimal OOM policy: when free pages drop below a low-water mark, select the
+ * largest non-init process and ask it to exit at its next syscall/tick. This
+ * is deliberately conservative — killing init or the current process would be
+ * worse than the allocation failure. */
+static void oom_check(void) {
+    if (boot_ticks % 100 || !current) return;
+    memory_stats_t memory = memory_stats();
+    if (memory.free_pages > 256) return;
+    int victim = -1;
+    u32 largest = 0;
+    for (int i = 0; i < PROCESS_MAX; ++i) {
+        process_t* p = &processes[i];
+        if (!p->state || p->pid == init_pid || p == current || p->state == ZOMBIE) continue;
+        if (p->heap_end > largest) { largest = p->heap_end; victim = i; }
+    }
+    if (victim < 0) return;
+    process_t* p = &processes[victim];
+    p->status = SIG_EXIT_KILLED;
+    p->interrupted = 1;
+    if (p->state == WAITING) p->state = READY;
+    char message[96];
+    snprintf(message, sizeof(message), "[OOM] killed pid %u (%s), %u bytes heap\n",
+             p->pid, p->name, p->heap_end);
+    log_write(message);
+}
+
 void process_tick(int user_mode) {
+    ++boot_ticks;
+    oom_check();
     process_wake(NULL); /* Terminal input waiters recheck after an IRQ/tick. */
     if (!current) {
         return;
     }
     ++current->ticks;
     if (user_mode && current->interrupted) {
-        process_exit(130);
+        process_exit(current->status ? current->status : SIG_EXIT_INTERRUPTED);
     }
     if (user_mode && current->ticks % 5 == 0) {
         schedule();
@@ -302,6 +418,7 @@ static int process_load(const char* path, int argc, char** argv) {
     }
     result = vfs_read(path, 0, image, stat.size);
     if (result < 0 || (u32)result != stat.size) {
+        log_event("DEBUG", "elf", "read failed: got=%d expected=%u", result, stat.size);
         kfree(image);
         return VFS_EIO;
     }
@@ -426,7 +543,7 @@ static int process_load(const char* path, int argc, char** argv) {
     current->name[name_length] = 0;
     /* Capability is assigned by the loader, never by a user request. */
     char executable[VFS_PATH_MAX];
-    current->shell = !vfs_normalize(path, executable) && !strcmp(executable, "/BIN/SHELL.ELF");
+    current->shell = !vfs_normalize(path, executable) && !strcmp(executable, "/bin/SHELL.ELF");
     current->stack = sp;
     u32* context = (u32*)((u32)current->kernel_stack + 16384);
     *--context = (u32)process_start;
@@ -434,6 +551,8 @@ static int process_load(const char* path, int argc, char** argv) {
         *--context = 0;
     }
     current->context = (u32)context;
+    current->priority = 1;
+    current->quantum = 1;
     current->state = READY;
     return 0;
 cleanup:
@@ -522,11 +641,19 @@ int process_pipeline(
             result = VFS_ENOMEM;
             break;
         }
+        u32 elevated = 0;
+        int elevate = parent ? process_take_pending_uid(&elevated) : 0;
         current = children[i] = slot;
         strcpy(current->cwd, inherited_cwd);
         current->pid = next_pid++;
         current->parent = parent ? parent->pid : 0;
         current->group = group;
+        current->uid = current->euid = parent ? parent->euid : 0;
+        current->gid = current->egid = parent ? parent->egid : 0;
+        if (elevate) {
+            current->uid = current->euid = elevated;
+            current->gid = current->egid = elevated;
+        }
         result = process_load(paths[i], argc[i], argv[i]);
         if (!result && parent) {
             memcpy(current->environment, parent->environment, KOS_ENV_MAX * sizeof(kos_env_entry));
@@ -654,7 +781,7 @@ int process_wait_jobs(void) {
 int process_boot_init(void) {
     char* argv[] = { "init", NULL };
     init_pid = next_pid;
-    return process_run("/BIN/INIT.ELF", 1, argv);
+    return process_run("/bin/INIT.ELF", 1, argv);
 }
 
 /* ABI: eax=number, ebx/ecx/edx/esi=arguments, eax=result. */
@@ -691,6 +818,12 @@ static int user_path(u32 address, char path[VFS_PATH_MAX]) {
         }
     }
     return 0;
+}
+
+static int permit_path(const char* path, int write) {
+    char absolute[VFS_PATH_MAX];
+    if (vfs_normalize(path, absolute)) return 0;
+    return kfs3_permit(absolute, write);
 }
 
 void syscall_dispatch(syscall_regs_t* r) {
@@ -786,14 +919,15 @@ void syscall_dispatch(syscall_regs_t* r) {
                 argv[i] = args[i];
                 argc[i] = request.argc[i];
                 valid = argc[i] > 0 && argc[i] <= 32 && user_path((u32)request.paths[i], paths[i])
-                    && user_range((u32)request.argv[i], argc[i] * 4, 0);
+                    && user_range((u32)request.argv[i], argc[i] * 4, 0)
+                    && permit_path(paths[i], 0);
                 for (int j = 0; valid && j < argc[i]; ++j) {
                     args[i][j] = strings[i * 33 + j + 1];
                     valid = user_path((u32)request.argv[i][j], args[i][j]);
                 }
             }
             if (valid && request.output) {
-                valid = user_path((u32)request.output, strings[264]);
+                valid = user_path((u32)request.output, strings[264]) && permit_path(strings[264], 1);
             }
             r->eax = valid ? process_pipeline(
                                  request.count,
@@ -820,6 +954,14 @@ void syscall_dispatch(syscall_regs_t* r) {
                 r->eax = process_wait_jobs();
                 return;
             }
+            /* ebx=3: run one kernel builtin with a one-shot root credential.
+             * sugo arms the pending elevation after verifying the password;
+             * the elevation is consumed only when a builtin actually exists. */
+            int elevated_call = r->ebx == 3;
+            if (elevated_call && current->euid != 0 && !current->pending_elevation) {
+                r->eax = KOS_EPERM;
+                return;
+            }
             if (!r->ecx || r->ecx > 32 || !user_range(r->edx, r->ecx * 4, 0)) {
                 break;
             }
@@ -835,18 +977,50 @@ void syscall_dispatch(syscall_regs_t* r) {
                 valid = user_path(((u32*)r->edx)[i], args[i]);
             }
             int result = 127;
-            if (valid) {
-                vmm_space_switch(0);
-                __asm__ volatile("sti" ::: "memory");
-                for (u32 i = 0; shell_command_at(i); ++i) {
-                    const shell_command_t* command = shell_command_at(i);
-                    if (!strcmp(command->name, argv[0])) {
-                        result = command->run(r->ecx, argv);
-                        break;
+            if (valid && !elevated_call) {
+                /* Power operations are intentionally available to every
+                 * logged-in user (the machine is a single-user workstation). */
+                static const char* const privileged[] = { "memtest", "memdump", "malloc", "free",
+                                                          "panic", "fault", "fstest", "load",
+                                                          "fat12info", "memmap" };
+                if (current->euid != 0) {
+                    for (u32 i = 0; i < sizeof(privileged) / sizeof(privileged[0]); ++i) {
+                        if (!strcmp(argv[0], privileged[i])) {
+                            valid = 0;
+                            result = KOS_EPERM;
+                        }
                     }
                 }
-                __asm__ volatile("cli" ::: "memory");
-                vmm_space_switch(space);
+            }
+            if (valid) {
+                const shell_command_t* found = 0;
+                for (u32 i = 0; shell_command_at(i); ++i) {
+                    const shell_command_t* command = shell_command_at(i);
+                    if (!strcmp(command->name, argv[0])) { found = command; break; }
+                }
+                u32 saved_uid = current->euid, saved_gid = current->egid;
+                int use_root = elevated_call && found && saved_uid != 0;
+                if (use_root) {
+                    u32 target = 0;
+                    if (!process_take_pending_uid(&target) || target != 0) {
+                        result = KOS_EPERM;
+                        use_root = 0;
+                    } else {
+                        current->uid = current->euid = 0;
+                        current->gid = current->egid = 0;
+                    }
+                }
+                if (found) {
+                    vmm_space_switch(0);
+                    __asm__ volatile("sti" ::: "memory");
+                    result = found->run(r->ecx, argv);
+                    __asm__ volatile("cli" ::: "memory");
+                    vmm_space_switch(space);
+                }
+                if (use_root) {
+                    current->uid = current->euid = saved_uid;
+                    current->gid = current->egid = saved_gid;
+                }
             }
             kfree(args);
             r->eax = result;
@@ -855,6 +1029,10 @@ void syscall_dispatch(syscall_regs_t* r) {
         case KOS_SYS_OPEN:
             if (!user_path(r->ebx, path)) {
                 break;
+            }
+            if (!permit_path(path, (r->ecx & (KOS_O_WRITE | KOS_O_APPEND | KOS_O_CREATE | KOS_O_TRUNC)) != 0)) {
+                r->eax = KOS_EPERM;
+                return;
             }
             r->eax = fd_open(&current->descriptors, path, r->ecx);
             return;
@@ -879,27 +1057,36 @@ void syscall_dispatch(syscall_regs_t* r) {
         case KOS_SYS_SYNC:
             r->eax = system_sync();
             return;
-        case KOS_SYS_KILL:
+        case KOS_SYS_KILL: {
+            /* kill(pid, sig): sig 0 is an existence check. Supported signals
+             * are cooperative: the target exits at its next syscall/tick. */
+            int signal = r->ecx ? (int)r->ecx : SIGTERM;
+            if (signal != 0 && signal != SIGHUP && signal != SIGINT && signal != SIGQUIT
+                && signal != SIGTERM && signal != SIGKILL && signal != SIGUSR1
+                && signal != SIGUSR2) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
             r->eax = KOS_ESRCH;
             for (int i = 0; i < PROCESS_MAX; ++i) {
                 process_t* p = &processes[i];
-                if (p->pid != r->ebx || !p->state || p->state == ZOMBIE) {
-                    continue;
-                }
-                if (p->pid == init_pid) {
+                if (p->pid != r->ebx || !p->state || p->state == ZOMBIE) continue;
+                if (p->pid == init_pid || (current->euid != 0 && p->euid != current->euid)) {
                     r->eax = KOS_EPERM;
+                } else if (signal == 0) {
+                    r->eax = 0;
                 } else if (p == current) {
-                    process_exit(130);
+                    process_exit(signal == SIGKILL ? SIG_EXIT_KILLED : SIG_EXIT_INTERRUPTED);
                 } else {
+                    p->status = signal == SIGKILL ? SIG_EXIT_KILLED : SIG_EXIT_INTERRUPTED;
                     p->interrupted = 1;
-                    if (p->state == WAITING) {
-                        p->state = READY;
-                    }
+                    if (p->state == WAITING) p->state = READY;
                     r->eax = 0;
                 }
                 break;
             }
             return;
+        }
         case KOS_SYS_PIPE: {
             if (!user_range(r->ebx, 8, 1)) {
                 break;
@@ -945,13 +1132,14 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case KOS_SYS_FRAMEBUFFER_INFO:
-            /* mode, theme, scale, font, then actual cell geometry in pixels. */
-            if (!user_range(r->ebx, 8 * sizeof(u32), 1)) break;
+            /* mode, theme, scale, font, font size, then cell geometry. */
+            if (!user_range(r->ebx, 9 * sizeof(u32), 1)) break;
             ((u32*)r->ebx)[0] = framebuffer_mode_index();
             ((u32*)r->ebx)[1] = framebuffer_theme_index();
             ((u32*)r->ebx)[2] = framebuffer_scale_index();
             ((u32*)r->ebx)[3] = framebuffer_font_index();
-            framebuffer_geometry((u32*)r->ebx + 4);
+            ((u32*)r->ebx)[4] = framebuffer_font_size_index();
+            framebuffer_geometry((u32*)r->ebx + 5);
             r->eax = 0;
             return;
         case KOS_SYS_FRAMEBUFFER_SCALE:
@@ -960,8 +1148,12 @@ void syscall_dispatch(syscall_regs_t* r) {
         case KOS_SYS_FRAMEBUFFER_FONT:
             if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_FONTS) { r->eax = KOS_EPERM; return; }
             framebuffer_font(r->ebx); terminal_get_state()->dirty = 1; r->eax = 0; return;
+        case KOS_SYS_FRAMEBUFFER_FONT_SIZE:
+            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_FONT_SIZES) { r->eax = KOS_EPERM; return; }
+            framebuffer_font_size(r->ebx); terminal_get_state()->dirty = 1; r->eax = 0; return;
         case KOS_SYS_SOUND_TONE:
-            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            /* A beep cannot corrupt another session's screen; background
+             * services (music daemons, alarms) must be able to use it. */
             audio_tone_inst(r->ebx, r->ecx, r->edx); r->eax = 0; return;
         case KOS_SYS_SOUND_VOLUME:
             if (!process_foreground() || r->ebx > 100) { r->eax = VFS_EINVAL; return; }
@@ -972,6 +1164,146 @@ void syscall_dispatch(syscall_regs_t* r) {
             ((u32*)r->ebx)[1] = audio_is_enabled();
             ((u32*)r->ebx)[2] = audio_is_opl2();
             r->eax = 0; return;
+        case KOS_SYS_GAME_PALETTE:
+            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            framebuffer_game_palette(r->ebx ? 1 : 0);
+            terminal_get_state()->dirty = 1;
+            r->eax = 0; return;
+        case KOS_SYS_SETPRIORITY:
+            if (!current) { r->eax = KOS_EPERM; return; }
+            if (r->ebx == 0 || r->ebx > 4) { r->eax = VFS_EINVAL; return; }
+            current->priority = r->ebx;
+            current->quantum = r->ebx;
+            r->eax = 0; return;
+        case KOS_SYS_SERVICE:
+            r->eax = kfs3_is_active() ? 1 : 0; return;
+        case KOS_SYS_GETUID:
+            r->eax = current ? current->euid : 0;
+            return;
+        case KOS_SYS_GETGID:
+            r->eax = current ? current->egid : 0;
+            return;
+        case KOS_SYS_GETUSER: {
+            if (!r->ebx || r->ecx < 2 || !user_range(r->ebx, r->ecx, 1)) break;
+            const char* account = auth_name_for_uid(current ? current->euid : 0);
+            u32 n = 0;
+            while (account[n] && n + 1 < r->ecx) {
+                ((char*)r->ebx)[n] = account[n];
+                ++n;
+            }
+            ((char*)r->ebx)[n] = 0;
+            r->eax = 0;
+            return;
+        }
+        case KOS_SYS_LOGIN: {
+            char account[VFS_PATH_MAX], password[VFS_PATH_MAX];
+            if (!current || current->euid != 0 || !user_path(r->ebx, account)) break;
+            if (!user_path(r->ecx, password)) break;
+            const auth_user_t* user = auth_find(account);
+            if (!user || auth_verify(account, password)) {
+                r->eax = KOS_EPERM;
+                return;
+            }
+            process_set_credentials(user->uid, user->gid);
+            log_event("INFO", "auth", "login %s uid=%u pid=%u", account, user->uid, current->pid);
+            r->eax = 0;
+            return;
+        }
+        case KOS_SYS_ELEVATE: {
+            char account[VFS_PATH_MAX], password[VFS_PATH_MAX];
+            if (!current || !user_path(r->ebx, account) || !user_path(r->ecx, password)) break;
+            const auth_user_t* target = auth_find(account);
+            if (!target) { r->eax = VFS_ENOENT; return; }
+            if (current->euid == 0) {
+                /* Root may drop to any account for the next child (login). */
+                process_set_pending_uid(target->uid);
+                r->eax = 0;
+                return;
+            }
+            if (target->uid != 0 || auth_verify("root", password)) {
+                r->eax = KOS_EPERM;
+                return;
+            }
+            process_set_pending_uid(0);
+            r->eax = 0;
+            return;
+        }
+        case KOS_SYS_CANCEL_ELEVATE:
+            if (current) current->pending_elevation = 0;
+            r->eax = 0;
+            return;
+        case KOS_SYS_AUTH: {
+            char account[VFS_PATH_MAX], password[VFS_PATH_MAX];
+            if (!user_path(r->ebx, account) || !user_path(r->ecx, password)) break;
+            r->eax = auth_verify(account, password);
+            return;
+        }
+        case KOS_SYS_NEEDAUTH: {
+            char account[VFS_PATH_MAX];
+            if (!user_path(r->ebx, account)) break;
+            r->eax = auth_needs_password(account);
+            return;
+        }
+        case KOS_SYS_CHMOD:
+        case KOS_SYS_CHOWN: {
+            char path[VFS_PATH_MAX];
+            if (!user_path(r->ebx, path)) break;
+            char absolute[VFS_PATH_MAX];
+            if (vfs_normalize(path, absolute)) { r->eax = VFS_EINVAL; return; }
+            u32 uid;
+            u16 mode;
+            int have = vfs_meta_get(absolute, &uid, &mode);
+            if (!have) { uid = kfs3_owner(absolute); mode = 0644; }
+            if (r->eax == KOS_SYS_CHOWN) {
+                if (!current || current->euid != 0) { r->eax = KOS_EPERM; return; }
+                uid = r->ecx;
+            } else {
+                if (!current || (current->euid != 0 && current->euid != uid)) { r->eax = KOS_EPERM; return; }
+                if (r->ecx > 0777) { r->eax = VFS_EINVAL; return; }
+                mode = (u16)r->ecx;
+            }
+            r->eax = vfs_meta_set(absolute, uid, mode);
+            return;
+        }
+        case KOS_SYS_USERADD: {
+            char account[VFS_PATH_MAX], password[VFS_PATH_MAX];
+            if (!current || current->euid != 0 || !user_path(r->ebx, account)) break;
+            if (r->ecx) {
+                if (!user_path(r->ecx, password)) break;
+            } else {
+                password[0] = 0;
+            }
+            int uid = auth_add(account, password, 0);
+            r->eax = uid < 0 ? uid : 0;
+            return;
+        }
+        case KOS_SYS_USERPASSWD: {
+            char account[VFS_PATH_MAX], previous[VFS_PATH_MAX], password[VFS_PATH_MAX];
+            if (!current || !user_path(r->ebx, account)) break;
+            if (r->ecx) {
+                if (!user_path(r->ecx, previous)) break;
+            } else {
+                previous[0] = 0;
+            }
+            if (!user_path(r->edx, password)) break;
+            const auth_user_t* user = auth_find(account);
+            if (!user) { r->eax = VFS_ENOENT; return; }
+            if (current->euid != 0) {
+                if (current->euid != user->uid || auth_verify(account, previous)) {
+                    r->eax = KOS_EPERM;
+                    return;
+                }
+            }
+            r->eax = auth_set_password(account, password);
+            return;
+        }
+        case KOS_SYS_REBOOT:
+            if (!current || current->euid != 0) { r->eax = KOS_EPERM; return; }
+            log_write("[INFO] reboot requested by root\n");
+            system_sync();
+            process_shutdown();
+            reboot();
+            for (;;) __asm__ volatile("cli; hlt");
         case KOS_SYS_SLEEP: {
             extern u32 tick;
             u32 ms = r->ebx > 10000 ? 10000 : r->ebx;
@@ -986,7 +1318,11 @@ void syscall_dispatch(syscall_regs_t* r) {
         case KOS_SYS_MOUSE:
             if (!user_range(r->ebx, sizeof(kos_mouse), 1)) break;
             if (!process_foreground()) { r->eax = KOS_EPERM; return; }
-            memcpy((void*)r->ebx, mouse_state(), sizeof(kos_mouse));
+            /* The mouse syscall consumes wheel notches so TUI apps see each
+             * notch once; the shell consumes them directly in raw-key mode. */
+            kos_mouse snapshot = *mouse_state();
+            snapshot.wheel = mouse_take_wheel();
+            memcpy((void*)r->ebx, &snapshot, sizeof(snapshot));
             r->eax = 0;
             return;
         case KOS_SYS_DESKTOP: {
@@ -1015,6 +1351,8 @@ void syscall_dispatch(syscall_regs_t* r) {
                                               .state = p->state,
                                               .ticks = p->ticks,
                                               .group = p->group,
+                                              .uid = p->euid,
+                                              .gid = p->egid,
                                               .heap_bytes = p->heap_end >= USER_HEAP_BASE
                                                   ? p->heap_end - USER_HEAP_BASE
                                                   : 0 };
@@ -1037,17 +1375,28 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = log_read(r->ebx, (char*)r->ecx, r->edx);
             return;
         case 18:
-            r->eax = fat12_check();
+            r->eax = ext2_is_mounted() ? 0 : kfs2_is_mounted() ? kfs2_check() : fat12_check();
             return;
         case 19: {
             if (!user_range(r->ebx, sizeof(kos_disk_info), 1)) {
                 break;
             }
             kos_disk_info info = { 0 };
-            info.mounted = fat12_is_mounted();
+            int ext = ext2_is_mounted();
+            int kfs = kfs2_is_mounted();
+            info.mounted = ext || kfs || fat12_is_mounted();
             info.disk_sectors = ata_disks[0].size;
             memcpy(info.model, ata_disks[0].model, sizeof(info.model));
-            fat12_usage(&info.sectors, &info.cluster_bytes, &info.clusters, &info.free_clusters);
+            if (ext) {
+                ext2_usage(&info.sectors, &info.cluster_bytes, &info.clusters, &info.free_clusters);
+                strcpy(info.fs, "ext2");
+            } else if (kfs) {
+                kfs2_usage(&info.sectors, &info.cluster_bytes, &info.clusters, &info.free_clusters);
+                strcpy(info.fs, "KFS2");
+            } else {
+                fat12_usage(&info.sectors, &info.cluster_bytes, &info.clusters, &info.free_clusters);
+                strcpy(info.fs, "FAT12");
+            }
             memcpy((void*)r->ebx, &info, sizeof(info));
             r->eax = 0;
             return;
@@ -1055,6 +1404,10 @@ void syscall_dispatch(syscall_regs_t* r) {
         case 13: { /* spawn(path, argc, argv): copy all parent pointers first. */
             if (!user_path(r->ebx, path) || !r->ecx || r->ecx > 32 || !user_range(r->edx, r->ecx * 4, 0)) {
                 break;
+            }
+            if (!permit_path(path, 0)) {
+                r->eax = KOS_EPERM;
+                return;
             }
             char (*args)[VFS_PATH_MAX] = kmalloc(32 * VFS_PATH_MAX);
             if (!args) {
@@ -1086,9 +1439,16 @@ void syscall_dispatch(syscall_regs_t* r) {
             child->pid = next_pid++;
             child->parent = parent->pid;
             child->group = parent->group;
+            child->uid = child->euid = parent->euid;
+            child->gid = child->egid = parent->egid;
+            u32 elevated = 0;
+            if (process_take_pending_uid(&elevated)) {
+                child->uid = child->euid = elevated;
+                child->gid = child->egid = elevated;
+            }
             if (parent->pid == init_pid) {
                 child->group = child->pid;
-                if (!strcmp(path, "/BIN/SHELL.ELF")) {
+                if (!strcmp(path, "/bin/SHELL.ELF")) {
                     shell_pid = child->pid;
                 }
             }
@@ -1159,12 +1519,20 @@ void syscall_dispatch(syscall_regs_t* r) {
             if (r->esi > 4096 || !user_path(r->ebx, path) || !user_range(r->edx, r->esi, 1)) {
                 break;
             }
+            if (!permit_path(path, 0)) {
+                r->eax = KOS_EPERM;
+                return;
+            }
             r->eax = vfs_read(path, r->ecx, (void*)r->edx, r->esi);
             return;
         case 3: /* directory iterator; cursor passed by pointer */
             if (!user_path(r->ebx, path) || !user_range(r->ecx, 4, 1)
                 || !user_range(r->edx, sizeof(vfs_dirent_t), 1)) {
                 break;
+            }
+            if (!permit_path(path, 0)) {
+                r->eax = KOS_EPERM;
+                return;
             }
             r->eax = vfs_readdir(path, (u32*)r->ecx, (vfs_dirent_t*)r->edx);
             return;
@@ -1209,6 +1577,20 @@ void syscall_dispatch(syscall_regs_t* r) {
                 __asm__ volatile("cli" ::: "memory");
                 process_check_interrupt();
                 key = keyboard_read_event();
+                if (current->shell) {
+                    int wheel = mouse_take_wheel();
+                    if (wheel) {
+                        if (wheel > 0) {
+                            terminal_scroll_up(3);
+                        } else {
+                            terminal_scroll_down(3);
+                            u32 bottom = terminal_get_state()->cursor_y >= SCREEN_HEIGHT
+                                ? terminal_get_state()->cursor_y - SCREEN_HEIGHT + 1 : 0;
+                            if (terminal_get_scroll_offset() > bottom) terminal_scroll_to(bottom);
+                        }
+                        terminal_refresh();
+                    }
+                }
                 if (current->shell
                     && (key == KEY_SCROLL_UP || key == KEY_SCROLL_DOWN || key == KEY_PAGE_UP
                         || key == KEY_PAGE_DOWN)) {
@@ -1264,11 +1646,23 @@ void syscall_dispatch(syscall_regs_t* r) {
             if (!user_path(r->ebx, path) || r->edx > 65536 || !user_range(r->ecx, r->edx, 0)) {
                 break;
             }
+            if (!permit_path(path, 1)) {
+                r->eax = KOS_EPERM;
+                return;
+            }
             r->eax = vfs_replace(path, (void*)r->ecx, r->edx);
             return;
         case 11: /* Small filesystem operations. */
             if (!user_path(r->ebx, path)) {
                 break;
+            }
+            if (r->ecx <= 2 && !permit_path(path, 1)) {
+                r->eax = KOS_EPERM;
+                return;
+            }
+            if (r->ecx >= 3 && !permit_path(path, 0)) {
+                r->eax = KOS_EPERM;
+                return;
             }
             switch (r->ecx) {
                 case 0:
@@ -1297,6 +1691,10 @@ void syscall_dispatch(syscall_regs_t* r) {
             if (!user_path(r->ebx, path) || !user_path(r->ecx, destination)) {
                 break;
             }
+            if (!permit_path(path, r->edx ? 1 : 0) || !permit_path(destination, 1)) {
+                r->eax = KOS_EPERM;
+                return;
+            }
             r->eax = r->edx ? vfs_rename(path, destination) : vfs_copy(path, destination);
             return;
         }
@@ -1306,6 +1704,10 @@ void syscall_dispatch(syscall_regs_t* r) {
                 || !user_range(r->ecx, sizeof(u32), 1)
                 || !user_range(r->edx, sizeof(kos_long_dirent), 1)) {
                 break;
+            }
+            if (!permit_path(directory, 0)) {
+                r->eax = KOS_EPERM;
+                return;
             }
             vfs_long_dirent_t long_entry;
             int result = vfs_readdir_long(directory, (u32*)r->ecx, &long_entry);

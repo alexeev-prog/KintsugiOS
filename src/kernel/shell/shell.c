@@ -99,7 +99,7 @@ static int execute_simple(char* line) {
     if (strchr(argv[0], '/')) {
         snprintf(executable, sizeof(executable), "%s", argv[0]);
     } else {
-        snprintf(executable, sizeof(executable), "/BIN/%s.ELF", argv[0]);
+        snprintf(executable, sizeof(executable), "/bin/%s.ELF", argv[0]);
     }
     vfs_stat_t executable_stat;
     int external = strchr(argv[0], '/') || !strcmp(argv[0], "echo") || !strcmp(argv[0], "cat")
@@ -111,6 +111,11 @@ static int execute_simple(char* line) {
         }
     }
     external |= !builtin;
+    if (external && vfs_stat(executable, &executable_stat)) {
+        /* KFS2 stores system programs as long names; vfs_normalize preserves case. */
+        for (char* p = executable + 5; *p; ++p)
+            if (*p >= 'a' && *p <= 'z') *p -= 32;
+    }
     if (external && !vfs_stat(executable, &executable_stat)) {
         int result = process_run(executable, argc, argv);
         if (result < 0) {
@@ -207,7 +212,7 @@ static int execute_pipeline(char* line, int background) {
         if (argc[i] < 1) {
             return SHELL_USAGE;
         }
-        snprintf(names[i], sizeof(names[i]), strchr(argv[i][0], '/') ? "%s" : "/BIN/%s.ELF", argv[i][0]);
+        snprintf(names[i], sizeof(names[i]), strchr(argv[i][0], '/') ? "%s" : "/bin/%s.ELF", argv[i][0]);
         paths[i] = names[i];
         vfs_stat_t stat;
         int result = vfs_stat(paths[i], &stat);

@@ -52,14 +52,13 @@ int main(int argc, char** argv) {
         tui_scrollbar(78, 4, 14, top, 14, count);
         tui_bar(23, "S sort PID/ticks | Enter details | K terminate | Space pause");
 #elif APP == 2
-        tui_bar(0, "KDISKMAN - Kintsugi Disk Manager (read only)");
+        tui_bar(0, "KDISKMAN - Kintsugi Disk Manager (ext2 / KFS2 / FAT12)");
         kos_disk_info info;
-        if (syscall(19, (u32)&info, 0, 0, 0)) {
-            return 1;
-        }
-        tui_text(
-            3, 3, info.mounted ? "Primary ATA volume: FAT12 mounted at /" : "No mounted FAT12 volume", 0x1f);
-        const char* labels[] = { "Sectors (512 bytes)", "Cluster bytes", "Total clusters", "Free clusters" };
+        int fs = syscall(19, (u32)&info, 0, 0, 0);
+        (void)fs;
+        tui_text(3, 3, info.mounted ? "Primary ATA volume online" : "No mounted volume", 0x1f);
+        tui_text(3, 4, info.fs[0] ? info.fs : "unknown", TUI_KEYWORD);
+        const char* labels[] = { "Sectors (512 bytes)", "Block bytes", "Total blocks", "Free blocks" };
         u32 values[] = { info.sectors, info.cluster_bytes, info.clusters, info.free_clusters };
         for (int i = 0; i < 4; ++i) {
             tui_text(3, 6 + i * 2, labels[i], 0x1f);
@@ -67,13 +66,10 @@ int main(int argc, char** argv) {
         }
         tui_gauge(3, 15, 70, info.clusters - info.free_clusters, info.clusters);
         tui_textn(3, 17, info.model, 41, 0x1f);
+        tui_text(3, 18, info.mounted ? "Volume online" : "Volume unavailable",
+                 info.mounted ? TUI_SUCCESS : TUI_ERROR);
         tui_text(3, 19, "ATA sectors:", 0x1f);
         tui_number(18, 19, info.disk_sectors, 0x1e);
-        tui_text(
-            3,
-            18,
-            info.mounted ? "Volume online" : "Volume unavailable",
-            info.mounted ? TUI_SUCCESS : TUI_ERROR);
         tui_bar(23, "C check filesystem | S sync disks | No formatting or repair operations");
 #else
         tui_bar(0, "KTUI - Kintsugi application launcher");
@@ -139,7 +135,9 @@ int main(int argc, char** argv) {
         (void)selected;
         (void)top;
         if (key == 'h') {
-            tui_message("Disk manager", "C validates FAT chains and directories without modifying disk.");
+            tui_message("Disk manager",
+                        "C checks the mounted filesystem read-only: ext2 bitmaps and descriptors, "
+                        "KFS2 inodes/extents, or FAT12 chains.");
         }
 #endif
 #if APP == 2
@@ -151,34 +149,37 @@ int main(int argc, char** argv) {
             tui_message(
                 "Filesystem check",
                 syscall(18, 0, 0, 0, 0) ? "Check failed: corrupt/unavailable filesystem or I/O error"
-                                        : "FAT12 allocation and directory structure are consistent");
+                                        : "Allocation, ownership and directories are consistent");
         }
 #elif APP == 3
         if (key == 'w' || key == 'p' || key == 'D' || key == 'i' || key == 'r') {
-            const char* path = key == 'w' ? "/BIN/KIWI.ELF" : key == 'p' ? "/BIN/KPAINT.ELF"
-                : key == 'D' ? "/BIN/KSET.ELF" : key == 'i' ? "/BIN/KINFO.ELF" : "/BIN/KRRAWL.ELF";
+            const char* path = key == 'w' ? "/bin/KIWI.ELF" : key == 'p' ? "/bin/KPAINT.ELF"
+                : key == 'D' ? "/bin/KSET.ELF" : key == 'i' ? "/bin/KINFO.ELF" : "/bin/KRRAWL.ELF";
             int result = tui_launch(path, 0);
             if (result < 0) tui_message("Launcher", kos_error(result));
         }
         const char* programs[] = { "KUNED", "KC",   "KBSM",    "KPROCM", "KDISKMAN",
-                                   "VIK",   "KTTE", "KMEMMAN", "HIERO" };
-        const char* paths[] = { "/BIN/KUNED.ELF",  "/BIN/KC.ELF",       "/BIN/KBSM.ELF",
-                                "/BIN/KPROCM.ELF", "/BIN/KDISKMAN.ELF", "/BIN/VIK.ELF",
-                                "/BIN/KTTE.ELF",   "/BIN/KMEMMAN.ELF",  "/BIN/HIERO.ELF" };
+                                   "VIK",   "KTTE", "KMEMMAN", "HIERO",  "KMUSA" };
+        const char* paths[] = { "/bin/KUNED.ELF",  "/bin/KC.ELF",       "/bin/KBSM.ELF",
+                                "/bin/KPROCM.ELF", "/bin/KDISKMAN.ELF", "/bin/VIK.ELF",
+                                "/bin/KTTE.ELF",   "/bin/KMEMMAN.ELF",  "/bin/HIERO.ELF",
+                                "/bin/KMUSA.ELF" };
         if (key == '\n') {
             const char* items[] = { "Editor",       "Commander",      "Resource monitor",
                                     "Processes",    "Disks",          "Vik",
-                                    "Theme editor", "Memory manager", "Hieroglyph documents" };
-            int choice = tui_menu("Launch application", items, 9, selected);
+                                    "Theme editor", "Memory manager", "Hieroglyph documents",
+                                    "TokioWheel racing" };
+            int choice = tui_menu("Launch application", items, 10, selected);
             if (choice >= 0) {
                 selected = choice;
-                key = '1' + choice;
+                key = choice == 9 ? '0' : '1' + choice;
             }
         }
         (void)top;
-        if (key >= '1' && key <= '9') {
-            char* args[] = { (char*)programs[key - '1'], 0 };
-            int pid = spawn(paths[key - '1'], 1, args);
+        if ((key >= '1' && key <= '9') || key == '0') {
+            int idx = key == '0' ? 9 : key - '1';
+            char* args[] = { (char*)programs[idx], 0 };
+            int pid = spawn(paths[idx], 1, args);
             if (pid < 0 || wait(pid)) {
                 tui_message("Launcher", "Application failed");
             }

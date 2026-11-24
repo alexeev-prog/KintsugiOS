@@ -37,11 +37,11 @@ void shell_complete(char* line, u32* length, u32* cursor) {
     u32 common_length = 0, matches = 0;
     u32 directory_cursor = 0;
     for (u32 i = 0;; ++i) {
-        char name[13];
+        char name[VFS_NAME_MAX + 1];
         const char* candidate;
         if (files) {
-            vfs_dirent_t entry;
-            if (vfs_readdir(directory, &directory_cursor, &entry) <= 0) {
+            vfs_long_dirent_t entry;
+            if (vfs_readdir_long(directory, &directory_cursor, &entry) <= 0) {
                 break;
             }
             strcpy(name, entry.name);

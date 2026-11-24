@@ -1,0 +1,5 @@
+# Kintsugi Service System definitions
+# name path scope account autostart restart enabled [args...]
+# scope is system (root) or user; account selects the POSIX user to run as.
+clockd /bin/KSDAEMON.ELF system root 1 1 1
+mixer  /bin/SOUNDCTL.ELF user  user  0 0 1

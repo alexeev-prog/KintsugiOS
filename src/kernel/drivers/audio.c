@@ -98,8 +98,8 @@ static int opl2_detect(void) {
     u8 after = port_byte_in(OPL2_ADDR);
     opl2_write(0x04, 0x60);
     opl2_write(0x04, 0x80);
-    (void)before;
-    return (after & 0xE0) == 0xC0;
+    /* A stale timer bit before the test makes the signature ambiguous. */
+    return (before & 0xE0) != 0xC0 && (after & 0xE0) == 0xC0;
 }
 
 static void opl2_init(void) {
@@ -113,7 +113,7 @@ static void opl2_init(void) {
 static u32 spk_remaining;
 static void speaker_tone(u32 frequency, u32 milliseconds) {
     if (!frequency) { port_byte_out(0x61, port_byte_in(0x61) & 0xfc); spk_remaining = 0; return; }
-    if (!volume || frequency > 20000) return;
+    if (!volume || frequency < 20 || frequency > 20000) return;
     u32 divisor = 1193180 / frequency;
     port_byte_out(0x43, 0xb6);
     port_byte_out(0x42, (u8)divisor);
@@ -137,7 +137,8 @@ void audio_volume(u32 value) {
         /* Re-apply carrier attenuation to every live voice. */
         for (u32 c = 0; c < 9; ++c)
             if (voice[c].active) opl2_write(0x40 + car_off[c], carrier_level());
-        if (!volume) opl2_all_off();
+        /* Volume 0 is implemented by full carrier attenuation: live notes
+         * keep their key-on state and resume when the volume is raised. */
     } else if (!volume) {
         port_byte_out(0x61, port_byte_in(0x61) & 0xfc);
     }

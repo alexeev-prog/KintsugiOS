@@ -89,10 +89,21 @@ int main(int argc, char** argv) {
     return n < 0;
 #elif UTIL == 8
     int result = syscall(18, 0, 0, 0, 0);
-    output(
-        result ? "kfsck: FAILED (unmounted, corrupt, I/O or memory error)\n"
-               : "kfsck: allocation chains, ownership and directories OK (read only)\n");
+    output(result ? "kfsck: FAILED (unmounted, corrupt filesystem or I/O error)\n"
+                  : "kfsck: ext2 bitmaps/descriptors or KFS2 inodes/extents OK (read only)\n");
     return result ? 1 : 0;
+#elif UTIL == 10
+    kos_disk_info info = {0};
+    if (syscall(19, (u32)&info, 0, 0, 0)) { output("df: disk information unavailable\n"); return 1; }
+    output("Filesystem  Blocks      Used        Free       Use%\n");
+    output(info.fs[0] ? info.fs : "unknown");
+    output("      ");
+    number(info.clusters); output("     ");
+    number(info.clusters - info.free_clusters); output("     ");
+    number(info.free_clusters); output("     ");
+    number(info.clusters ? (info.clusters - info.free_clusters) * 100 / info.clusters : 0);
+    output("%\n");
+    return 0;
 #elif UTIL == 9
     kos_process_info list[16];
     int n = syscall(16, (u32)list, 16, 0, 0);
