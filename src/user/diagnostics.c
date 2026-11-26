@@ -66,8 +66,11 @@ int main(int argc, char** argv) {
         }
         tui_gauge(3, 15, 70, info.clusters - info.free_clusters, info.clusters);
         tui_textn(3, 17, info.model, 41, 0x1f);
-        tui_text(3, 18, info.mounted ? "Volume online" : "Volume unavailable",
-                 info.mounted ? TUI_SUCCESS : TUI_ERROR);
+        tui_text(
+            3,
+            18,
+            info.mounted ? "Volume online" : "Volume unavailable",
+            info.mounted ? TUI_SUCCESS : TUI_ERROR);
         tui_text(3, 19, "ATA sectors:", 0x1f);
         tui_number(18, 19, info.disk_sectors, 0x1e);
         tui_bar(23, "C check filesystem | S sync disks | No formatting or repair operations");
@@ -129,7 +132,9 @@ int main(int argc, char** argv) {
             }
         }
         if (key == 'h') {
-            tui_message("Process manager", "Arrows select; K terminates any process except init, including this manager.");
+            tui_message(
+                "Process manager",
+                "Arrows select; K terminates any process except init, including this manager.");
         }
 #elif APP == 2
         (void)selected;
@@ -153,21 +158,25 @@ int main(int argc, char** argv) {
         }
 #elif APP == 3
         if (key == 'w' || key == 'p' || key == 'D' || key == 'i' || key == 'r') {
-            const char* path = key == 'w' ? "/bin/KIWI.ELF" : key == 'p' ? "/bin/KPAINT.ELF"
-                : key == 'D' ? "/bin/KSET.ELF" : key == 'i' ? "/bin/KINFO.ELF" : "/bin/KRRAWL.ELF";
+            const char* path = key == 'w' ? "/bin/KIWI.ELF"
+                : key == 'p'              ? "/bin/KPAINT.ELF"
+                : key == 'D'              ? "/bin/KSET.ELF"
+                : key == 'i'              ? "/bin/KINFO.ELF"
+                                          : "/bin/KRRAWL.ELF";
             int result = tui_launch(path, 0);
-            if (result < 0) tui_message("Launcher", kos_error(result));
+            if (result < 0) {
+                tui_message("Launcher", kos_error(result));
+            }
         }
         const char* programs[] = { "KUNED", "KC",   "KBSM",    "KPROCM", "KDISKMAN",
                                    "VIK",   "KTTE", "KMEMMAN", "HIERO",  "KMUSA" };
-        const char* paths[] = { "/bin/KUNED.ELF",  "/bin/KC.ELF",       "/bin/KBSM.ELF",
-                                "/bin/KPROCM.ELF", "/bin/KDISKMAN.ELF", "/bin/VIK.ELF",
-                                "/bin/KTTE.ELF",   "/bin/KMEMMAN.ELF",  "/bin/HIERO.ELF",
-                                "/bin/KMUSA.ELF" };
+        const char* paths[] = { "/bin/KUNED.ELF",    "/bin/KC.ELF",   "/bin/KBSM.ELF", "/bin/KPROCM.ELF",
+                                "/bin/KDISKMAN.ELF", "/bin/VIK.ELF",  "/bin/KTTE.ELF", "/bin/KMEMMAN.ELF",
+                                "/bin/HIERO.ELF",    "/bin/KMUSA.ELF" };
         if (key == '\n') {
-            const char* items[] = { "Editor",       "Commander",      "Resource monitor",
-                                    "Processes",    "Disks",          "Vik",
-                                    "Theme editor", "Memory manager", "Hieroglyph documents",
+            const char* items[] = { "Editor",           "Commander",      "Resource monitor",
+                                    "Processes",        "Disks",          "Vik",
+                                    "Theme editor",     "Memory manager", "Hieroglyph documents",
                                     "TokioWheel racing" };
             int choice = tui_menu("Launch application", items, 10, selected);
             if (choice >= 0) {

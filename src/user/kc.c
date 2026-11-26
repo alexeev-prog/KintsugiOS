@@ -120,8 +120,8 @@ static int refresh(panel* p) {
         parent->stat = (tui_stat){ 0, 1, 1 };
     }
     while (p->entries_count < ENTRIES
-           && (result = tui_readdir_long(p->tabs[p->active].directory, &cursor,
-                   (tui_long_entry*)&p->entries[p->entries_count]))
+           && (result = tui_readdir_long(
+                   p->tabs[p->active].directory, &cursor, (tui_long_entry*)&p->entries[p->entries_count]))
                > 0) {
         ++p->entries_count;
     }
@@ -169,7 +169,7 @@ static void draw(panel* p, int x, int active) {
                 : p->entries[i].stat.directory ? "/"
                                                : " ",
             active && i == t->selected ? 0x70 : color);
-            tui_textn(x + 4, y, p->entries[i].name, 21, active && i == t->selected ? 0x70 : color);
+        tui_textn(x + 4, y, p->entries[i].name, 21, active && i == t->selected ? 0x70 : color);
         if (settings[0]) {
             tui_number(x + 26, y, p->entries[i].stat.size, active && i == t->selected ? 0x70 : color);
         }
@@ -205,14 +205,18 @@ int main(int argc, char** argv) {
         tui_event event;
         tui_event_read(&event, 1);
         int key = event.key;
-        if ((event.pressed & 1) && event.mouse_y >= 4 && event.mouse_y < 22
-            && event.mouse_x >= 0 && event.mouse_x < 80) {
+        if ((event.pressed & 1) && event.mouse_y >= 4 && event.mouse_y < 22 && event.mouse_x >= 0
+            && event.mouse_x < 80) {
             active = event.mouse_x >= 40;
             tab* clicked = &panels[active].tabs[panels[active].active];
             unsigned at = clicked->top + event.mouse_y - 4;
-            if (at < panels[active].entries_count) clicked->selected = at;
+            if (at < panels[active].entries_count) {
+                clicked->selected = at;
+            }
         }
-        if ((event.pressed & 2) && event.mouse_y >= 4 && event.mouse_y < 22) key = '\n';
+        if ((event.pressed & 2) && event.mouse_y >= 4 && event.mouse_y < 22) {
+            key = '\n';
+        }
         static const int functions[] = { 'h', 'i', 'v', '\n', 'c', 'm', 'n', 'd', 'o', 'q' };
         if (key >= TUI_F1 && key <= TUI_F10) {
             key = functions[key - TUI_F1];
@@ -262,7 +266,9 @@ int main(int argc, char** argv) {
                     : e->stat.readonly ? "Read-only file"
                                        : "Writable file; V preview / Enter edit");
         } else if (key == 'o') {
-            const char* items[] = { "Toggle sizes", "Toggle directories first", "Save settings", "Sort by name", "Sort by size" };
+            const char* items[] = {
+                "Toggle sizes", "Toggle directories first", "Save settings", "Sort by name", "Sort by size"
+            };
             int c = tui_menu("Commander settings", items, 5, 0);
             if (c == 0) {
                 settings[0] ^= 1;
@@ -336,9 +342,14 @@ int main(int argc, char** argv) {
                     u32 n = tui_len(source);
                     int executable = n > 4 && same(source + n - 4, ".ELF");
                     int painting = n > 4 && same(source + n - 4, ".KPT");
-                    int result = tui_launch(executable ? source : painting ? "/bin/KPAINT.ELF" : "/bin/KUNED.ELF",
+                    int result = tui_launch(
+                        executable     ? source
+                            : painting ? "/bin/KPAINT.ELF"
+                                       : "/bin/KUNED.ELF",
                         executable ? 0 : source);
-                    status = result < 0 ? kos_error(result) : result ? "Application returned error" : "Application closed";
+                    status = result < 0 ? kos_error(result)
+                        : result        ? "Application returned error"
+                                        : "Application closed";
                 }
             } else if (key == 'n' && tui_prompt("New directory:", input, sizeof(input))) {
                 tui_path(dest, t->directory, input);

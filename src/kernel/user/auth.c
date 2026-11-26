@@ -1,11 +1,11 @@
 #include "auth.h"
 
-#include "process.h"
+#include "../../user/ioabi.h"
 #include "../fs/kfs3.h"
 #include "../fs/vfs.h"
 #include "../kernel/log.h"
 #include "../kklibc/kklibc.h"
-#include "../../user/ioabi.h"
+#include "process.h"
 
 #define AUTH_PASSWD_PATH "/etc/PASSWD"
 #define AUTH_SHADOW_PATH "/etc/SHADOW"
@@ -17,37 +17,59 @@ static u32 salt_counter = 0x13572468u;
 
 static int text_length(const char* text, u32 limit) {
     u32 n = 0;
-    while (n < limit && text[n]) ++n;
+    while (n < limit && text[n]) {
+        ++n;
+    }
     return (int)n;
 }
 
 static int same(const char* a, const char* b) {
-    while (*a && *a == *b) { ++a; ++b; }
+    while (*a && *a == *b) {
+        ++a;
+        ++b;
+    }
     return *a == *b;
 }
 
 static int valid_name(const char* name) {
-    if (!name || !*name) return 0;
+    if (!name || !*name) {
+        return 0;
+    }
     u32 n = 0;
     for (; name[n]; ++n) {
         char c = name[n];
-        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) return 0;
-        if (n >= AUTH_NAME_MAX - 1) return 0;
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) {
+            return 0;
+        }
+        if (n >= AUTH_NAME_MAX - 1) {
+            return 0;
+        }
     }
     return n > 0;
 }
 
 static void copy_text(char* out, const char* text, u32 capacity) {
     u32 n = 0;
-    if (!capacity) return;
-    while (text[n] && n + 1 < capacity) { out[n] = text[n]; ++n; }
+    if (!capacity) {
+        return;
+    }
+    while (text[n] && n + 1 < capacity) {
+        out[n] = text[n];
+        ++n;
+    }
     out[n] = 0;
 }
 
 static int hex_value(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+    if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    }
     return -1;
 }
 
@@ -64,7 +86,9 @@ static u32 from_hex(const char* text) {
     u32 value = 0;
     for (int i = 0; i < 8; ++i) {
         int digit = hex_value(text[i]);
-        if (digit < 0) return 0;
+        if (digit < 0) {
+            return 0;
+        }
         value = (value << 4) | (u32)digit;
     }
     return value;
@@ -92,7 +116,10 @@ static u32 digest(const char* password, const char* salt) {
 
 static void make_salt(auth_user_t* user, const char* name) {
     u32 h = 2166136261u;
-    for (const char* p = name; *p; ++p) { h ^= (u8)*p; h *= 16777619u; }
+    for (const char* p = name; *p; ++p) {
+        h ^= (u8)*p;
+        h *= 16777619u;
+    }
     h ^= (u32)process_ticks();
     h += ++salt_counter * 2654435761u;
     to_hex(user->salt, h);
@@ -105,8 +132,12 @@ static void assign_password(auth_user_t* user, const char* password) {
         return;
     }
     u32 n = 0;
-    while (password[n]) ++n;
-    if (n > AUTH_PASS_MAX) n = AUTH_PASS_MAX;
+    while (password[n]) {
+        ++n;
+    }
+    if (n > AUTH_PASS_MAX) {
+        n = AUTH_PASS_MAX;
+    }
     char bounded[AUTH_PASS_MAX + 1];
     memcpy(bounded, password, n);
     bounded[n] = 0;
@@ -117,10 +148,16 @@ static void assign_password(auth_user_t* user, const char* password) {
 static int read_file(const char* path, char* buffer, u32 capacity) {
     vfs_stat_t stat;
     int result = vfs_stat(path, &stat);
-    if (result) return result;
-    if (stat.directory || stat.size >= capacity) return VFS_EINVAL;
+    if (result) {
+        return result;
+    }
+    if (stat.directory || stat.size >= capacity) {
+        return VFS_EINVAL;
+    }
     result = vfs_read(path, 0, buffer, stat.size);
-    if (result < 0) return result;
+    if (result < 0) {
+        return result;
+    }
     buffer[result] = 0;
     return result;
 }
@@ -131,8 +168,12 @@ static int split(char* line, char** fields, int capacity) {
     char* p = line;
     while (count < capacity) {
         fields[count++] = p;
-        while (*p && *p != ':') ++p;
-        if (!*p) break;
+        while (*p && *p != ':') {
+            ++p;
+        }
+        if (!*p) {
+            break;
+        }
         *p++ = 0;
     }
     return count;
@@ -179,7 +220,9 @@ void auth_init(void) {
         char* line = passwd;
         while (*line && user_count < AUTH_MAX) {
             char* end = line;
-            while (*end && *end != '\n' && *end != '\r') ++end;
+            while (*end && *end != '\n' && *end != '\r') {
+                ++end;
+            }
             char saved = *end;
             *end = 0;
             char* fields[6];
@@ -190,12 +233,17 @@ void auth_init(void) {
                 user->uid = parse_u32(fields[1]);
                 user->gid = parse_u32(fields[2]);
                 copy_text(user->home, fields[3], AUTH_HOME_MAX);
-                if (n >= 5 && *fields[4]) copy_text(user->shell, fields[4], AUTH_SHELL_MAX);
-                else copy_text(user->shell, "/bin/shell", AUTH_SHELL_MAX);
+                if (n >= 5 && *fields[4]) {
+                    copy_text(user->shell, fields[4], AUTH_SHELL_MAX);
+                } else {
+                    copy_text(user->shell, "/bin/shell", AUTH_SHELL_MAX);
+                }
                 user->flags = n >= 6 ? parse_u32(fields[5]) : 0;
                 make_salt(user, user->name);
             }
-            if (!saved) break;
+            if (!saved) {
+                break;
+            }
             line = end + 1;
         }
     }
@@ -203,7 +251,9 @@ void auth_init(void) {
         char* line = shadow;
         while (*line) {
             char* end = line;
-            while (*end && *end != '\n' && *end != '\r') ++end;
+            while (*end && *end != '\n' && *end != '\r') {
+                ++end;
+            }
             char saved = *end;
             *end = 0;
             char* fields[3];
@@ -211,16 +261,23 @@ void auth_init(void) {
             if (n >= 3) {
                 auth_user_t* user = 0;
                 for (int i = 0; i < user_count; ++i) {
-                    if (same(users[i].name, fields[0])) { user = &users[i]; break; }
+                    if (same(users[i].name, fields[0])) {
+                        user = &users[i];
+                        break;
+                    }
                 }
                 if (user) {
                     copy_text(user->salt, fields[1], AUTH_HASH_HEX);
                     copy_text(user->hash, fields[2], AUTH_HASH_HEX);
                     user->has_password = fields[2][0] != 0;
-                    if (!user->salt[0]) make_salt(user, user->name);
+                    if (!user->salt[0]) {
+                        make_salt(user, user->name);
+                    }
                 }
             }
-            if (!saved) break;
+            if (!saved) {
+                break;
+            }
             line = end + 1;
         }
     }
@@ -251,37 +308,64 @@ int auth_save(void) {
     shadow[0] = 0;
     for (int i = 0; i < user_count; ++i) {
         auth_user_t* user = &users[i];
-        int n = snprintf(passwd + p, sizeof(passwd) - p, "%s:%u:%u:%s:%s:%u\n",
-                         user->name, user->uid, user->gid, user->home, user->shell, user->flags);
-        if (n < 0 || (u32)n >= sizeof(passwd) - p) return VFS_ENOSPC;
+        int n = snprintf(
+            passwd + p,
+            sizeof(passwd) - p,
+            "%s:%u:%u:%s:%s:%u\n",
+            user->name,
+            user->uid,
+            user->gid,
+            user->home,
+            user->shell,
+            user->flags);
+        if (n < 0 || (u32)n >= sizeof(passwd) - p) {
+            return VFS_ENOSPC;
+        }
         p += (u32)n;
-        n = snprintf(shadow + s, sizeof(shadow) - s, "%s:%s:%s\n",
-                     user->name, user->salt, user->has_password ? user->hash : "");
-        if (n < 0 || (u32)n >= sizeof(shadow) - s) return VFS_ENOSPC;
+        n = snprintf(
+            shadow + s,
+            sizeof(shadow) - s,
+            "%s:%s:%s\n",
+            user->name,
+            user->salt,
+            user->has_password ? user->hash : "");
+        if (n < 0 || (u32)n >= sizeof(shadow) - s) {
+            return VFS_ENOSPC;
+        }
         s += (u32)n;
     }
     int result = vfs_replace(AUTH_PASSWD_PATH, passwd, p);
-    if (result) return result;
+    if (result) {
+        return result;
+    }
     return vfs_replace(AUTH_SHADOW_PATH, shadow, s);
 }
 
-int auth_count(void) { return user_count; }
+int auth_count(void) {
+    return user_count;
+}
 
 const auth_user_t* auth_at(int index) {
     return index >= 0 && index < user_count ? &users[index] : 0;
 }
 
 const auth_user_t* auth_find(const char* name) {
-    if (!name) return 0;
+    if (!name) {
+        return 0;
+    }
     for (int i = 0; i < user_count; ++i) {
-        if (same(users[i].name, name)) return &users[i];
+        if (same(users[i].name, name)) {
+            return &users[i];
+        }
     }
     return 0;
 }
 
 const auth_user_t* auth_by_uid(u32 uid) {
     for (int i = 0; i < user_count; ++i) {
-        if (users[i].uid == uid) return &users[i];
+        if (users[i].uid == uid) {
+            return &users[i];
+        }
     }
     return 0;
 }
@@ -301,16 +385,26 @@ u32 auth_current_uid(void) {
 
 int auth_verify(const char* name, const char* password) {
     auth_user_t* user = (auth_user_t*)auth_find(name);
-    if (!user || (user->flags & AUTH_FLAG_LOCKED)) return KOS_EPERM;
-    if (user->lock_until && process_ticks() < user->lock_until) return KOS_EPERM;
+    if (!user || (user->flags & AUTH_FLAG_LOCKED)) {
+        return KOS_EPERM;
+    }
+    if (user->lock_until && process_ticks() < user->lock_until) {
+        return KOS_EPERM;
+    }
     int ok;
     if (!user->has_password) {
         ok = !password || !*password;
     } else {
-        if (!password) password = "";
+        if (!password) {
+            password = "";
+        }
         u32 n = 0;
-        while (password[n]) ++n;
-        if (n > AUTH_PASS_MAX) return KOS_EPERM;
+        while (password[n]) {
+            ++n;
+        }
+        if (n > AUTH_PASS_MAX) {
+            return KOS_EPERM;
+        }
         char bounded[AUTH_PASS_MAX + 1];
         memcpy(bounded, password, n);
         bounded[n] = 0;
@@ -325,7 +419,9 @@ int auth_verify(const char* name, const char* password) {
         user->lock_until = 0;
         return 0;
     }
-    if (user->failures < 255) ++user->failures;
+    if (user->failures < 255) {
+        ++user->failures;
+    }
     if (user->failures >= 5) {
         user->lock_until = process_ticks() + 500;
         user->failures = 0;
@@ -345,16 +441,25 @@ static int next_uid(void) {
     for (;;) {
         int used = 0;
         for (int i = 0; i < user_count; ++i) {
-            if (users[i].uid == uid) { used = 1; break; }
+            if (users[i].uid == uid) {
+                used = 1;
+                break;
+            }
         }
-        if (!used) return (int)uid;
+        if (!used) {
+            return (int)uid;
+        }
         ++uid;
     }
 }
 
 int auth_add(const char* name, const char* password, u32 flags) {
-    if (!valid_name(name) || auth_find(name)) return auth_find(name) ? VFS_EEXIST : VFS_EINVAL;
-    if (user_count >= AUTH_MAX) return VFS_ENOSPC;
+    if (!valid_name(name) || auth_find(name)) {
+        return auth_find(name) ? VFS_EEXIST : VFS_EINVAL;
+    }
+    if (user_count >= AUTH_MAX) {
+        return VFS_ENOSPC;
+    }
     auth_user_t* user = &users[user_count];
     memset(user, 0, sizeof(*user));
     user->uid = (u32)next_uid();
@@ -380,11 +485,19 @@ int auth_add(const char* name, const char* password, u32 flags) {
 
 int auth_set_password(const char* name, const char* password) {
     auth_user_t* user = (auth_user_t*)auth_find(name);
-    if (!user) return VFS_ENOENT;
-    if (!password || !*password) return VFS_EINVAL;
+    if (!user) {
+        return VFS_ENOENT;
+    }
+    if (!password || !*password) {
+        return VFS_EINVAL;
+    }
     u32 n = 0;
-    while (password[n]) ++n;
-    if (n > AUTH_PASS_MAX) return VFS_EINVAL;
+    while (password[n]) {
+        ++n;
+    }
+    if (n > AUTH_PASS_MAX) {
+        return VFS_EINVAL;
+    }
     assign_password(user, password);
     user->failures = 0;
     user->lock_until = 0;
@@ -394,9 +507,14 @@ int auth_set_password(const char* name, const char* password) {
 
 int auth_set_locked(const char* name, int locked) {
     auth_user_t* user = (auth_user_t*)auth_find(name);
-    if (!user) return VFS_ENOENT;
-    if (locked) user->flags |= AUTH_FLAG_LOCKED;
-    else user->flags &= ~AUTH_FLAG_LOCKED;
+    if (!user) {
+        return VFS_ENOENT;
+    }
+    if (locked) {
+        user->flags |= AUTH_FLAG_LOCKED;
+    } else {
+        user->flags &= ~AUTH_FLAG_LOCKED;
+    }
     return auth_save();
 }
 
@@ -404,7 +522,9 @@ int auth_is_system_path(const char* absolute) {
     static const char* const roots[] = { "/etc", "/bin", "/usr", "/boot", "/var", "/root", "/man" };
     for (u32 i = 0; i < sizeof(roots) / sizeof(roots[0]); ++i) {
         u32 n = text_length(roots[i], 64);
-        if (!strncmp(absolute, roots[i], n) && (absolute[n] == '/' || !absolute[n])) return 1;
+        if (!strncmp(absolute, roots[i], n) && (absolute[n] == '/' || !absolute[n])) {
+            return 1;
+        }
     }
     return 0;
 }

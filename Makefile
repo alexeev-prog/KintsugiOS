@@ -9,9 +9,10 @@ LD := $(CROSS)ld
 OBJCOPY := $(CROSS)objcopy
 PYTHON ?= python3
 QEMU ?= qemu-system-i386
+VNC ?= :0
 QEMU_FLAGS ?=
 AUDIO_FLAGS ?= -audiodev driver=sdl,id=kos-audio -device adlib,audiodev=kos-audio -machine pcspk-audiodev=kos-audio
-MEMORY ?= 64
+MEMORY ?= 128
 VGA ?= std
 BIN_DIR := bin
 DISKIMG_DIR := diskimgs
@@ -34,7 +35,7 @@ OBJS := $(BIN_DIR)/bootloader/kernel_entry.o $(BIN_DIR)/kernel/cpu/interrupt.o $
 
 all: $(BIN_DIR)/kintsugios.bin users
 
-USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG FDCHECK KCALC VOLUMECTL POSIXINFO KILL CHMOD CHOWN BASENAME DIRNAME PRINTF DATE UNAME SLEEP TOUCH HEAD SEQ PRINTENV DU CUT TR NL REV TAC UNIQ TEE YES EXPR FACTOR CKSUM OD STRINGS CMP REALPATH TRUNCATE MKTEMP
+USER_PROGRAMS := ECHO CAT LS PWD FAULT CHECK INPUT SPIN KLOG FDCHECK KCALC VOLUMECTL POSIXINFO KILL CHMOD CHOWN MOUSESTAT BASENAME DIRNAME PRINTF DATE UNAME SLEEP TOUCH HEAD SEQ PRINTENV DU CUT TR NL REV TAC UNIQ TEE YES EXPR FACTOR CKSUM OD STRINGS CMP REALPATH TRUNCATE MKTEMP
 USER_ELFS := $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(USER_PROGRAMS)))
 USER_ELFS += $(BIN_DIR)/user/INIT.ELF
 USER_ELFS += $(BIN_DIR)/user/SHELL.ELF
@@ -46,7 +47,7 @@ $(BIN_DIR)/user/INIT.ELF: src/user/init.c src/user/ktuilib.h src/user/user.ld $(
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/INIT.o -o $@
 TUI_PROGRAMS := KUNED VIK KBSM KMEMMAN KC KPROCM KDISKMAN KTUI KTTE PAGER JOURNAL HIERO
 TUI_PROGRAMS += KTERM KMAN DIR
-TUI_PROGRAMS += KSET KPAINT KIWI KINFO KFETCH KRRAWL
+TUI_PROGRAMS += KSET KPAINT KIWI KINFO KFETCH KGUI GDEMO KRRAWL
 TUI_PROGRAMS += KMUSA KLISTEN SOUNDCTL KTMUX KSERVICES KSERSYS KSDAEMON KCSV KMINES K2048 KLIFE
 UTIL_PROGRAMS := TREE FIND GREP TAIL WC SORT KFSCK PROC DF
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(UTIL_PROGRAMS)))
@@ -107,6 +108,15 @@ $(BIN_DIR)/user/SOUNDCTL.ELF: src/user/soundapps.c src/user/kms.h src/user/ktuil
 $(BIN_DIR)/user/KCALC.ELF: src/user/kcalc.c src/user/runtime.h src/user/user.ld $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
 	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/KCALC.o
 	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/KCALC.o -o $@
+$(BIN_DIR)/user/gfx.o: src/user/gfx.c src/user/gfx.h src/user/desktopabi.h src/kernel/drivers/font.h
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(BIN_DIR)/user/GDEMO.ELF: src/user/gdemo.c src/user/gfx.h src/user/tuiabi.h src/user/user.ld $(BIN_DIR)/user/gfx.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/GDEMO.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/gfx.o $(BIN_DIR)/user/GDEMO.o -o $@
+$(BIN_DIR)/user/KGUI.ELF: src/user/kgui.c src/user/gfx.h src/user/tuiabi.h src/user/user.ld $(BIN_DIR)/user/gfx.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
+	$(CC) $(CFLAGS) -c $< -o $(BIN_DIR)/user/KGUI.o
+	$(LD) -m elf_i386 -T src/user/user.ld $(BIN_DIR)/user/start.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/gfx.o $(BIN_DIR)/user/KGUI.o -o $@
 $(BIN_DIR)/user/ktuilib.o: src/user/tuidoc.c
 define DIAG_RULE
 $(BIN_DIR)/user/$(1).ELF: src/user/diagnostics.c src/user/sysabi.h $(BIN_DIR)/user/ktuilib.o $(BIN_DIR)/user/runtime.o $(BIN_DIR)/user/start.o
@@ -184,6 +194,7 @@ $(eval $(call USER_RULE,CMP,40))
 $(eval $(call USER_RULE,REALPATH,41))
 $(eval $(call USER_RULE,TRUNCATE,42))
 $(eval $(call USER_RULE,MKTEMP,43))
+$(eval $(call USER_RULE,MOUSESTAT,44))
 ADMIN_PROGRAMS := USERADD USERPSWD ROOTPSWD USERCHANGE
 USER_ELFS += $(addprefix $(BIN_DIR)/user/,$(addsuffix .ELF,$(ADMIN_PROGRAMS)))
 define ADMIN_RULE
@@ -308,6 +319,8 @@ run_kfs2: $(FLOPPY) $(KFS2DISK)
 	$(RUN) $(FLOPPY_DRIVE) -drive file=$(KFS2DISK),format=raw,if=ide,index=0 -boot order=a
 run_kfs3: $(FLOPPY) $(KFS3DISK)
 	$(RUN) $(FLOPPY_DRIVE) -drive file=$(KFS3DISK),format=raw,if=ide,index=0 -boot order=a
+run_gui: $(FLOPPY) $(KFS3DISK)
+	$(QEMU) -m $(MEMORY) -vga $(VGA) -name KintsugiOS-GUI $(AUDIO_FLAGS) -vnc $(VNC) $(FLOPPY_DRIVE) -drive file=$(KFS3DISK),format=raw,if=ide,index=0 -boot order=a $(QEMU_FLAGS)
 run_iso: $(ISO) $(FATDISK) system-install
 	$(RUN) -cdrom $(ISO) $(FAT_DRIVE) -boot order=d
 debug_fda debug_hdd debug_fat12: $(FLOPPY) $(FATDISK)
@@ -351,7 +364,7 @@ test: $(FLOPPY) $(ISO) $(USER_ELFS) test-tui
 	$(PYTHON) tools/smoke_test.py --full-disk
 	$(PYTHON) tools/smoke_test.py --panic
 	$(PYTHON) tools/smoke_test.py --fault
-.PHONY: test kfs2 kfs3 run_kfs2 run_kfs3
+.PHONY: test kfs2 kfs3 run_kfs2 run_kfs3 run_gui
 .PHONY: test-tui
 .PHONY: help disk-create disk-reset
 .PHONY: all diskimg hddimg fat12hdd iso testfiles run run_bin run_fda run_hdd run_fat12 run_iso run_kfs3 debug_fda debug_hdd debug_fat12 debug_iso clean clean_all quick re info

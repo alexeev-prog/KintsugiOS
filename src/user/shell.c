@@ -1,8 +1,8 @@
+#include "../shared/text.h"
+#include "authabi.h"
 #include "fsabi.h"
 #include "runtime.h"
 #include "shellabi.h"
-#include "authabi.h"
-#include "../shared/text.h"
 
 static char line[256], history[16][256], draft[256];
 static unsigned length, cursor, rendered, histories, position;
@@ -21,7 +21,9 @@ static unsigned current_uid(void) {
 static const char* current_user(void) {
     static char name[32];
     name[0] = 0;
-    if (syscall(KOS_SYS_GETUSER, (u32)name, sizeof(name), 0, 0)) copy(name, "user");
+    if (syscall(KOS_SYS_GETUSER, (u32)name, sizeof(name), 0, 0)) {
+        copy(name, "user");
+    }
     return name;
 }
 
@@ -30,8 +32,13 @@ static void read_secret(char* buffer, unsigned capacity) {
     buffer[0] = 0;
     for (;;) {
         int key = syscall(8, 1, 0, 0, 0);
-        if (key == '\n' || key == '\r') break;
-        if (key == 3) { n = 0; break; }
+        if (key == '\n' || key == '\r') {
+            break;
+        }
+        if (key == 3) {
+            n = 0;
+            break;
+        }
         if (key == 8) {
             if (n) {
                 --n;
@@ -58,7 +65,10 @@ static void prompt(void) {
     print("@kintsugi ");
     print(cwd);
     print(" ]\n");
-    { char mark[2] = { prompt_mark, 0 }; print(mark); }
+    {
+        char mark[2] = { prompt_mark, 0 };
+        print(mark);
+    }
     print(" ");
 }
 
@@ -265,11 +275,21 @@ static int find_unquoted(char* text, const char* token) {
     u32 width = len(token);
     for (u32 i = 0; text[i]; ++i) {
         if ((text[i] == '\'' || text[i] == '"')) {
-            if (!quote) quote = text[i]; else if (quote == text[i]) quote = 0;
+            if (!quote) {
+                quote = text[i];
+            } else if (quote == text[i]) {
+                quote = 0;
+            }
         }
         int same = !quote;
-        for (u32 j = 0; same && j < width; ++j) if (text[i + j] != token[j]) same = 0;
-        if (same) return (int)i;
+        for (u32 j = 0; same && j < width; ++j) {
+            if (text[i + j] != token[j]) {
+                same = 0;
+            }
+        }
+        if (same) {
+            return (int)i;
+        }
     }
     return -1;
 }
@@ -393,15 +413,23 @@ too_long:
 /* ---- shell control flow ------------------------------------------------- */
 
 static char* skip_ws(char* p) {
-    while (*p == ' ' || *p == '\t') ++p;
+    while (*p == ' ' || *p == '\t') {
+        ++p;
+    }
     return p;
 }
 
 static int starts_word(char* text, const char* word) {
     text = skip_ws(text);
     unsigned n = 0;
-    while (word[n]) ++n;
-    for (unsigned i = 0; i < n; ++i) if (text[i] != word[i]) return 0;
+    while (word[n]) {
+        ++n;
+    }
+    for (unsigned i = 0; i < n; ++i) {
+        if (text[i] != word[i]) {
+            return 0;
+        }
+    }
     char after = text[n];
     return after == 0 || after == ' ' || after == '\t' || after == ';';
 }
@@ -412,9 +440,16 @@ static int split_semi(char* text, char** parts, int capacity) {
     char quote = 0;
     parts[count++] = skip_ws(text);
     for (char* p = text; *p && count < capacity; ++p) {
-        if (*p == '\\' && quote != '\'' && p[1]) { ++p; continue; }
+        if (*p == '\\' && quote != '\'' && p[1]) {
+            ++p;
+            continue;
+        }
         if (*p == '\'' || *p == '"') {
-            if (!quote) quote = *p; else if (quote == *p) quote = 0;
+            if (!quote) {
+                quote = *p;
+            } else if (quote == *p) {
+                quote = 0;
+            }
             continue;
         }
         if (!quote && *p == ';') {
@@ -429,20 +464,37 @@ static void join_parts(char** parts, int from, int to, char* out, u32 capacity) 
     u32 used = 0;
     out[0] = 0;
     for (int i = from; i < to; ++i) {
-        if (!parts[i] || !*parts[i]) continue;
-        if (used) { if (used + 1 >= capacity) break; out[used++] = ' '; out[used] = 0; }
+        if (!parts[i] || !*parts[i]) {
+            continue;
+        }
+        if (used) {
+            if (used + 1 >= capacity) {
+                break;
+            }
+            out[used++] = ' ';
+            out[used] = 0;
+        }
         const char* p = parts[i];
-        while (*p && used + 1 < capacity) out[used++] = *p++;
+        while (*p && used + 1 < capacity) {
+            out[used++] = *p++;
+        }
         out[used] = 0;
     }
 }
 
 static int decimal(const char* text) {
     int value = 0, negative = 0;
-    if (*text == '-') { negative = 1; ++text; }
-    if (!*text) return 0;
+    if (*text == '-') {
+        negative = 1;
+        ++text;
+    }
+    if (!*text) {
+        return 0;
+    }
     for (const char* p = text; *p; ++p) {
-        if (*p < '0' || *p > '9') return 0;
+        if (*p < '0' || *p > '9') {
+            return 0;
+        }
         value = value * 10 + (*p - '0');
     }
     return negative ? -value : value;
@@ -451,16 +503,24 @@ static int decimal(const char* text) {
 static int exec_control(char* text) {
     char* parts[64];
     int count = split_semi(text, parts, 64);
-    if (!count) return 0;
+    if (!count) {
+        return 0;
+    }
 
     if (starts_word(parts[0], "if")) {
         int then_at = -1, else_at = -1, fi_at = -1;
         for (int i = 1; i < count; ++i) {
-            if (starts_word(parts[i], "then")) then_at = i;
-            else if (starts_word(parts[i], "else")) else_at = i;
-            else if (starts_word(parts[i], "fi")) fi_at = i;
+            if (starts_word(parts[i], "then")) {
+                then_at = i;
+            } else if (starts_word(parts[i], "else")) {
+                else_at = i;
+            } else if (starts_word(parts[i], "fi")) {
+                fi_at = i;
+            }
         }
-        if (then_at < 0 || fi_at < 0 || fi_at <= then_at) return 2;
+        if (then_at < 0 || fi_at < 0 || fi_at <= then_at) {
+            return 2;
+        }
         char condition[512];
         join_parts(parts, 1, then_at, condition, sizeof(condition));
         int status = execute(condition);
@@ -468,23 +528,32 @@ static int exec_control(char* text) {
         int to = status == 0 ? (else_at >= 0 ? else_at : fi_at) : fi_at;
         char branch[1024];
         join_parts(parts, from, to, branch, sizeof(branch));
-        if (!*branch) return status;
+        if (!*branch) {
+            return status;
+        }
         return execute(branch);
     }
 
     if (starts_word(parts[0], "while")) {
         int do_at = -1, done_at = -1;
         for (int i = 1; i < count; ++i) {
-            if (starts_word(parts[i], "do")) do_at = i;
-            else if (starts_word(parts[i], "done")) done_at = i;
+            if (starts_word(parts[i], "do")) {
+                do_at = i;
+            } else if (starts_word(parts[i], "done")) {
+                done_at = i;
+            }
         }
-        if (do_at < 0 || done_at < 0 || done_at <= do_at) return 2;
+        if (do_at < 0 || done_at < 0 || done_at <= do_at) {
+            return 2;
+        }
         char condition[512], body[1024];
         join_parts(parts, 1, do_at, condition, sizeof(condition));
         join_parts(parts, do_at + 1, done_at, body, sizeof(body));
         int status = 1;
         for (int guard = 0; guard < 1000; ++guard) {
-            if (execute(condition) != 0) break;
+            if (execute(condition) != 0) {
+                break;
+            }
             status = execute(body);
         }
         return status;
@@ -493,17 +562,27 @@ static int exec_control(char* text) {
     if (starts_word(parts[0], "for")) {
         int in_at = -1, do_at = -1, done_at = -1;
         for (int i = 1; i < count; ++i) {
-            if (starts_word(parts[i], "in")) in_at = i;
-            else if (starts_word(parts[i], "do")) do_at = i;
-            else if (starts_word(parts[i], "done")) done_at = i;
+            if (starts_word(parts[i], "in")) {
+                in_at = i;
+            } else if (starts_word(parts[i], "do")) {
+                do_at = i;
+            } else if (starts_word(parts[i], "done")) {
+                done_at = i;
+            }
         }
-        if (in_at < 0 || do_at < 0 || done_at < 0 || do_at <= in_at || done_at <= do_at) return 2;
+        if (in_at < 0 || do_at < 0 || done_at < 0 || do_at <= in_at || done_at <= do_at) {
+            return 2;
+        }
         char variable[32] = "";
         char* head = skip_ws(parts[0] + 3);
         u32 n = 0;
-        while (*head && *head != ' ' && *head != '\t' && n + 1 < sizeof(variable)) variable[n++] = *head++;
+        while (*head && *head != ' ' && *head != '\t' && n + 1 < sizeof(variable)) {
+            variable[n++] = *head++;
+        }
         variable[n] = 0;
-        if (!variable[0]) return 2;
+        if (!variable[0]) {
+            return 2;
+        }
         char values[512], body[1024];
         join_parts(parts, in_at + 1, do_at, values, sizeof(values));
         join_parts(parts, do_at + 1, done_at, body, sizeof(body));
@@ -511,14 +590,20 @@ static int exec_control(char* text) {
         char* cursor = values;
         while (*cursor) {
             cursor = skip_ws(cursor);
-            if (!*cursor) break;
+            if (!*cursor) {
+                break;
+            }
             char* start = cursor;
-            while (*cursor && *cursor != ' ' && *cursor != '\t') ++cursor;
+            while (*cursor && *cursor != ' ' && *cursor != '\t') {
+                ++cursor;
+            }
             char saved = *cursor;
             *cursor = 0;
             setenv(variable, start);
             status = execute(body);
-            if (!saved) break;
+            if (!saved) {
+                break;
+            }
             ++cursor;
         }
         return status;
@@ -529,7 +614,9 @@ static int exec_control(char* text) {
 static int execute_inner(char* text, command_frame* frame) {
     if (starts_word(text, "if") || starts_word(text, "for") || starts_word(text, "while")) {
         int result = exec_control(text);
-        if (result >= 0) return result;
+        if (result >= 0) {
+            return result;
+        }
     }
     char quote = 0;
     int background = 0;
@@ -537,32 +624,45 @@ static int execute_inner(char* text, command_frame* frame) {
      * before pipelines. This keeps each subcommand on the same shell context. */
     int conditional = find_unquoted(text, "||");
     if (conditional >= 0) {
-        text[conditional] = 0; text[conditional + 1] = 0;
+        text[conditional] = 0;
+        text[conditional + 1] = 0;
         int result = execute_raw(text);
         return result ? execute_raw(text + conditional + 2) : result;
     }
     conditional = find_unquoted(text, "&&");
     if (conditional >= 0) {
-        text[conditional] = 0; text[conditional + 1] = 0;
+        text[conditional] = 0;
+        text[conditional + 1] = 0;
         int result = execute_raw(text);
         return result ? result : execute_raw(text + conditional + 2);
     }
     for (char* p = text; *p; ++p) {
-        if (*p == '\\' && quote != '\'' && p[1]) { ++p; continue; }
+        if (*p == '\\' && quote != '\'' && p[1]) {
+            ++p;
+            continue;
+        }
         if (*p == '\'' || *p == '"') {
-            if (!quote) quote = *p; else if (quote == *p) quote = 0;
+            if (!quote) {
+                quote = *p;
+            } else if (quote == *p) {
+                quote = 0;
+            }
             continue;
         }
         if (!quote && *p == ';') {
             *p = 0;
             int result = execute_raw(text);
             char* next = p + 1;
-            while (*next == ' ' || *next == '\t') ++next;
+            while (*next == ' ' || *next == '\t') {
+                ++next;
+            }
             return *next ? execute_raw(next) : result;
         }
     }
     char* begin = text;
-    while (*begin == ' ' || *begin == '\t') ++begin;
+    while (*begin == ' ' || *begin == '\t') {
+        ++begin;
+    }
     unsigned length = len(begin);
     if (length >= 2 && begin[0] == '(' && begin[length - 1] == ')') {
         begin[length - 1] = 0;
@@ -588,7 +688,7 @@ static int execute_inner(char* text, command_frame* frame) {
             continue;
         }
         if ((*p == '|' || *p == '&') && p[1] == *p) {
-            char operator = *p;
+            char operator= * p;
             char* left = text;
             while (*left == ' ' || *left == '\t') {
                 ++left;
@@ -603,8 +703,8 @@ static int execute_inner(char* text, command_frame* frame) {
             }
             *p = 0;
             int result = execute_raw(text);
-            return operator == '|' ? (result ? execute_raw(p + 2) : result)
-                                   : (result ? result : execute_raw(p + 2));
+            return operator== '|' ? (result ? execute_raw(p + 2) : result)
+                                  : (result ? result : execute_raw(p + 2));
         }
         if (*p == '&') {
             char* tail = p + 1;
@@ -720,39 +820,83 @@ static int execute_inner(char* text, command_frame* frame) {
             int result = syscall(KOS_SYS_LAUNCH, (u32)&request, 0, 0, 0);
             return result < 0 ? 126 : result;
         }
-        if (equal(argv[0], "true")) return 0;
-        if (equal(argv[0], "false")) return 1;
+        if (equal(argv[0], "gui")) {
+            char* gui_args[] = { "kgui", 0 };
+            int pid = spawn("/bin/KGUI.ELF", 1, gui_args);
+            if (pid >= 0) {
+                wait(pid);
+            }
+            return 0;
+        }
+        if (equal(argv[0], "true")) {
+            return 0;
+        }
+        if (equal(argv[0], "false")) {
+            return 1;
+        }
         if (equal(argv[0], "test") || equal(argv[0], "[")) {
             int start = equal(argv[0], "[") ? 1 : 0;
             int end = argc;
-            if (start && end > start && equal(argv[end - 1], "]")) --end;
+            if (start && end > start && equal(argv[end - 1], "]")) {
+                --end;
+            }
             int items = end - start;
-            if (items <= 0) return 1;
+            if (items <= 0) {
+                return 1;
+            }
             char** v = argv + start;
-            if (items == 1) return *v[0] ? 0 : 1;
+            if (items == 1) {
+                return *v[0] ? 0 : 1;
+            }
             if (items == 2) {
-                if (equal(v[0], "-n")) return *v[1] ? 0 : 1;
-                if (equal(v[0], "-z")) return *v[1] ? 1 : 0;
+                if (equal(v[0], "-n")) {
+                    return *v[1] ? 0 : 1;
+                }
+                if (equal(v[0], "-z")) {
+                    return *v[1] ? 1 : 0;
+                }
                 if (v[0][0] == '-' && (v[0][1] == 'e' || v[0][1] == 'f' || v[0][1] == 'd')) {
                     kos_stat status;
                     int result = syscall(11, (u32)v[1], 4, (u32)&status, 0);
-                    if (result) return 1;
-                    if (v[0][1] == 'f') return status.directory ? 1 : 0;
-                    if (v[0][1] == 'd') return status.directory ? 0 : 1;
+                    if (result) {
+                        return 1;
+                    }
+                    if (v[0][1] == 'f') {
+                        return status.directory ? 1 : 0;
+                    }
+                    if (v[0][1] == 'd') {
+                        return status.directory ? 0 : 1;
+                    }
                     return 0;
                 }
                 return 2;
             }
             if (items == 3) {
-                if (equal(v[1], "=")) return equal(v[0], v[2]) ? 0 : 1;
-                if (equal(v[1], "!=")) return equal(v[0], v[2]) ? 1 : 0;
+                if (equal(v[1], "=")) {
+                    return equal(v[0], v[2]) ? 0 : 1;
+                }
+                if (equal(v[1], "!=")) {
+                    return equal(v[0], v[2]) ? 1 : 0;
+                }
                 int a = decimal(v[0]), b = decimal(v[2]);
-                if (equal(v[1], "-eq")) return a == b ? 0 : 1;
-                if (equal(v[1], "-ne")) return a != b ? 0 : 1;
-                if (equal(v[1], "-lt")) return a < b ? 0 : 1;
-                if (equal(v[1], "-le")) return a <= b ? 0 : 1;
-                if (equal(v[1], "-gt")) return a > b ? 0 : 1;
-                if (equal(v[1], "-ge")) return a >= b ? 0 : 1;
+                if (equal(v[1], "-eq")) {
+                    return a == b ? 0 : 1;
+                }
+                if (equal(v[1], "-ne")) {
+                    return a != b ? 0 : 1;
+                }
+                if (equal(v[1], "-lt")) {
+                    return a < b ? 0 : 1;
+                }
+                if (equal(v[1], "-le")) {
+                    return a <= b ? 0 : 1;
+                }
+                if (equal(v[1], "-gt")) {
+                    return a > b ? 0 : 1;
+                }
+                if (equal(v[1], "-ge")) {
+                    return a >= b ? 0 : 1;
+                }
             }
             return 2;
         }
@@ -762,8 +906,12 @@ static int execute_inner(char* text, command_frame* frame) {
                 print("Installed /BIN entries:\n");
                 kos_dirent entry;
                 u32 cursor_bin = 0;
-                while (syscall(3, (u32)"/bin", (u32)&cursor_bin, (u32)&entry, 0) > 0) {
-                    if (!entry.stat.directory) { print("  "); print(entry.name); print("\n"); }
+                while (syscall(3, (u32) "/bin", (u32)&cursor_bin, (u32)&entry, 0) > 0) {
+                    if (!entry.stat.directory) {
+                        print("  ");
+                        print(entry.name);
+                        print("\n");
+                    }
                 }
             } else if (argc == 2 && equal(argv[1], "fs")) {
                 print("write <file> <text>       Replace file contents\n");
@@ -785,6 +933,7 @@ static int execute_inner(char* text, command_frame* frame) {
                 print("           cksum od strings cmp realpath truncate mktemp df du\n");
                 print("Perms:   chmod <mode> <path>  chown <user|uid> <path>\n");
                 print("Apps:    ktui kiwi kc kuned kcsv kservices ksersys klisten kfetch\n");
+                print("         gui | kgui - pixel window manager (Win95 style)\n");
                 print("         krrawl kcalc kman kset kpaint kinfo kterm ktmux\n");
                 print("Control: if COND; then CMD; else CMD; fi | for V in A B; do CMD; done\n");
                 print("         while COND; do CMD; done | CMD && CMD | CMD || CMD | CMD; CMD\n");
@@ -853,7 +1002,7 @@ static int execute_inner(char* text, command_frame* frame) {
                 char password[64];
                 print("Password for root: ");
                 read_secret(password, sizeof(password));
-                if (syscall(KOS_SYS_ELEVATE, (u32)"root", (u32)password, 0, 0)) {
+                if (syscall(KOS_SYS_ELEVATE, (u32) "root", (u32)password, 0, 0)) {
                     print("sugo: authentication failed\n");
                     return 1;
                 }
@@ -882,7 +1031,9 @@ static int execute_inner(char* text, command_frame* frame) {
             } else {
                 path(target, argv[1]);
                 request.argc[0] = argc - 1;
-                for (int i = 1; i < argc; ++i) args[0][i - 1] = argv[i];
+                for (int i = 1; i < argc; ++i) {
+                    args[0][i - 1] = argv[i];
+                }
                 args[0][argc - 1] = 0;
             }
             request.paths[0] = target;
@@ -1024,13 +1175,20 @@ static void complete(void) {
 static void redraw(void) {
     /* Keep the editing line on one physical row, including long commands. */
     unsigned start = 0;
-    while (text_columns(line + start, cursor - start) > 73) start = text_next(line, start);
+    while (text_columns(line + start, cursor - start) > 73) {
+        start = text_next(line, start);
+    }
     unsigned finish = start, visible = 0;
-    while (finish < length && visible < 74) { finish = text_next(line, finish); ++visible; }
+    while (finish < length && visible < 74) {
+        finish = text_next(line, finish);
+        ++visible;
+    }
     /* The editing row must keep exactly the same mark as the printed prompt:
      * '$' for a user, '#' for root. It used to flip to the legacy '!#>'. */
     char frame[512];
-    frame[0] = '\r'; frame[1] = prompt_mark; frame[2] = ' ';
+    frame[0] = '\r';
+    frame[1] = prompt_mark;
+    frame[2] = ' ';
     unsigned n = 3;
     for (unsigned i = start; i < finish; ++i) {
         frame[n++] = line[i];
@@ -1054,7 +1212,9 @@ int main(int argc, char** argv) {
     prompt_mark = uid == 0 ? '#' : '$';
     char account[32];
     account[0] = 0;
-    if (syscall(KOS_SYS_GETUSER, (u32)account, sizeof(account), 0, 0)) copy(account, uid ? "user" : "root");
+    if (syscall(KOS_SYS_GETUSER, (u32)account, sizeof(account), 0, 0)) {
+        copy(account, uid ? "user" : "root");
+    }
     if (uid == 0) {
         setenv("USER", "root");
         setenv("LOGNAME", "root");
@@ -1071,7 +1231,9 @@ int main(int argc, char** argv) {
     }
     if (argc == 1) {
         const char* home = getenv("HOME");
-        if (home) syscall(11, (u32)home, 3, 0, 0);
+        if (home) {
+            syscall(11, (u32)home, 3, 0, 0);
+        }
         int profile = open("/etc/PROFILE", KOS_O_READ);
         if (profile >= 0) {
             close(profile);
@@ -1153,7 +1315,9 @@ int main(int argc, char** argv) {
             for (unsigned i = length + 1; i > cursor; --i) {
                 line[i + add - 1] = line[i - 1];
             }
-            for (unsigned i = 0; i < add; ++i) line[cursor++] = encoded[i];
+            for (unsigned i = 0; i < add; ++i) {
+                line[cursor++] = encoded[i];
+            }
             length += add;
         }
         redraw();

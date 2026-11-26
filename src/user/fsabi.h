@@ -15,6 +15,7 @@ typedef struct {
 /* Extended directory ABI: long names are supported by KFS2; this record
  * remains available for legacy FAT12 programs. */
 #define KOS_LONG_NAME_MAX 256
+
 typedef struct {
     char name[KOS_LONG_NAME_MAX];
     kos_stat stat;

@@ -10,13 +10,13 @@
 
 #include "terminal.h"
 
+#include "../../shared/text.h"
 #include "../kklibc/mem.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
-#include "screen.h"
 #include "framebuffer.h"
 #include "keyboard.h"
-#include "../../shared/text.h"
+#include "screen.h"
 
 /* Глобальное состояние терминала */
 static terminal_state_t term_state;
@@ -28,9 +28,16 @@ static u32 utf_code, utf_min;
 static u8 utf_left;
 
 static int terminal_ansi(char c) {
-    if (!ansi_state && c == 27) { ansi_state = 1; return 1; }
+    if (!ansi_state && c == 27) {
+        ansi_state = 1;
+        return 1;
+    }
     if (ansi_state == 1) {
-        if (c == '[') { ansi_state = 2; ansi_value = 0; return 1; }
+        if (c == '[') {
+            ansi_state = 2;
+            ansi_value = 0;
+            return 1;
+        }
         ansi_state = 0;
         return 0;
     }
@@ -40,8 +47,9 @@ static int terminal_ansi(char c) {
             return 1;
         }
         if (c == 'm') {
-            if (ansi_value == 0) terminal_reset_color();
-            else if (ansi_value >= 30 && ansi_value <= 37) {
+            if (ansi_value == 0) {
+                terminal_reset_color();
+            } else if (ansi_value >= 30 && ansi_value <= 37) {
                 static const u8 colors[] = { 0x04, 0x02, 0x06, 0x01, 0x04, 0x05, 0x03, 0x0f };
                 terminal_set_color(colors[ansi_value - 30]);
             }
@@ -111,9 +119,12 @@ void terminal_putchar(char c) {
     if (utf_left) {
         if ((byte & 0xc0) == 0x80) {
             utf_code = (utf_code << 6) | (byte & 63);
-            if (--utf_left) return;
-            c = utf_code >= utf_min && utf_code <= 0x10ffff
-                && !(utf_code >= 0xd800 && utf_code <= 0xdfff) ? text_glyph(utf_code) : '?';
+            if (--utf_left) {
+                return;
+            }
+            c = utf_code >= utf_min && utf_code <= 0x10ffff && !(utf_code >= 0xd800 && utf_code <= 0xdfff)
+                ? text_glyph(utf_code)
+                : '?';
         } else {
             utf_left = 0;
             terminal_putchar('?');
@@ -126,7 +137,9 @@ void terminal_putchar(char c) {
         utf_code = byte & (byte < 0xe0 ? 31 : byte < 0xf0 ? 15 : 7);
         return;
     }
-    if (terminal_ansi(c)) return;
+    if (terminal_ansi(c)) {
+        return;
+    }
     /* Move only: line editors erase explicitly by writing spaces. */
     if (c == '\b') {
         if (term_state.cursor_x) {
@@ -343,12 +356,18 @@ static void terminal_direct_render(void) {
     }
     int cursor = -1;
     if (term_state.cursor_y >= term_state.scroll_offset
-        && term_state.cursor_y < term_state.scroll_offset + MAX_ROWS
-        && term_state.cursor_x < MAX_COLS)
+        && term_state.cursor_y < term_state.scroll_offset + MAX_ROWS && term_state.cursor_x < MAX_COLS) {
         cursor = (term_state.cursor_y - term_state.scroll_offset) * MAX_COLS + term_state.cursor_x;
-    if (graphics && !initialized) framebuffer_clear(0x141820);
-    if (graphics) framebuffer_chrome(keyboard_russian(), term_state.scroll_offset
-        < (term_state.cursor_y >= MAX_ROWS ? term_state.cursor_y - MAX_ROWS + 1 : 0));
+    }
+    if (graphics && !initialized) {
+        framebuffer_clear(0x141820);
+    }
+    if (graphics) {
+        framebuffer_chrome(
+            keyboard_russian(),
+            term_state.scroll_offset
+                < (term_state.cursor_y >= MAX_ROWS ? term_state.cursor_y - MAX_ROWS + 1 : 0));
+    }
 
     u32 max_scroll = 0;
     if (TERMINAL_HEIGHT > SCREEN_HEIGHT) {
@@ -378,9 +397,11 @@ static void terminal_direct_render(void) {
             // Записываем напрямую в видеопамять
             u16 cell = (u8)character | ((u16)(u8)attribute << 8);
             console_cells[offset / 2] = cell;
-            if (graphics && (!initialized || previous[screen_row][screen_col] != cell
-                || (int)(offset / 2) == cursor || (int)(offset / 2) == old_cursor))
+            if (graphics
+                && (!initialized || previous[screen_row][screen_col] != cell || (int)(offset / 2) == cursor
+                    || (int)(offset / 2) == old_cursor)) {
                 framebuffer_cell(screen_col, screen_row, character, attribute, (int)(offset / 2) == cursor);
+            }
             previous[screen_row][screen_col] = cell;
             if (!graphics && vidmem[offset / 2] != cell) {
                 vidmem[offset / 2] = cell;
@@ -390,7 +411,9 @@ static void terminal_direct_render(void) {
 
     initialized = 1;
     old_cursor = cursor;
-    if (graphics) framebuffer_mouse_show();
+    if (graphics) {
+        framebuffer_mouse_show();
+    }
     u32 cursor_screen_row = 0;
     u8 cursor_visible = 0;
 
@@ -406,13 +429,25 @@ static void terminal_direct_render(void) {
     }
 }
 
+static int gui_mode;
+
+void terminal_set_gui_mode(int active) {
+    gui_mode = active ? 1 : 0;
+    term_state.dirty = 1;
+}
+
 void terminal_refresh(void) {
+    if (gui_mode) {
+        return;
+    }
     if (!term_state.dirty) {
         return;
     }
     extern u32 tick;
     static u32 refresh_tick = ~0u;
-    if (framebuffer_get_info()->available && tick && refresh_tick == tick) return;
+    if (framebuffer_get_info()->available && tick && refresh_tick == tick) {
+        return;
+    }
     refresh_tick = tick;
 
     terminal_direct_render();

@@ -1,7 +1,7 @@
-#include "runtime.h"
 #include "authabi.h"
 #include "desktopabi.h"
 #include "ktuilib.h"
+#include "runtime.h"
 #include "sysabi.h"
 
 /* PID 1: root service supervisor. It presents a clean full-screen TUI login,
@@ -24,38 +24,58 @@ static int account_count;
 
 static u32 length(const char* text) {
     u32 n = 0;
-    while (text[n]) ++n;
+    while (text[n]) {
+        ++n;
+    }
     return n;
 }
 
 static int equal(const char* a, const char* b) {
-    while (*a && *a == *b) { ++a; ++b; }
+    while (*a && *a == *b) {
+        ++a;
+        ++b;
+    }
     return *a == *b;
 }
 
-static char lower_char(char c) { return c >= 'A' && c <= 'Z' ? (char)(c + 32) : c; }
+static char lower_char(char c) {
+    return c >= 'A' && c <= 'Z' ? (char)(c + 32) : c;
+}
+
 static int equal_ci(const char* a, const char* b) {
-    while (*a && lower_char(*a) == lower_char(*b)) { ++a; ++b; }
+    while (*a && lower_char(*a) == lower_char(*b)) {
+        ++a;
+        ++b;
+    }
     return lower_char(*a) == lower_char(*b);
 }
 
 static void copy(char* out, const char* text, u32 capacity) {
     u32 n = 0;
-    if (!capacity) return;
-    while (text[n] && n + 1 < capacity) { out[n] = text[n]; ++n; }
+    if (!capacity) {
+        return;
+    }
+    while (text[n] && n + 1 < capacity) {
+        out[n] = text[n];
+        ++n;
+    }
     out[n] = 0;
 }
 
 static int read_text(const char* path, char* buffer, u32 capacity) {
     int result = syscall(2, (u32)path, 0, (u32)buffer, capacity - 1);
-    if (result < 0) return result;
+    if (result < 0) {
+        return result;
+    }
     buffer[result] = 0;
     return result;
 }
 
 static void trim(char* text) {
     u32 n = length(text);
-    while (n && (text[n - 1] == '\n' || text[n - 1] == '\r' || text[n - 1] == ' ')) text[--n] = 0;
+    while (n && (text[n - 1] == '\n' || text[n - 1] == '\r' || text[n - 1] == ' ')) {
+        text[--n] = 0;
+    }
 }
 
 static void load_accounts(void) {
@@ -71,7 +91,9 @@ static void load_accounts(void) {
     char* line = data;
     while (*line && account_count < USERS_MAX) {
         char* end = line;
-        while (*end && *end != '\n' && *end != '\r') ++end;
+        while (*end && *end != '\n' && *end != '\r') {
+            ++end;
+        }
         char saved = *end;
         *end = 0;
         if (*line) {
@@ -80,20 +102,27 @@ static void load_accounts(void) {
             char* p = line;
             while (count < 6) {
                 fields[count++] = p;
-                while (*p && *p != ':') ++p;
-                if (!*p) break;
+                while (*p && *p != ':') {
+                    ++p;
+                }
+                if (!*p) {
+                    break;
+                }
                 *p++ = 0;
             }
             if (count >= 4 && fields[0][0]) {
                 account_t* account = &accounts[account_count++];
                 copy(account->name, fields[0], NAME_MAX);
                 account->uid = 0;
-                for (const char* d = fields[1]; *d >= '0' && *d <= '9'; ++d)
+                for (const char* d = fields[1]; *d >= '0' && *d <= '9'; ++d) {
                     account->uid = account->uid * 10 + (u32)(*d - '0');
+                }
                 copy(account->home, fields[3], HOME_MAX);
             }
         }
-        if (!saved) break;
+        if (!saved) {
+            break;
+        }
         line = end + 1;
     }
     if (!account_count) {
@@ -112,13 +141,19 @@ static int password_required(const char* name) {
  * the login TUI, so SoundCtl/volumectl changes survive a reboot. */
 static void load_volume(void) {
     char text[16];
-    if (read_text("/etc/volume.cfg", text, sizeof(text)) <= 0) return;
+    if (read_text("/etc/volume.cfg", text, sizeof(text)) <= 0) {
+        return;
+    }
     trim(text);
     unsigned value = 0;
     for (const char* p = text; *p; ++p) {
-        if (*p < '0' || *p > '9') return;
+        if (*p < '0' || *p > '9') {
+            return;
+        }
         unsigned digit = (unsigned)(*p - '0');
-        if (value > (100u - digit) / 10u) return;
+        if (value > (100u - digit) / 10u) {
+            return;
+        }
         value = value * 10 + digit;
     }
     syscall(KOS_SYS_SOUND_VOLUME, value, 0, 0, 0);
@@ -128,8 +163,7 @@ static void load_volume(void) {
  * no status panel. The mask hides the password while still using the shared
  * input editor for UTF-8-safe editing keys. */
 static void draw_login(
-    int selected, const char* message, int bad,
-    int password_mode, u32 password_length, u32 cursor) {
+    int selected, const char* message, int bad, int password_mode, u32 password_length, u32 cursor) {
     tui_clear(TUI_DESKTOP);
     tui_bar(0, "KintsugiOS - Login");
     tui_box(16, 3, 48, 18, "Account", TUI_BORDER);
@@ -164,7 +198,9 @@ static int wait_for_account(void) {
     if (read_text("/etc/LASTUSER", last, sizeof(last)) > 0) {
         trim(last);
         for (int i = 0; i < account_count; ++i) {
-            if (equal(accounts[i].name, last)) selected = i;
+            if (equal(accounts[i].name, last)) {
+                selected = i;
+            }
         }
     }
     for (;;) {
@@ -182,7 +218,9 @@ static int wait_for_account(void) {
 
 static int authenticate(int selected) {
     account_t* account = &accounts[selected];
-    if (!password_required(account->name)) return 1;
+    if (!password_required(account->name)) {
+        return 1;
+    }
     char password[64];
     for (int attempt = 0; attempt < 3; ++attempt) {
         tui_input input = { password, sizeof(password), 0 };
@@ -190,11 +228,17 @@ static int authenticate(int selected) {
         for (;;) {
             draw_login(selected, "Password:", 0, 1, length(password), input.cursor);
             int key = syscall(8, 1, 0, 0, 0);
-            if (key == 27 || key == 3) return 0;
-            if (key == '\n' || key == '\r') break;
+            if (key == 27 || key == 3) {
+                return 0;
+            }
+            if (key == '\n' || key == '\r') {
+                break;
+            }
             tui_input_key(&input, key);
         }
-        if (!syscall(KOS_SYS_AUTH, (u32)account->name, (u32)password, 0, 0)) return 1;
+        if (!syscall(KOS_SYS_AUTH, (u32)account->name, (u32)password, 0, 0)) {
+            return 1;
+        }
         draw_login(selected, "Login incorrect. Try again.", 1, 0, 0, 0);
         syscall(KOS_SYS_SLEEP, 30, 0, 0, 0);
     }
@@ -206,7 +250,7 @@ static int authenticate(int selected) {
 static void log_in(int selected) {
     account_t* account = &accounts[selected];
     /* Root asks the kernel for a one-shot credential drop for the child. */
-    if (syscall(KOS_SYS_ELEVATE, (u32)account->name, (u32)"", 0, 0)) {
+    if (syscall(KOS_SYS_ELEVATE, (u32)account->name, (u32) "", 0, 0)) {
         syscall(KOS_SYS_CANCEL_ELEVATE, 0, 0, 0, 0);
         return;
     }
@@ -221,17 +265,19 @@ static void log_in(int selected) {
     if (account->uid == 0) {
         /* root's home is /root; keep the POSIX alias visible to programs. */
         setenv("HOME", "/root");
-        syscall(11, (u32)"/root", 3, 0, 0);
+        syscall(11, (u32) "/root", 3, 0, 0);
     }
-    syscall(10, (u32)"/etc/LASTUSER", (u32)account->name, length(account->name), 0);
+    syscall(10, (u32) "/etc/LASTUSER", (u32)account->name, length(account->name), 0);
     /* Hand a clean terminal to the shell: the login screen must not remain
      * behind the prompt after authentication. */
     tui_clear(0x07);
     tui_present(0, 0);
     char* args[] = { "shell", 0 };
     int pid = spawn("/bin/SHELL.ELF", 1, args);
-    if (pid >= 0) wait(pid);
-    syscall(11, (u32)"/", 3, 0, 0);
+    if (pid >= 0) {
+        wait(pid);
+    }
+    syscall(11, (u32) "/", 3, 0, 0);
     setenv("USER", "root");
     setenv("HOME", "/root");
 }
@@ -246,7 +292,9 @@ static void ensure_ksersys(void) {
         int count = syscall(16, (u32)list, 16, 0, 0);
         for (int i = 0; i < count; ++i) {
             if (list[i].pid == (unsigned)ksersys_pid && list[i].state != 4
-                && equal_ci(list[i].name, "ksersys")) return;
+                && equal_ci(list[i].name, "ksersys")) {
+                return;
+            }
         }
     }
     char* args[] = { "ksersys", "--supervise", 0 };
@@ -257,19 +305,30 @@ int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
     unsigned char settings[5] = { 1, 5, 1, 0, 1 }; /* theme 5 = Mono, font size 100% */
-    int loaded = syscall(2, (u32)"/etc/VIDEO.CFG", 0, (u32)settings, sizeof(settings));
-    if (loaded >= 1 && settings[0] < KOS_VIDEO_MODES) syscall(KOS_SYS_DISPLAY, settings[0], 0, 0, 0);
-    if (loaded >= 2 && settings[1] < KOS_FRAMEBUFFER_THEMES) syscall(KOS_SYS_FRAMEBUFFER_THEME, settings[1], 0, 0, 0);
-    if (loaded >= 3 && settings[2] < KOS_FRAMEBUFFER_SCALES) syscall(KOS_SYS_FRAMEBUFFER_SCALE, settings[2], 0, 0, 0);
-    if (loaded >= 4 && settings[3] < KOS_FRAMEBUFFER_FONTS) syscall(KOS_SYS_FRAMEBUFFER_FONT, settings[3], 0, 0, 0);
-    if (loaded >= 5 && settings[4] < KOS_FRAMEBUFFER_FONT_SIZES)
+    int loaded = syscall(2, (u32) "/etc/VIDEO.CFG", 0, (u32)settings, sizeof(settings));
+    if (loaded >= 1 && settings[0] < KOS_VIDEO_MODES) {
+        syscall(KOS_SYS_DISPLAY, settings[0], 0, 0, 0);
+    }
+    if (loaded >= 2 && settings[1] < KOS_FRAMEBUFFER_THEMES) {
+        syscall(KOS_SYS_FRAMEBUFFER_THEME, settings[1], 0, 0, 0);
+    }
+    if (loaded >= 3 && settings[2] < KOS_FRAMEBUFFER_SCALES) {
+        syscall(KOS_SYS_FRAMEBUFFER_SCALE, settings[2], 0, 0, 0);
+    }
+    if (loaded >= 4 && settings[3] < KOS_FRAMEBUFFER_FONTS) {
+        syscall(KOS_SYS_FRAMEBUFFER_FONT, settings[3], 0, 0, 0);
+    }
+    if (loaded >= 5 && settings[4] < KOS_FRAMEBUFFER_FONT_SIZES) {
         syscall(KOS_SYS_FRAMEBUFFER_FONT_SIZE, settings[4], 0, 0, 0);
+    }
     load_volume();
     load_accounts();
     for (;;) {
         ensure_ksersys();
         int selected = wait_for_account();
-        if (!authenticate(selected)) continue;
+        if (!authenticate(selected)) {
+            continue;
+        }
         log_in(selected);
         syscall(32, 0, 0, 0, 0);
     }

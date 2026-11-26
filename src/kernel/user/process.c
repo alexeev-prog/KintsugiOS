@@ -1,23 +1,23 @@
 #include "process.h"
 
-#include "../../user/envabi.h"
+#include "../../shared/signal.h"
 #include "../../user/authabi.h"
+#include "../../user/envabi.h"
 #include "../../user/ioabi.h"
 #include "../../user/shellabi.h"
 #include "../../user/sysabi.h"
 #include "../../user/tuiabi.h"
-#include "../../shared/signal.h"
 #include "../cpu/idt.h"
 #include "../drivers/ata_pio.h"
-#include "../drivers/keyboard.h"
-#include "../drivers/framebuffer.h"
 #include "../drivers/audio.h"
+#include "../drivers/framebuffer.h"
+#include "../drivers/keyboard.h"
 #include "../drivers/mouse.h"
 #include "../drivers/terminal.h"
+#include "../fs/ext2.h"
 #include "../fs/fat12.h"
 #include "../fs/kfs2.h"
 #include "../fs/kfs3.h"
-#include "../fs/ext2.h"
 #include "../fs/vfs.h"
 #include "../kernel/log.h"
 #include "../kernel/power.h"
@@ -25,13 +25,21 @@
 #include "../mm/memory.h"
 #include "../shell/shell.h"
 #include "auth.h"
-#include "vfs_meta.h"
 #include "fd.h"
+#include "gfxwm.h"
+#include "vfs_meta.h"
 
 #define STACK_BOTTOM (USER_TOP - 9 * PAGE_SIZE)
 #define STACK_START (STACK_BOTTOM + PAGE_SIZE)
 static u8 kernel_stack[16384] __attribute__((aligned(16)));
 static u32 gdt[12] __attribute__((aligned(8)));
+/* Optional TUI capture target: syscall 7 from this process fills the buffer
+ * instead of taking over the shared terminal (used by the pixel GUI). */
+static u32 tui_capture_pid;
+static ktui_cell tui_capture_cells[25][80];
+static int tui_capture_dirty;
+static u32 key_inject_pid;
+static int key_injected;
 static u32 tss[26];
 #define PROCESS_MAX 16
 
@@ -88,76 +96,122 @@ char* process_cwd(void) {
     return current ? current->cwd : NULL;
 }
 
-u32 process_pid(void) { return current ? current->pid : 0; }
-u32 process_euid(void) { return current ? current->euid : 0; }
-u32 process_egid(void) { return current ? current->egid : 0; }
-u32 process_ticks(void) { return boot_ticks; }
+u32 process_pid(void) {
+    return current ? current->pid : 0;
+}
+
+u32 process_euid(void) {
+    return current ? current->euid : 0;
+}
+
+u32 process_egid(void) {
+    return current ? current->egid : 0;
+}
+
+u32 process_ticks(void) {
+    return boot_ticks;
+}
 
 int process_set_credentials(u32 uid, u32 gid) {
-    if (!current) return KOS_EPERM;
+    if (!current) {
+        return KOS_EPERM;
+    }
     current->uid = current->euid = uid;
     current->gid = current->egid = gid;
     return 0;
 }
 
 void process_set_pending_uid(u32 uid) {
-    if (!current) return;
+    if (!current) {
+        return;
+    }
     current->pending_uid = uid;
     current->pending_elevation = 1;
 }
 
 int process_take_pending_uid(u32* uid) {
-    if (!current || !current->pending_elevation) return 0;
-    if (uid) *uid = current->pending_uid;
+    if (!current || !current->pending_elevation) {
+        return 0;
+    }
+    if (uid) {
+        *uid = current->pending_uid;
+    }
     current->pending_elevation = 0;
     return 1;
 }
 
 u32 process_pid_exists(u32 pid) {
-    if (!pid) return 0;
+    if (!pid) {
+        return 0;
+    }
     for (int i = 0; i < PROCESS_MAX; ++i) {
-        if (processes[i].state && processes[i].pid == pid) return pid;
+        if (processes[i].state && processes[i].pid == pid) {
+            return pid;
+        }
     }
     return 0;
 }
 
 u32 process_pid_at(u32 index) {
     for (int i = 0; i < PROCESS_MAX; ++i) {
-        if (!processes[i].state) continue;
-        if (!index--) return processes[i].pid;
+        if (!processes[i].state) {
+            continue;
+        }
+        if (!index--) {
+            return processes[i].pid;
+        }
     }
     return 0;
 }
 
 static process_t* process_by_pid(u32 pid) {
     for (int i = 0; i < PROCESS_MAX; ++i) {
-        if (processes[i].state && processes[i].pid == pid) return &processes[i];
+        if (processes[i].state && processes[i].pid == pid) {
+            return &processes[i];
+        }
     }
     return NULL;
 }
 
 int process_proc_name(u32 pid, char* out, u32 capacity) {
     process_t* p = process_by_pid(pid);
-    if (!p || !capacity) return 0;
+    if (!p || !capacity) {
+        return 0;
+    }
     u32 n = 0;
-    while (p->name[n] && n + 1 < capacity) { out[n] = p->name[n]; ++n; }
+    while (p->name[n] && n + 1 < capacity) {
+        out[n] = p->name[n];
+        ++n;
+    }
     out[n] = 0;
     return (int)n;
 }
 
 int process_proc_status(u32 pid, char* out, u32 capacity) {
     process_t* p = process_by_pid(pid);
-    if (!p) return 0;
+    if (!p) {
+        return 0;
+    }
     static const char* const states[] = { "unused", "ready", "running", "waiting", "zombie" };
     const char* state = p->state <= ZOMBIE ? states[p->state] : "unknown";
-    return snprintf(out, capacity,
-                    "Name:\t%s\nState:\t%s\nPid:\t%u\nPPid:\t%u\nUid:\t%u\nGid:\t%u\nTicks:\t%u\n",
-                    p->name, state, p->pid, p->parent, p->euid, p->egid, p->ticks);
+    return snprintf(
+        out,
+        capacity,
+        "Name:\t%s\nState:\t%s\nPid:\t%u\nPPid:\t%u\nUid:\t%u\nGid:\t%u\nTicks:\t%u\n",
+        p->name,
+        state,
+        p->pid,
+        p->parent,
+        p->euid,
+        p->egid,
+        p->ticks);
 }
 
 int process_proc_cmdline(u32 pid, char* out, u32 capacity) {
     process_t* p = process_by_pid(pid);
-    if (!p || !capacity) return 0;
+    if (!p || !capacity) {
+        return 0;
+    }
     return snprintf(out, capacity, "%s\n", p->name);
 }
 
@@ -267,8 +321,11 @@ static void schedule(void) {
             if (p == old) {
                 /* Priority-aware: keep the quantum for high-priority tasks,
                  * but always yield after `priority` turns. */
-                if (p->quantum > 1 && p->priority > 1) --p->quantum;
-                else p->quantum = p->priority ? p->priority : 1;
+                if (p->quantum > 1 && p->priority > 1) {
+                    --p->quantum;
+                } else {
+                    p->quantum = p->priority ? p->priority : 1;
+                }
                 p->state = RUNNING;
                 return;
             }
@@ -299,24 +356,37 @@ static void schedule(void) {
  * is deliberately conservative — killing init or the current process would be
  * worse than the allocation failure. */
 static void oom_check(void) {
-    if (boot_ticks % 100 || !current) return;
+    if (boot_ticks % 100 || !current) {
+        return;
+    }
     memory_stats_t memory = memory_stats();
-    if (memory.free_pages > 256) return;
+    if (memory.free_pages > 256) {
+        return;
+    }
     int victim = -1;
     u32 largest = 0;
     for (int i = 0; i < PROCESS_MAX; ++i) {
         process_t* p = &processes[i];
-        if (!p->state || p->pid == init_pid || p == current || p->state == ZOMBIE) continue;
-        if (p->heap_end > largest) { largest = p->heap_end; victim = i; }
+        if (!p->state || p->pid == init_pid || p == current || p->state == ZOMBIE) {
+            continue;
+        }
+        if (p->heap_end > largest) {
+            largest = p->heap_end;
+            victim = i;
+        }
     }
-    if (victim < 0) return;
+    if (victim < 0) {
+        return;
+    }
     process_t* p = &processes[victim];
     p->status = SIG_EXIT_KILLED;
     p->interrupted = 1;
-    if (p->state == WAITING) p->state = READY;
+    if (p->state == WAITING) {
+        p->state = READY;
+    }
     char message[96];
-    snprintf(message, sizeof(message), "[OOM] killed pid %u (%s), %u bytes heap\n",
-             p->pid, p->name, p->heap_end);
+    snprintf(
+        message, sizeof(message), "[OOM] killed pid %u (%s), %u bytes heap\n", p->pid, p->name, p->heap_end);
     log_write(message);
 }
 
@@ -563,6 +633,14 @@ cleanup:
 }
 
 static void reap(process_t* p) {
+    if (tui_capture_pid && tui_capture_pid == p->pid) {
+        tui_capture_pid = 0;
+        tui_capture_dirty = 1;
+    }
+    if (key_inject_pid && key_inject_pid == p->pid) {
+        key_inject_pid = 0;
+        key_injected = 0;
+    }
     kfree(p->environment);
     fd_destroy(&p->descriptors);
     vmm_space_destroy(p->address_space);
@@ -822,7 +900,9 @@ static int user_path(u32 address, char path[VFS_PATH_MAX]) {
 
 static int permit_path(const char* path, int write) {
     char absolute[VFS_PATH_MAX];
-    if (vfs_normalize(path, absolute)) return 0;
+    if (vfs_normalize(path, absolute)) {
+        return 0;
+    }
     return kfs3_permit(absolute, write);
 }
 
@@ -919,8 +999,7 @@ void syscall_dispatch(syscall_regs_t* r) {
                 argv[i] = args[i];
                 argc[i] = request.argc[i];
                 valid = argc[i] > 0 && argc[i] <= 32 && user_path((u32)request.paths[i], paths[i])
-                    && user_range((u32)request.argv[i], argc[i] * 4, 0)
-                    && permit_path(paths[i], 0);
+                    && user_range((u32)request.argv[i], argc[i] * 4, 0) && permit_path(paths[i], 0);
                 for (int j = 0; valid && j < argc[i]; ++j) {
                     args[i][j] = strings[i * 33 + j + 1];
                     valid = user_path((u32)request.argv[i][j], args[i][j]);
@@ -980,8 +1059,8 @@ void syscall_dispatch(syscall_regs_t* r) {
             if (valid && !elevated_call) {
                 /* Power operations are intentionally available to every
                  * logged-in user (the machine is a single-user workstation). */
-                static const char* const privileged[] = { "memtest", "memdump", "malloc", "free",
-                                                          "panic", "fault", "fstest", "load",
+                static const char* const privileged[] = { "memtest",   "memdump", "malloc", "free",
+                                                          "panic",     "fault",   "fstest", "load",
                                                           "fat12info", "memmap" };
                 if (current->euid != 0) {
                     for (u32 i = 0; i < sizeof(privileged) / sizeof(privileged[0]); ++i) {
@@ -996,7 +1075,10 @@ void syscall_dispatch(syscall_regs_t* r) {
                 const shell_command_t* found = 0;
                 for (u32 i = 0; shell_command_at(i); ++i) {
                     const shell_command_t* command = shell_command_at(i);
-                    if (!strcmp(command->name, argv[0])) { found = command; break; }
+                    if (!strcmp(command->name, argv[0])) {
+                        found = command;
+                        break;
+                    }
                 }
                 u32 saved_uid = current->euid, saved_gid = current->egid;
                 int use_root = elevated_call && found && saved_uid != 0;
@@ -1030,7 +1112,8 @@ void syscall_dispatch(syscall_regs_t* r) {
             if (!user_path(r->ebx, path)) {
                 break;
             }
-            if (!permit_path(path, (r->ecx & (KOS_O_WRITE | KOS_O_APPEND | KOS_O_CREATE | KOS_O_TRUNC)) != 0)) {
+            if (!permit_path(
+                    path, (r->ecx & (KOS_O_WRITE | KOS_O_APPEND | KOS_O_CREATE | KOS_O_TRUNC)) != 0)) {
                 r->eax = KOS_EPERM;
                 return;
             }
@@ -1061,16 +1144,17 @@ void syscall_dispatch(syscall_regs_t* r) {
             /* kill(pid, sig): sig 0 is an existence check. Supported signals
              * are cooperative: the target exits at its next syscall/tick. */
             int signal = r->ecx ? (int)r->ecx : SIGTERM;
-            if (signal != 0 && signal != SIGHUP && signal != SIGINT && signal != SIGQUIT
-                && signal != SIGTERM && signal != SIGKILL && signal != SIGUSR1
-                && signal != SIGUSR2) {
+            if (signal != 0 && signal != SIGHUP && signal != SIGINT && signal != SIGQUIT && signal != SIGTERM
+                && signal != SIGKILL && signal != SIGUSR1 && signal != SIGUSR2) {
                 r->eax = VFS_EINVAL;
                 return;
             }
             r->eax = KOS_ESRCH;
             for (int i = 0; i < PROCESS_MAX; ++i) {
                 process_t* p = &processes[i];
-                if (p->pid != r->ebx || !p->state || p->state == ZOMBIE) continue;
+                if (p->pid != r->ebx || !p->state || p->state == ZOMBIE) {
+                    continue;
+                }
                 if (p->pid == init_pid || (current->euid != 0 && p->euid != current->euid)) {
                     r->eax = KOS_EPERM;
                 } else if (signal == 0) {
@@ -1080,7 +1164,9 @@ void syscall_dispatch(syscall_regs_t* r) {
                 } else {
                     p->status = signal == SIGKILL ? SIG_EXIT_KILLED : SIG_EXIT_INTERRUPTED;
                     p->interrupted = 1;
-                    if (p->state == WAITING) p->state = READY;
+                    if (p->state == WAITING) {
+                        p->state = READY;
+                    }
                     r->eax = 0;
                 }
                 break;
@@ -1115,25 +1201,39 @@ void syscall_dispatch(syscall_regs_t* r) {
             return;
         }
         case KOS_SYS_DISPLAY:
-            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            if (!process_foreground()) {
+                r->eax = KOS_EPERM;
+                return;
+            }
             r->eax = framebuffer_mode(r->ebx);
             terminal_get_state()->dirty = 1;
             return;
         case KOS_SYS_LAYOUT:
-            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            if (!process_foreground()) {
+                r->eax = KOS_EPERM;
+                return;
+            }
             keyboard_set_layout(r->ebx);
             r->eax = 0;
             return;
         case KOS_SYS_FRAMEBUFFER_THEME:
-            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
-            if (r->ebx >= KOS_FRAMEBUFFER_THEMES) { r->eax = VFS_EINVAL; return; }
+            if (!process_foreground()) {
+                r->eax = KOS_EPERM;
+                return;
+            }
+            if (r->ebx >= KOS_FRAMEBUFFER_THEMES) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
             framebuffer_theme(r->ebx);
             terminal_get_state()->dirty = 1;
             r->eax = 0;
             return;
         case KOS_SYS_FRAMEBUFFER_INFO:
             /* mode, theme, scale, font, font size, then cell geometry. */
-            if (!user_range(r->ebx, 9 * sizeof(u32), 1)) break;
+            if (!user_range(r->ebx, 9 * sizeof(u32), 1)) {
+                break;
+            }
             ((u32*)r->ebx)[0] = framebuffer_mode_index();
             ((u32*)r->ebx)[1] = framebuffer_theme_index();
             ((u32*)r->ebx)[2] = framebuffer_scale_index();
@@ -1143,40 +1243,261 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case KOS_SYS_FRAMEBUFFER_SCALE:
-            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_SCALES) { r->eax = KOS_EPERM; return; }
-            framebuffer_scale(r->ebx); terminal_get_state()->dirty = 1; r->eax = 0; return;
+            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_SCALES) {
+                r->eax = KOS_EPERM;
+                return;
+            }
+            framebuffer_scale(r->ebx);
+            terminal_get_state()->dirty = 1;
+            r->eax = 0;
+            return;
         case KOS_SYS_FRAMEBUFFER_FONT:
-            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_FONTS) { r->eax = KOS_EPERM; return; }
-            framebuffer_font(r->ebx); terminal_get_state()->dirty = 1; r->eax = 0; return;
+            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_FONTS) {
+                r->eax = KOS_EPERM;
+                return;
+            }
+            framebuffer_font(r->ebx);
+            terminal_get_state()->dirty = 1;
+            r->eax = 0;
+            return;
         case KOS_SYS_FRAMEBUFFER_FONT_SIZE:
-            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_FONT_SIZES) { r->eax = KOS_EPERM; return; }
-            framebuffer_font_size(r->ebx); terminal_get_state()->dirty = 1; r->eax = 0; return;
+            if (!process_foreground() || r->ebx >= KOS_FRAMEBUFFER_FONT_SIZES) {
+                r->eax = KOS_EPERM;
+                return;
+            }
+            framebuffer_font_size(r->ebx);
+            terminal_get_state()->dirty = 1;
+            r->eax = 0;
+            return;
+        case KOS_SYS_GFX_INFO: {
+            const framebuffer_info_t* fb = framebuffer_get_info();
+            if (!user_range(r->ebx, sizeof(kos_gfx_info), 1)) {
+                break;
+            }
+            kos_gfx_info info = { fb->width, fb->height, fb->pitch, fb->bpp };
+            memcpy((void*)r->ebx, &info, sizeof(info));
+            r->eax = fb->available ? 0 : VFS_EIO;
+            return;
+        }
+        case KOS_SYS_GFX_BLIT: {
+            /* ebx points to a kos_gfx_blit request in userspace. The explicit
+             * source stride is what makes dirty-rect updates correct. */
+            kos_gfx_blit request;
+            if (!user_range(r->ebx, sizeof(request), 1)) {
+                break;
+            }
+            memcpy(&request, (void*)r->ebx, sizeof(request));
+            u32 stride = request.stride ? request.stride : request.width;
+            if (!request.width || !request.height || stride < request.width || stride > 4096
+                || (int)request.x < 0 || (int)request.y < 0) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
+            u32 bytes = stride * request.height * 4;
+            if (!bytes || bytes > 0x1000000u || !user_range(request.source, bytes, 0)) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
+            framebuffer_blit(
+                request.x, request.y, request.width, request.height, stride, (const u32*)request.source);
+            r->eax = 0;
+            return;
+        }
+        case KOS_SYS_GFX_MODE:
+            /* 1 = pixel GUI owns the framebuffer, 0 = terminal mode. */
+            terminal_set_gui_mode((int)r->ebx);
+            r->eax = 0;
+            return;
+        case KOS_SYS_GFX_FILL: {
+            if (!user_range(r->ebx, sizeof(kos_gfx_rect), 1)) {
+                break;
+            }
+            kos_gfx_rect rect;
+            memcpy(&rect, (void*)r->ebx, sizeof(rect));
+            if (rect.x < 0 || rect.y < 0) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
+            framebuffer_rect((u32)rect.x, (u32)rect.y, rect.width, rect.height, rect.color);
+            r->eax = 0;
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_CREATE: {
+            if (r->ebx < 1 || r->ebx > 1920 || r->ecx < 1 || r->ecx > 1200) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
+            r->eax = gfxwm_create(r->ebx, r->ecx);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_CLOSE:
+            /* Windows are owned by the creating process (pid), not by its uid. */
+            r->eax = gfxwm_close((int)r->ebx, current ? current->pid : 0, current ? current->euid : 0);
+            return;
+        case KOS_SYS_GFX_WINDOW_FILL: {
+            if (!user_range(r->ebx, 24, 1)) {
+                break;
+            }
+            u32 vals[6];
+            memcpy(vals, (void*)r->ebx, 24);
+            r->eax = gfxwm_fill((int)vals[0], (int)vals[1], (int)vals[2], vals[3], vals[4], vals[5]);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_BLIT: {
+            /* pointer, id, x, y, w, h packed in two user words is awkward;
+             * use ebx=pointer, ecx=id, edx=x, esi=(y<<16)|w, edi? no. Pack
+             * y/w/h in one word via user buffer instead. */
+            if (!user_range(r->ebx, 24, 1)) {
+                break;
+            }
+            u32 vals[6];
+            memcpy(vals, (void*)r->ebx, 24);
+            r->eax =
+                gfxwm_blit((int)vals[0], (const u32*)vals[1], (int)vals[2], (int)vals[3], vals[4], vals[5]);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_TITLE: {
+            /* ebx = window id, ecx = user title string (NUL terminated). */
+            if (!user_range(r->ecx, 1, 0)) {
+                break;
+            }
+            char title[48];
+            int n = 0;
+            while (n < 47 && user_range(r->ecx + n, 1, 0) && ((const char*)r->ecx)[n]) {
+                title[n] = ((const char*)r->ecx)[n];
+                ++n;
+            }
+            title[n] = 0;
+            r->eax = gfxwm_title((int)r->ebx, title);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_MOVE: {
+            if (!user_range(r->ebx, 12, 1)) {
+                break;
+            }
+            u32 vals[3];
+            memcpy(vals, (void*)r->ebx, 12);
+            r->eax = gfxwm_move((int)vals[0], (int)vals[1], (int)vals[2]);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_RESIZE: {
+            if (!user_range(r->ebx, 12, 1)) {
+                break;
+            }
+            u32 vals[3];
+            memcpy(vals, (void*)r->ebx, 12);
+            r->eax = gfxwm_resize((int)vals[0], vals[1], vals[2]);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_STATE:
+            r->eax = gfxwm_state((int)r->ebx, (int)r->ecx);
+            return;
+        case KOS_SYS_GFX_WINDOW_RAISE:
+            r->eax = gfxwm_raise((int)r->ebx);
+            return;
+
+        case KOS_SYS_GFX_WINDOW_LIST: {
+            if (!user_range(r->ebx, r->ecx * sizeof(kos_gui_window_info), 1)) {
+                break;
+            }
+            r->eax = gfxwm_list((kos_gui_window_info*)r->ebx, r->ecx);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_READ: {
+            if (!user_range(r->ebx, 24, 1)) {
+                break;
+            }
+            u32 vals[6];
+            memcpy(vals, (void*)r->ebx, 24);
+            u32 bytes = vals[4] * vals[5] * 4;
+            if (!bytes || !vals[1] || !user_range(vals[1], bytes, 1)) {
+                break;
+            }
+            r->eax = gfxwm_read((int)vals[0], (u32*)vals[1], (int)vals[2], (int)vals[3], vals[4], vals[5]);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_POST: {
+            if (!user_range(r->ebx, sizeof(kos_gui_event), 1)) {
+                break;
+            }
+            kos_gui_event event;
+            memcpy(&event, (void*)r->ebx, sizeof(event));
+            r->eax = gfxwm_post((int)r->ecx, &event);
+            return;
+        }
+        case KOS_SYS_GFX_WINDOW_EVENT: {
+            if (!user_range(r->ebx, sizeof(kos_gui_event), 1)) {
+                break;
+            }
+            r->eax = gfxwm_event((int)r->ecx, (kos_gui_event*)r->ebx);
+            return;
+        }
+        case KOS_SYS_TUI_ATTACH:
+            tui_capture_pid = r->ebx;
+            tui_capture_dirty = 1;
+            r->eax = 0;
+            return;
+        case KOS_SYS_KEY_INJECT:
+            key_inject_pid = r->ebx;
+            key_injected = (int)r->ecx;
+            r->eax = 0;
+            return;
+        case KOS_SYS_TUI_READ:
+            if (!user_range(r->ebx, sizeof(tui_capture_cells), 1)) {
+                break;
+            }
+            memcpy((void*)r->ebx, tui_capture_cells, sizeof(tui_capture_cells));
+            r->eax = tui_capture_dirty;
+            tui_capture_dirty = 0;
+            return;
         case KOS_SYS_SOUND_TONE:
             /* A beep cannot corrupt another session's screen; background
              * services (music daemons, alarms) must be able to use it. */
-            audio_tone_inst(r->ebx, r->ecx, r->edx); r->eax = 0; return;
+            audio_tone_inst(r->ebx, r->ecx, r->edx);
+            r->eax = 0;
+            return;
         case KOS_SYS_SOUND_VOLUME:
-            if (!process_foreground() || r->ebx > 100) { r->eax = VFS_EINVAL; return; }
-            audio_volume(r->ebx); r->eax = 0; return;
+            if (!process_foreground() || r->ebx > 100) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
+            audio_volume(r->ebx);
+            r->eax = 0;
+            return;
         case KOS_SYS_SOUND_INFO:
-            if (!user_range(r->ebx, 3 * sizeof(u32), 1)) break;
+            if (!user_range(r->ebx, 3 * sizeof(u32), 1)) {
+                break;
+            }
             ((u32*)r->ebx)[0] = audio_get_volume();
             ((u32*)r->ebx)[1] = audio_is_enabled();
             ((u32*)r->ebx)[2] = audio_is_opl2();
-            r->eax = 0; return;
+            r->eax = 0;
+            return;
         case KOS_SYS_GAME_PALETTE:
-            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            if (!process_foreground()) {
+                r->eax = KOS_EPERM;
+                return;
+            }
             framebuffer_game_palette(r->ebx ? 1 : 0);
             terminal_get_state()->dirty = 1;
-            r->eax = 0; return;
+            r->eax = 0;
+            return;
         case KOS_SYS_SETPRIORITY:
-            if (!current) { r->eax = KOS_EPERM; return; }
-            if (r->ebx == 0 || r->ebx > 4) { r->eax = VFS_EINVAL; return; }
+            if (!current) {
+                r->eax = KOS_EPERM;
+                return;
+            }
+            if (r->ebx == 0 || r->ebx > 4) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
             current->priority = r->ebx;
             current->quantum = r->ebx;
-            r->eax = 0; return;
+            r->eax = 0;
+            return;
         case KOS_SYS_SERVICE:
-            r->eax = kfs3_is_active() ? 1 : 0; return;
+            r->eax = kfs3_is_active() ? 1 : 0;
+            return;
         case KOS_SYS_GETUID:
             r->eax = current ? current->euid : 0;
             return;
@@ -1184,7 +1505,9 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = current ? current->egid : 0;
             return;
         case KOS_SYS_GETUSER: {
-            if (!r->ebx || r->ecx < 2 || !user_range(r->ebx, r->ecx, 1)) break;
+            if (!r->ebx || r->ecx < 2 || !user_range(r->ebx, r->ecx, 1)) {
+                break;
+            }
             const char* account = auth_name_for_uid(current ? current->euid : 0);
             u32 n = 0;
             while (account[n] && n + 1 < r->ecx) {
@@ -1197,8 +1520,12 @@ void syscall_dispatch(syscall_regs_t* r) {
         }
         case KOS_SYS_LOGIN: {
             char account[VFS_PATH_MAX], password[VFS_PATH_MAX];
-            if (!current || current->euid != 0 || !user_path(r->ebx, account)) break;
-            if (!user_path(r->ecx, password)) break;
+            if (!current || current->euid != 0 || !user_path(r->ebx, account)) {
+                break;
+            }
+            if (!user_path(r->ecx, password)) {
+                break;
+            }
             const auth_user_t* user = auth_find(account);
             if (!user || auth_verify(account, password)) {
                 r->eax = KOS_EPERM;
@@ -1211,9 +1538,14 @@ void syscall_dispatch(syscall_regs_t* r) {
         }
         case KOS_SYS_ELEVATE: {
             char account[VFS_PATH_MAX], password[VFS_PATH_MAX];
-            if (!current || !user_path(r->ebx, account) || !user_path(r->ecx, password)) break;
+            if (!current || !user_path(r->ebx, account) || !user_path(r->ecx, password)) {
+                break;
+            }
             const auth_user_t* target = auth_find(account);
-            if (!target) { r->eax = VFS_ENOENT; return; }
+            if (!target) {
+                r->eax = VFS_ENOENT;
+                return;
+            }
             if (current->euid == 0) {
                 /* Root may drop to any account for the next child (login). */
                 process_set_pending_uid(target->uid);
@@ -1229,37 +1561,60 @@ void syscall_dispatch(syscall_regs_t* r) {
             return;
         }
         case KOS_SYS_CANCEL_ELEVATE:
-            if (current) current->pending_elevation = 0;
+            if (current) {
+                current->pending_elevation = 0;
+            }
             r->eax = 0;
             return;
         case KOS_SYS_AUTH: {
             char account[VFS_PATH_MAX], password[VFS_PATH_MAX];
-            if (!user_path(r->ebx, account) || !user_path(r->ecx, password)) break;
+            if (!user_path(r->ebx, account) || !user_path(r->ecx, password)) {
+                break;
+            }
             r->eax = auth_verify(account, password);
             return;
         }
         case KOS_SYS_NEEDAUTH: {
             char account[VFS_PATH_MAX];
-            if (!user_path(r->ebx, account)) break;
+            if (!user_path(r->ebx, account)) {
+                break;
+            }
             r->eax = auth_needs_password(account);
             return;
         }
         case KOS_SYS_CHMOD:
         case KOS_SYS_CHOWN: {
             char path[VFS_PATH_MAX];
-            if (!user_path(r->ebx, path)) break;
+            if (!user_path(r->ebx, path)) {
+                break;
+            }
             char absolute[VFS_PATH_MAX];
-            if (vfs_normalize(path, absolute)) { r->eax = VFS_EINVAL; return; }
+            if (vfs_normalize(path, absolute)) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
             u32 uid;
             u16 mode;
             int have = vfs_meta_get(absolute, &uid, &mode);
-            if (!have) { uid = kfs3_owner(absolute); mode = 0644; }
+            if (!have) {
+                uid = kfs3_owner(absolute);
+                mode = 0644;
+            }
             if (r->eax == KOS_SYS_CHOWN) {
-                if (!current || current->euid != 0) { r->eax = KOS_EPERM; return; }
+                if (!current || current->euid != 0) {
+                    r->eax = KOS_EPERM;
+                    return;
+                }
                 uid = r->ecx;
             } else {
-                if (!current || (current->euid != 0 && current->euid != uid)) { r->eax = KOS_EPERM; return; }
-                if (r->ecx > 0777) { r->eax = VFS_EINVAL; return; }
+                if (!current || (current->euid != 0 && current->euid != uid)) {
+                    r->eax = KOS_EPERM;
+                    return;
+                }
+                if (r->ecx > 0777) {
+                    r->eax = VFS_EINVAL;
+                    return;
+                }
                 mode = (u16)r->ecx;
             }
             r->eax = vfs_meta_set(absolute, uid, mode);
@@ -1267,9 +1622,13 @@ void syscall_dispatch(syscall_regs_t* r) {
         }
         case KOS_SYS_USERADD: {
             char account[VFS_PATH_MAX], password[VFS_PATH_MAX];
-            if (!current || current->euid != 0 || !user_path(r->ebx, account)) break;
+            if (!current || current->euid != 0 || !user_path(r->ebx, account)) {
+                break;
+            }
             if (r->ecx) {
-                if (!user_path(r->ecx, password)) break;
+                if (!user_path(r->ecx, password)) {
+                    break;
+                }
             } else {
                 password[0] = 0;
             }
@@ -1279,15 +1638,24 @@ void syscall_dispatch(syscall_regs_t* r) {
         }
         case KOS_SYS_USERPASSWD: {
             char account[VFS_PATH_MAX], previous[VFS_PATH_MAX], password[VFS_PATH_MAX];
-            if (!current || !user_path(r->ebx, account)) break;
+            if (!current || !user_path(r->ebx, account)) {
+                break;
+            }
             if (r->ecx) {
-                if (!user_path(r->ecx, previous)) break;
+                if (!user_path(r->ecx, previous)) {
+                    break;
+                }
             } else {
                 previous[0] = 0;
             }
-            if (!user_path(r->edx, password)) break;
+            if (!user_path(r->edx, password)) {
+                break;
+            }
             const auth_user_t* user = auth_find(account);
-            if (!user) { r->eax = VFS_ENOENT; return; }
+            if (!user) {
+                r->eax = VFS_ENOENT;
+                return;
+            }
             if (current->euid != 0) {
                 if (current->euid != user->uid || auth_verify(account, previous)) {
                     r->eax = KOS_EPERM;
@@ -1298,12 +1666,17 @@ void syscall_dispatch(syscall_regs_t* r) {
             return;
         }
         case KOS_SYS_REBOOT:
-            if (!current || current->euid != 0) { r->eax = KOS_EPERM; return; }
+            if (!current || current->euid != 0) {
+                r->eax = KOS_EPERM;
+                return;
+            }
             log_write("[INFO] reboot requested by root\n");
             system_sync();
             process_shutdown();
             reboot();
-            for (;;) __asm__ volatile("cli; hlt");
+            for (;;) {
+                __asm__ volatile("cli; hlt");
+            }
         case KOS_SYS_SLEEP: {
             extern u32 tick;
             u32 ms = r->ebx > 10000 ? 10000 : r->ebx;
@@ -1311,13 +1684,19 @@ void syscall_dispatch(syscall_regs_t* r) {
             while (tick < deadline) {
                 current->state = WAITING;
                 schedule();
-                if (current->interrupted) process_exit(130);
+                if (current->interrupted) {
+                    process_exit(130);
+                }
             }
-            r->eax = 0; return;
+            r->eax = 0;
+            return;
         }
         case KOS_SYS_MOUSE:
-            if (!user_range(r->ebx, sizeof(kos_mouse), 1)) break;
-            if (!process_foreground()) { r->eax = KOS_EPERM; return; }
+            if (!user_range(r->ebx, sizeof(kos_mouse), 1)) {
+                break;
+            }
+            /* Any GUI process may read the pointer; requiring foreground here
+             * broke kgui, which is spawned directly by the shell builtin. */
             /* The mouse syscall consumes wheel notches so TUI apps see each
              * notch once; the shell consumes them directly in raw-key mode. */
             kos_mouse snapshot = *mouse_state();
@@ -1326,13 +1705,22 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case KOS_SYS_DESKTOP: {
-            if (!user_range(r->ebx, sizeof(kos_desktop_info), 1)) break;
+            if (!user_range(r->ebx, sizeof(kos_desktop_info), 1)) {
+                break;
+            }
             const framebuffer_info_t* fb = framebuffer_get_info();
             memory_stats_t m = memory_stats();
             extern u32 tick;
-            kos_desktop_info out = {fb->width, fb->height, fb->available, framebuffer_mode_index(),
-                tick / 50, m.free_pages * 4, m.usable_kib, 0, keyboard_russian()};
-            for (int i = 0; i < PROCESS_MAX; ++i) if (processes[i].state) ++out.processes;
+            kos_desktop_info out = { fb->width,         fb->height,
+                                     fb->available,     framebuffer_mode_index(),
+                                     tick / 50,         m.free_pages * 4,
+                                     m.usable_kib,      0,
+                                     keyboard_russian() };
+            for (int i = 0; i < PROCESS_MAX; ++i) {
+                if (processes[i].state) {
+                    ++out.processes;
+                }
+            }
             memcpy((void*)r->ebx, &out, sizeof(out));
             r->eax = 0;
             return;
@@ -1544,6 +1932,12 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case 7: /* Full screen presentation, restored automatically on exit. */
+            if (tui_capture_pid && current && current->pid == tui_capture_pid) {
+                memcpy(tui_capture_cells, (void*)r->ebx, sizeof(tui_capture_cells));
+                tui_capture_dirty = 1;
+                r->eax = 0;
+                return;
+            }
             if (!process_foreground()) {
                 r->eax = VFS_EBUSY;
                 return;
@@ -1568,10 +1962,16 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case 8: { /* Raw key: 0 poll, 1 wait, 2 wait at most one timer tick. */
-            if (!process_foreground()) {
-                r->eax = VFS_EBUSY;
+            if (key_inject_pid && current && current->pid == key_inject_pid && key_injected) {
+                int forwarded = key_injected;
+                key_injected = 0;
+                key_inject_pid = 0;
+                r->eax = forwarded;
                 return;
             }
+            /* The GUI process may be spawned directly by the shell builtin and
+             * is not in the shell's foreground group. Key input is a shared
+             * console resource in this single-user design. */
             int key;
             do {
                 __asm__ volatile("cli" ::: "memory");
@@ -1585,8 +1985,11 @@ void syscall_dispatch(syscall_regs_t* r) {
                         } else {
                             terminal_scroll_down(3);
                             u32 bottom = terminal_get_state()->cursor_y >= SCREEN_HEIGHT
-                                ? terminal_get_state()->cursor_y - SCREEN_HEIGHT + 1 : 0;
-                            if (terminal_get_scroll_offset() > bottom) terminal_scroll_to(bottom);
+                                ? terminal_get_state()->cursor_y - SCREEN_HEIGHT + 1
+                                : 0;
+                            if (terminal_get_scroll_offset() > bottom) {
+                                terminal_scroll_to(bottom);
+                            }
                         }
                         terminal_refresh();
                     }
@@ -1700,8 +2103,7 @@ void syscall_dispatch(syscall_regs_t* r) {
         }
         case KOS_SYS_READDIR_LONG: {
             char directory[VFS_PATH_MAX];
-            if (!user_path(r->ebx, directory)
-                || !user_range(r->ecx, sizeof(u32), 1)
+            if (!user_path(r->ebx, directory) || !user_range(r->ecx, sizeof(u32), 1)
                 || !user_range(r->edx, sizeof(kos_long_dirent), 1)) {
                 break;
             }

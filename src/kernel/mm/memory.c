@@ -1,6 +1,6 @@
 #include "memory.h"
-#include "../drivers/framebuffer.h"
 
+#include "../drivers/framebuffer.h"
 #include "../kernel/log.h"
 #include "../kklibc/kklibc.h"
 
@@ -190,7 +190,9 @@ void memory_init(void) {
         /* Supervisor-only MMIO, uncached; inherited by every process.
          * 12 MiB covers the largest mode (1920x1200x4 = 9.2 MiB). */
         for (u32 d = 0; d < 3; ++d) {
-            for (u32 i = 0; i < 1024; ++i) video_table[d][i] = (fb->address + (d * 1024 + i) * PAGE_SIZE) | 0x1b;
+            for (u32 i = 0; i < 1024; ++i) {
+                video_table[d][i] = (fb->address + (d * 1024 + i) * PAGE_SIZE) | 0x1b;
+            }
             directory[(0xe0000000u >> 22) + d] = (u32)video_table[d] | 3;
         }
     }

@@ -1,7 +1,7 @@
 #ifndef FS_KFS3_H
 #define FS_KFS3_H
-#include "../kklibc/ctypes.h"
 #include "../../user/fsabi.h"
+#include "../kklibc/ctypes.h"
 
 /* KFS3 - POSIX compatibility and security layer over the mounted KFS2/FAT12
  * backend. It owns the user namespace, path translation, permission policy

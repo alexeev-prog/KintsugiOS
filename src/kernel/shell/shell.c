@@ -113,8 +113,11 @@ static int execute_simple(char* line) {
     external |= !builtin;
     if (external && vfs_stat(executable, &executable_stat)) {
         /* KFS2 stores system programs as long names; vfs_normalize preserves case. */
-        for (char* p = executable + 5; *p; ++p)
-            if (*p >= 'a' && *p <= 'z') *p -= 32;
+        for (char* p = executable + 5; *p; ++p) {
+            if (*p >= 'a' && *p <= 'z') {
+                *p -= 32;
+            }
+        }
     }
     if (external && !vfs_stat(executable, &executable_stat)) {
         int result = process_run(executable, argc, argv);

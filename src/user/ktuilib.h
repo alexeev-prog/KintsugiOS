@@ -1,14 +1,20 @@
 #ifndef KTUILIB_H
 #define KTUILIB_H
+#include "../shared/text.h"
+#include "desktopabi.h"
 #include "fsabi.h"
 #include "runtime.h"
 #include "tuiabi.h"
-#include "../shared/text.h"
-#include "desktopabi.h"
 
 #define TUI_COLUMNS 80
 #define TUI_ROWS 25
-typedef struct { int key, mouse_x, mouse_y; unsigned buttons, pressed, released; int wheel; } tui_event;
+
+typedef struct {
+    int key, mouse_x, mouse_y;
+    unsigned buttons, pressed, released;
+    int wheel;
+} tui_event;
+
 int tui_event_read(tui_event* event, int wait);
 int tui_hit(int x, int y, int width, int height, const tui_event* event);
 void tui_status(int y);

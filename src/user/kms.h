@@ -4,8 +4,8 @@
 /* Kintsugi Music: a tiny plain-text note format.
  * Lines are "frequency duration_ms instrument"; 0 frequency is a rest.
  * "name <title>" and "tempo <ms>" headers are optional. */
-#include "runtime.h"
 #include "desktopabi.h"
+#include "runtime.h"
 
 #define KMS_MAX_NOTES 128
 

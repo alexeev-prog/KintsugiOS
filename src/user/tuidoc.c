@@ -124,16 +124,25 @@ int tui_editor_key(tui_editor* e, int key) {
                 end = doc_end(e->text, e->length, start);
             }
             e->cursor = start;
-            for (u32 c = 0; c < col && e->cursor < end; ++c)
+            for (u32 c = 0; c < col && e->cursor < end; ++c) {
                 e->cursor = text_next(e->text, e->cursor);
+            }
         }
         return 0;
     }
     int remove = (key == 8 && e->cursor) || (key == TUI_DELETE && e->cursor < e->length);
-    char encoded[4] = {0};
+    char encoded[4] = { 0 };
     u32 add = text_key(key, encoded);
-    if (key == '\n') { encoded[0] = '\n'; add = 1; }
-    if (key == '\t') { for (u32 i = 0; i < 4; ++i) encoded[i] = ' '; add = 4; }
+    if (key == '\n') {
+        encoded[0] = '\n';
+        add = 1;
+    }
+    if (key == '\t') {
+        for (u32 i = 0; i < 4; ++i) {
+            encoded[i] = ' ';
+        }
+        add = 4;
+    }
     if (!remove && !add) {
         return 0;
     }
@@ -213,10 +222,14 @@ void tui_editor_draw(tui_editor* e, int x, int y, int width, int height) {
     for (u32 i = 0; i < e->length; i = text_next(e->text, i)) {
         char ch = e->text[i];
         if (ch != '\n' && r >= e->top && r < e->top + height) {
-            char out[5] = {0};
+            char out[5] = { 0 };
             u32 count = text_next(e->text, i) - i;
-            if (count > 4) count = 1;
-            for (u32 j = 0; j < count; ++j) out[j] = e->text[i + j];
+            if (count > 4) {
+                count = 1;
+            }
+            for (u32 j = 0; j < count; ++j) {
+                out[j] = e->text[i + j];
+            }
             tui_text(x + c, y + r - e->top, out, 0x07);
         }
         if (ch == '\n' || ++c == (u32)width) {
@@ -227,8 +240,12 @@ void tui_editor_draw(tui_editor* e, int x, int y, int width, int height) {
     char caret[5] = { ' ', 0, 0, 0, 0 };
     if (e->cursor < e->length && (unsigned char)e->text[e->cursor] >= 32) {
         u32 count = text_next(e->text, e->cursor) - e->cursor;
-        if (count > 4) count = 1;
-        for (u32 j = 0; j < count; ++j) caret[j] = e->text[e->cursor + j];
+        if (count > 4) {
+            count = 1;
+        }
+        for (u32 j = 0; j < count; ++j) {
+            caret[j] = e->text[e->cursor + j];
+        }
     }
     tui_text(x + cc, y + cr - e->top, caret, TUI_FOCUS);
     tui_scrollbar(x + width, y, height, e->top, height, row + 1);

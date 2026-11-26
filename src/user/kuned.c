@@ -145,7 +145,9 @@ int main(int argc, char** argv) {
         u32 row = 0, col = 0;
         u32 logical_line = 1, logical_col = 1;
         text[length] = 0;
-        while (cursor && cursor < length && ((unsigned char)text[cursor] & 0xc0) == 0x80) --cursor;
+        while (cursor && cursor < length && ((unsigned char)text[cursor] & 0xc0) == 0x80) {
+            --cursor;
+        }
         for (u32 i = 0; i < cursor; i = text_next(text, i)) {
             if (text[i] == '\n') {
                 ++logical_line;
@@ -239,7 +241,10 @@ int main(int argc, char** argv) {
         int key = tui_key(1);
         char encoded[4];
         u32 add = text_key(key, encoded);
-        if (key == '\n') { encoded[0] = '\n'; add = 1; }
+        if (key == '\n') {
+            encoded[0] = '\n';
+            add = 1;
+        }
         if (VIK && !insert && key == 18) {
             if (!readonly) {
                 history_swap(text, &length, &cursor, 1);
@@ -257,7 +262,9 @@ int main(int argc, char** argv) {
             }
             continue;
         }
-        if (VIK && !insert && key >= TEXT_UNICODE_KEY) continue;
+        if (VIK && !insert && key >= TEXT_UNICODE_KEY) {
+            continue;
+        }
         if (VIK && !insert) {
             if (vik_key(&vim, text, &length, &cursor, key, readonly, &insert, &dirty)) {
                 continue;
@@ -280,9 +287,11 @@ int main(int argc, char** argv) {
                 }
                 if (command[0] == 's' && command[1] == 'e' && command[2] == 't' && command[3] == ' ') {
                     if (command[4] == 'n' && command[5] == 'u') {
-                        settings[0] = 1; status = "Line numbers on";
+                        settings[0] = 1;
+                        status = "Line numbers on";
                     } else if (command[4] == 'n' && command[5] == 'o' && command[6] == 'n') {
-                        settings[0] = 0; status = "Line numbers off";
+                        settings[0] = 0;
+                        status = "Line numbers off";
                     } else {
                         status = ":set nu | nonu";
                     }
@@ -642,7 +651,9 @@ int main(int argc, char** argv) {
             for (u32 i = length; i > cursor; --i) {
                 text[i + add - 1] = text[i - 1];
             }
-            for (u32 i = 0; i < add; ++i) text[cursor++] = encoded[i];
+            for (u32 i = 0; i < add; ++i) {
+                text[cursor++] = encoded[i];
+            }
             length += add;
             dirty = 1;
         }

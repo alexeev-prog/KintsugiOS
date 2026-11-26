@@ -6,7 +6,9 @@
 
 static int permit(const char* path, int write) {
     char absolute[VFS_PATH_MAX];
-    if (vfs_normalize(path, absolute)) return 0;
+    if (vfs_normalize(path, absolute)) {
+        return 0;
+    }
     return kfs3_permit(absolute, write);
 }
 

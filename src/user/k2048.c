@@ -20,18 +20,28 @@ static unsigned rnd(unsigned n) {
 
 static void add_tile(void) {
     int empty[N * N], count = 0;
-    for (int y = 0; y < N; ++y)
-        for (int x = 0; x < N; ++x)
-            if (!board[y][x]) empty[count++] = y * N + x;
-    if (!count) return;
+    for (int y = 0; y < N; ++y) {
+        for (int x = 0; x < N; ++x) {
+            if (!board[y][x]) {
+                empty[count++] = y * N + x;
+            }
+        }
+    }
+    if (!count) {
+        return;
+    }
     int at = empty[rnd((unsigned)count)];
     board[at / N][at % N] = rnd(10) ? 2 : 4;
 }
 
 static int has_value(unsigned value) {
-    for (int y = 0; y < N; ++y)
-        for (int x = 0; x < N; ++x)
-            if (board[y][x] == value) return 1;
+    for (int y = 0; y < N; ++y) {
+        for (int x = 0; x < N; ++x) {
+            if (board[y][x] == value) {
+                return 1;
+            }
+        }
+    }
     return 0;
 }
 
@@ -39,8 +49,11 @@ static int has_value(unsigned value) {
 static int slide(unsigned* line) {
     unsigned packed[N];
     int count = 0;
-    for (int i = 0; i < N; ++i)
-        if (line[i]) packed[count++] = line[i];
+    for (int i = 0; i < N; ++i) {
+        if (line[i]) {
+            packed[count++] = line[i];
+        }
+    }
     unsigned merged[N];
     int out = 0;
     for (int i = 0; i < count; ++i) {
@@ -56,7 +69,9 @@ static int slide(unsigned* line) {
     int changed = 0;
     for (int i = 0; i < N; ++i) {
         unsigned value = i < out ? merged[i] : 0;
-        if (line[i] != value) changed = 1;
+        if (line[i] != value) {
+            changed = 1;
+        }
         line[i] = value;
     }
     return changed;
@@ -79,23 +94,35 @@ static int move(int dx, int dy) {
             board[y][x] = line[j];
         }
     }
-    if (changed) add_tile();
+    if (changed) {
+        add_tile();
+    }
     return changed;
 }
 
 static int can_move(void) {
-    for (int y = 0; y < N; ++y)
+    for (int y = 0; y < N; ++y) {
         for (int x = 0; x < N; ++x) {
-            if (!board[y][x]) return 1;
-            if (x + 1 < N && board[y][x] == board[y][x + 1]) return 1;
-            if (y + 1 < N && board[y][x] == board[y + 1][x]) return 1;
+            if (!board[y][x]) {
+                return 1;
+            }
+            if (x + 1 < N && board[y][x] == board[y][x + 1]) {
+                return 1;
+            }
+            if (y + 1 < N && board[y][x] == board[y + 1][x]) {
+                return 1;
+            }
         }
+    }
     return 0;
 }
 
 static void reset(void) {
-    for (int y = 0; y < N; ++y)
-        for (int x = 0; x < N; ++x) board[y][x] = 0;
+    for (int y = 0; y < N; ++y) {
+        for (int x = 0; x < N; ++x) {
+            board[y][x] = 0;
+        }
+    }
     score = 0;
     won = over = 0;
     add_tile();
@@ -103,13 +130,27 @@ static void reset(void) {
 }
 
 static unsigned color_for(unsigned value) {
-    if (!value) return 0x08;
-    if (value <= 4) return 0x1f;
-    if (value <= 16) return 0x2f;
-    if (value <= 64) return 0x6f;
-    if (value <= 256) return 0x4f;
-    if (value <= 1024) return 0x5f;
-    if (value <= 2048) return 0x4e;
+    if (!value) {
+        return 0x08;
+    }
+    if (value <= 4) {
+        return 0x1f;
+    }
+    if (value <= 16) {
+        return 0x2f;
+    }
+    if (value <= 64) {
+        return 0x6f;
+    }
+    if (value <= 256) {
+        return 0x4f;
+    }
+    if (value <= 1024) {
+        return 0x5f;
+    }
+    if (value <= 2048) {
+        return 0x4e;
+    }
     return 0x7e;
 }
 
@@ -126,7 +167,9 @@ static void number_text(char* out, unsigned value) {
         value /= 10;
     }
     int i = 0;
-    while (n) out[i++] = reversed[--n];
+    while (n) {
+        out[i++] = reversed[--n];
+    }
     out[i] = 0;
 }
 
@@ -134,7 +177,7 @@ static void draw(const char* status) {
     tui_clear(TUI_DESKTOP);
     tui_bar(0, "K2048 - WASD / arrows slide   N new game   Q quit");
     tui_box(21, 2, 38, 19, "2048 - Kintsugi edition", TUI_BORDER);
-    for (int y = 0; y < N; ++y)
+    for (int y = 0; y < N; ++y) {
         for (int x = 0; x < N; ++x) {
             int px = 24 + x * 7, py = 5 + y * 3;
             unsigned value = board[y][x];
@@ -147,6 +190,7 @@ static void draw(const char* status) {
                 tui_textn(px + pad, py + 1, text, 7 - (u32)pad, value > 999 ? 0x0f : 0x17);
             }
         }
+    }
     tui_text(24, 18, "SCORE", TUI_KEYWORD);
     tui_number(31, 18, score, TUI_NUMBER);
     if (won && !over) {
@@ -167,19 +211,30 @@ int main(int argc, char** argv) {
         draw(status);
         int key = tui_key(1);
         seed ^= (unsigned)key * 2654435761u;
-        if (key == 'q' || key == 27 || key == TUI_F10) return 0;
+        if (key == 'q' || key == 27 || key == TUI_F10) {
+            return 0;
+        }
         if (key == 'n' || key == 'N') {
             reset();
             status = "New game";
             continue;
         }
-        if (over) continue;
+        if (over) {
+            continue;
+        }
         int dx = 0, dy = 0;
-        if (key == TUI_LEFT || key == 'a' || key == 'A') dx = -1;
-        else if (key == TUI_RIGHT || key == 'd' || key == 'D') dx = 1;
-        else if (key == TUI_UP || key == 'w' || key == 'W') dy = -1;
-        else if (key == TUI_DOWN || key == 's' || key == 'S') dy = 1;
-        if (!dx && !dy) continue;
+        if (key == TUI_LEFT || key == 'a' || key == 'A') {
+            dx = -1;
+        } else if (key == TUI_RIGHT || key == 'd' || key == 'D') {
+            dx = 1;
+        } else if (key == TUI_UP || key == 'w' || key == 'W') {
+            dy = -1;
+        } else if (key == TUI_DOWN || key == 's' || key == 'S') {
+            dy = 1;
+        }
+        if (!dx && !dy) {
+            continue;
+        }
         int moved = move(dx, dy);
         status = moved ? "Moved" : "Nothing moves that way";
         if (!won && has_value(2048)) {

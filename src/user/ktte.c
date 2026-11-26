@@ -195,14 +195,22 @@ int main(int argc, char** argv) {
         static unsigned char previous[256];
         static int have_previous;
         if (key == 'u' && have_previous) {
-            for (int i = 0; i < 256; ++i) { unsigned char c = colors[i]; colors[i] = previous[i]; previous[i] = c; }
-            dirty = 1; status = "Theme edit undone/redone";
+            for (int i = 0; i < 256; ++i) {
+                unsigned char c = colors[i];
+                colors[i] = previous[i];
+                previous[i] = c;
+            }
+            dirty = 1;
+            status = "Theme edit undone/redone";
         } else if (key == 'C') {
             for (int i = 0; i < 256; ++i) {
                 previous[i] = colors[i];
-                if ((colors[i] & 15) == (colors[i] >> 4)) colors[i] = (colors[i] & 0xf0) | ((colors[i] >> 4) < 8 ? 15 : 0);
+                if ((colors[i] & 15) == (colors[i] >> 4)) {
+                    colors[i] = (colors[i] & 0xf0) | ((colors[i] >> 4) < 8 ? 15 : 0);
+                }
             }
-            have_previous = dirty = 1; status = "Invisible foreground/background pairs repaired";
+            have_previous = dirty = 1;
+            status = "Invisible foreground/background pairs repaired";
         } else if (key == 'm') {
             simple = !simple;
             selected = top = 0;
@@ -303,7 +311,9 @@ int main(int argc, char** argv) {
                 value = (((colors[attribute] >> shift) & 15) + (key == TUI_RIGHT ? 1 : 15)) & 15;
             }
             if (value >= 0) {
-                for (int i = 0; i < 256; ++i) previous[i] = colors[i];
+                for (int i = 0; i < 256; ++i) {
+                    previous[i] = colors[i];
+                }
                 have_previous = 1;
                 colors[attribute] = (colors[attribute] & ~(15 << shift)) | (value << shift);
                 if (simple && selected == 1 && shift == 4) {

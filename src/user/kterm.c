@@ -13,6 +13,8 @@ int main(int argc, char** argv) {
     tui_present(79, 24);
     char* args[] = { "SHELL", 0 };
     int pid = spawn("/bin/SHELL.ELF", 1, args);
-    if (pid > 0) wait(pid);
+    if (pid > 0) {
+        wait(pid);
+    }
     return pid < 0;
 }

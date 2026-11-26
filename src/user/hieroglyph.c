@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
                                    "READ: arrows, PgUp/PgDn, Space, Home/End",
                                    "WRITE: arrows, Home/End, Tab, ^Z undo, ^R redo",
                                    "F3 previews the current buffer without saving",
-                                    "UTF-8 text, 64 KiB; LF output; no HTML or images" };
+                                   "UTF-8 text, 64 KiB; LF output; no HTML or images" };
             tui_menu("Hieroglyph - Markdown help", help, 10, 0);
         } else if (key == TUI_F3) {
             writing = !writing;
@@ -145,13 +145,17 @@ int main(int argc, char** argv) {
                         editor.length = 0;
                         while (editor.length < st.size) {
                             int n = read(fd, editor.text + editor.length, st.size - editor.length);
-                            if (n <= 0) break;
+                            if (n <= 0) {
+                                break;
+                            }
                             editor.length += n;
                         }
                         close(fd);
                         editor.text[editor.length] = 0;
                         tui_copy(path, load, 256);
-                        writing = 0; dirty = 0; top = 0;
+                        writing = 0;
+                        dirty = 0;
+                        top = 0;
                         status = "Document opened";
                     }
                 } else {

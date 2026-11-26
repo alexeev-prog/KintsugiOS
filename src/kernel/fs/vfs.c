@@ -1,9 +1,9 @@
 #include "vfs.h"
-#include "kfs3.h"
 
 #include "../../user/errors.h"
 #include "../kklibc/kklibc.h"
 #include "../user/process.h"
+#include "kfs3.h"
 static const vfs_ops_t* backend;
 static u32 generation;
 static char cwd[VFS_PATH_MAX] = "/";
@@ -17,9 +17,13 @@ static u32 event_used;
 static void event_log(const char* operation, const char* path) {
     char line[VFS_PATH_MAX + 24];
     int n = snprintf(line, sizeof(line), "%s %s\n", operation, path);
-    if (n <= 0) return;
+    if (n <= 0) {
+        return;
+    }
     u32 length = (u32)n;
-    if (length >= sizeof(line)) length = sizeof(line) - 1;
+    if (length >= sizeof(line)) {
+        length = sizeof(line) - 1;
+    }
     if (event_used + length > sizeof(event_data)) {
         event_used = 0; /* bounded ring: drop old history rather than overflow */
     }
@@ -29,7 +33,9 @@ static void event_log(const char* operation, const char* path) {
 
 int vfs_events_read(char* buffer, u32 capacity) {
     u32 n = event_used < capacity ? event_used : capacity;
-    if (n) memcpy(buffer, event_data, n);
+    if (n) {
+        memcpy(buffer, event_data, n);
+    }
     return (int)n;
 }
 
@@ -72,7 +78,9 @@ int vfs_open(const char* path, vfs_file_t* file) {
         return result;
     }
     vfs_open_object_t* object = kmalloc(sizeof(*object));
-    if (!object) return VFS_ENOMEM;
+    if (!object) {
+        return VFS_ENOMEM;
+    }
     object->references = 1;
     object->mount_generation = generation;
     object->backend = backend;
@@ -119,14 +127,15 @@ int vfs_file_write(vfs_file_t* file, const void* buffer, u32 size) {
         result = object->backend->write ? object->backend->write(object->path, file->offset, buffer, size)
                                         : vfs_write(object->path, file->offset, buffer, size);
     }
-    if (result >= 0) file->offset += result;
+    if (result >= 0) {
+        file->offset += result;
+    }
     return result;
 }
 
 int vfs_seek(vfs_file_t* file, u32 offset) {
     if (!file || !file->open || !file->object
-        || ((vfs_open_object_t*)file->object)->mount_generation != generation
-        || offset > 0x7fffffffu) {
+        || ((vfs_open_object_t*)file->object)->mount_generation != generation || offset > 0x7fffffffu) {
         return VFS_EINVAL;
     }
     file->offset = offset;
@@ -136,7 +145,9 @@ int vfs_seek(vfs_file_t* file, u32 offset) {
 void vfs_close(vfs_file_t* file) {
     if (file && file->open) {
         vfs_open_object_t* object = file->object;
-        if (object && --object->references == 0) kfree(object);
+        if (object && --object->references == 0) {
+            kfree(object);
+        }
         file->object = NULL;
         file->open = 0;
     }
@@ -151,7 +162,9 @@ void vfs_file_clone(vfs_file_t* destination, const vfs_file_t* source) {
 
 int vfs_file_stat(vfs_file_t* file, vfs_stat_t* stat) {
     if (!file || !file->open || !file->object || !stat
-        || ((vfs_open_object_t*)file->object)->mount_generation != generation) return VFS_EINVAL;
+        || ((vfs_open_object_t*)file->object)->mount_generation != generation) {
+        return VFS_EINVAL;
+    }
     vfs_open_object_t* object = file->object;
     kos_stat pseudo;
     if (object->pseudo) {
@@ -164,13 +177,17 @@ int vfs_file_stat(vfs_file_t* file, vfs_stat_t* stat) {
 
 int vfs_file_truncate(vfs_file_t* file, u32 size) {
     if (!file || !file->open || !file->object
-        || ((vfs_open_object_t*)file->object)->mount_generation != generation) return VFS_EINVAL;
+        || ((vfs_open_object_t*)file->object)->mount_generation != generation) {
+        return VFS_EINVAL;
+    }
     vfs_open_object_t* object = file->object;
     return vfs_truncate(object->path, size);
 }
 
 const char* vfs_file_path(const vfs_file_t* file) {
-    if (!file || !file->open || !file->object) return NULL;
+    if (!file || !file->open || !file->object) {
+        return NULL;
+    }
     return ((vfs_open_object_t*)file->object)->path;
 }
 
@@ -180,7 +197,9 @@ int vfs_normalize(const char* path, char out[VFS_PATH_MAX]) {
     }
     /* POSIX path translation (KFS3) happens before legacy normalization. */
     char posix[VFS_PATH_MAX];
-    if (kfs3_is_active() && !kfs3_translate(path, posix)) path = posix;
+    if (kfs3_is_active() && !kfs3_translate(path, posix)) {
+        path = posix;
+    }
     u32 length = 1;
     out[0] = '/';
     out[1] = 0;
@@ -289,7 +308,9 @@ int vfs_replace(const char* path, const void* data, u32 size) {
         return pseudo;
     }
     result = backend->replace(absolute, data, size);
-    if (!result) event_log("WRITE", absolute);
+    if (!result) {
+        event_log("WRITE", absolute);
+    }
     return result;
 }
 
@@ -353,18 +374,26 @@ int vfs_truncate(const char* p, u32 n) {
 int vfs_create(const char* path) {
     RESOLVE(path);
     kos_stat pseudo;
-    if (kfs3_pseudo_stat(absolute, &pseudo)) return VFS_EEXIST;
+    if (kfs3_pseudo_stat(absolute, &pseudo)) {
+        return VFS_EEXIST;
+    }
     result = backend->create(absolute, 0);
-    if (!result) event_log("CREATE", absolute);
+    if (!result) {
+        event_log("CREATE", absolute);
+    }
     return result;
 }
 
 int vfs_mkdir(const char* path) {
     RESOLVE(path);
     kos_stat pseudo;
-    if (kfs3_pseudo_stat(absolute, &pseudo)) return VFS_EEXIST;
+    if (kfs3_pseudo_stat(absolute, &pseudo)) {
+        return VFS_EEXIST;
+    }
     result = backend->create(absolute, 1);
-    if (!result) event_log("MKDIR", absolute);
+    if (!result) {
+        event_log("MKDIR", absolute);
+    }
     return result;
 }
 
@@ -376,21 +405,29 @@ static int ancestor(const char* parent, const char* child) {
 int vfs_unlink(const char* path) {
     RESOLVE(path);
     kos_stat pseudo;
-    if (kfs3_pseudo_stat(absolute, &pseudo)) return VFS_EROFS;
+    if (kfs3_pseudo_stat(absolute, &pseudo)) {
+        return VFS_EROFS;
+    }
     result = backend->remove(absolute, 0);
-    if (!result) event_log("UNLINK", absolute);
+    if (!result) {
+        event_log("UNLINK", absolute);
+    }
     return result;
 }
 
 int vfs_rmdir(const char* path) {
     RESOLVE(path);
     kos_stat pseudo;
-    if (kfs3_pseudo_stat(absolute, &pseudo)) return VFS_EROFS;
+    if (kfs3_pseudo_stat(absolute, &pseudo)) {
+        return VFS_EROFS;
+    }
     if (ancestor(absolute, cwd)) {
         return VFS_EBUSY;
     }
     result = backend->remove(absolute, 1);
-    if (!result) event_log("RMDIR", absolute);
+    if (!result) {
+        event_log("RMDIR", absolute);
+    }
     return result;
 }
 
@@ -402,12 +439,16 @@ int vfs_rename(const char* source, const char* destination) {
         return result;
     }
     kos_stat pseudo;
-    if (kfs3_pseudo_stat(absolute, &pseudo) || kfs3_pseudo_stat(target, &pseudo)) return VFS_EROFS;
+    if (kfs3_pseudo_stat(absolute, &pseudo) || kfs3_pseudo_stat(target, &pseudo)) {
+        return VFS_EROFS;
+    }
     if (ancestor(absolute, cwd)) {
         return VFS_EBUSY;
     }
     result = backend->rename(absolute, target);
-    if (!result) event_log("RENAME", absolute);
+    if (!result) {
+        event_log("RENAME", absolute);
+    }
     return result;
 }
 
@@ -418,21 +459,29 @@ int vfs_readdir(const char* path, u32* cursor, vfs_dirent_t* entry) {
     RESOLVE(path);
     kos_stat pseudo;
     if (kfs3_pseudo_stat(absolute, &pseudo)) {
-        if (!pseudo.directory) return VFS_ENOTDIR;
+        if (!pseudo.directory) {
+            return VFS_ENOTDIR;
+        }
         return kfs3_pseudo_readdir(absolute, cursor, entry);
     }
     return backend->readdir(absolute, cursor, entry);
 }
 
 int vfs_readdir_long(const char* path, u32* cursor, vfs_long_dirent_t* entry) {
-    if (!cursor || !entry) return VFS_EINVAL;
+    if (!cursor || !entry) {
+        return VFS_EINVAL;
+    }
     RESOLVE(path);
     kos_stat pseudo;
     if (kfs3_pseudo_stat(absolute, &pseudo)) {
-        if (!pseudo.directory) return VFS_ENOTDIR;
+        if (!pseudo.directory) {
+            return VFS_ENOTDIR;
+        }
         return kfs3_pseudo_readdir_long(absolute, cursor, entry);
     }
-    if (backend->readdir_long) return backend->readdir_long(absolute, cursor, entry);
+    if (backend->readdir_long) {
+        return backend->readdir_long(absolute, cursor, entry);
+    }
     vfs_dirent_t legacy;
     result = backend->readdir(absolute, cursor, &legacy);
     if (result > 0) {

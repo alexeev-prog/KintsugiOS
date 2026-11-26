@@ -76,7 +76,14 @@ while test 1 = 2; do echo never; done
 Встроенные `test` / `[`, `true`, `false` и `$?` работают с условиями; `&&`, `||`
 и `;` уже доступны. Добавлены coreutils-подобные утилиты: `basename`, `dirname`,
 `printf`, `date`, `uname`, `sleep`, `touch`, `head`, `seq`, `printenv`, `du`,
-а также `df`, `chmod`, `chown`, `kill`, `posixinfo`. `kintsugifetch` (`kfetch`)
+а также `df`, `chmod`, `chown`, `kill`, `posixinfo`. `kgui` запускает отдельный **пиксельный GUI-режим**: рабочий стол, панель задач
+с Start, перекрывающиеся окна со своим surface, z-order/фокус, drag/resize,
+minimize/maximize/close, двойная буферизация и dirty-rect presentation. Ядро
+предоставляет graphic ABI (`gfx_info`, `gfx_blit`, `gfx_fill`, `gfx_mode`); TUI
+и старые syscalls остаются совместимыми. Управление с клавиатуры: Tab — фокус,
+WASD —.move, R — resize, N — minimize, M — maximize, Q — выход.
+
+`kintsugifetch` (`kfetch`)
 выводит neofetch-карточку с ANSI-цветами и ASCII-артом в обычный терминал —
 он не занимает весь экран и его можно перенаправлять.
 
@@ -584,3 +591,30 @@ KintsugiOS распространяется под лицензией MIT. По�
 <div align="center">
 <sub>Название "Kintsugi" отсылает к японскому искусству восстановления керамики золотым лаком — метафора красоты в несовершенстве и постоянного развития.</sub>
 </div>
+
+
+## Pixel GUI
+
+`gui` (или `kgui`) запускает графический режим в стиле Windows 95: десктоп,
+панель задач, Start-меню с Programs/Search/Run/Settings/Help/Shut Down,
+перекрывающиеся окна, z-order/фокус, drag/resize, minimize/maximize/close,
+двойная буферизация и dirty-rect. Встроенные приложения: **KGFM** (файловый
+менеджер), **KGED** (графический редактор), **KGTERM** (графический терминал
+с запуском внешних ELF). Управление: Tab, WASD, R, N, M, Q, S.
+
+
+## GUI Administration
+
+`gui` содержит окно **kadms** (Kintsugi Administration Service): плавающее окно
+с полем root-пароля и командой. После успешной проверки пароля команда
+запускается с одноразовыми правами root.
+
+
+## GUI testing with QMP mouse
+
+`input-send-event` mouse injection requires a QEMU input console; use
+`make run_gui VNC=:0` (or add `-vnc :0` to QEMU_FLAGS). Then `tools/qmp_mouse.py`
+sends `rel`/`btn` events through QMP. `mousestat` can verify coordinates.
+Russian text input works after choosing Russian in GUI Settings (CP866 font).
+KGFM supports right-click context menu, create file/folder, copy/cut/paste,
+delete and rename.

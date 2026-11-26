@@ -15,12 +15,20 @@ static unsigned char raw_backgrounds[MODALS][25][80];
 static unsigned mouse_buttons;
 static const char* toast_message;
 static unsigned toast_until;
-void tui_toast(const char* message, unsigned ticks) { toast_message = message; toast_until = ticks ? ticks : 1; }
+
+void tui_toast(const char* message, unsigned ticks) {
+    toast_message = message;
+    toast_until = ticks ? ticks : 1;
+}
+
 void tui_sound(int kind) {
     static const unsigned freq[4] = { 660, 880, 220, 330 };
     static const unsigned dur[4] = { 40, 60, 120, 60 };
-    if (kind >= 0 && kind < 4) syscall(KOS_SYS_SOUND_TONE, freq[kind], dur[kind], 0, 0);
+    if (kind >= 0 && kind < 4) {
+        syscall(KOS_SYS_SOUND_TONE, freq[kind], dur[kind], 0, 0);
+    }
 }
+
 int tui_shortcut(int key, const char* label) {
     (void)label;
     return key;
@@ -29,18 +37,24 @@ int tui_shortcut(int key, const char* label) {
 int tui_hit(int x, int y, int width, int height, const tui_event* e) {
     return e && e->mouse_x >= x && e->mouse_x < x + width && e->mouse_y >= y && e->mouse_y < y + height;
 }
+
 int tui_event_read(tui_event* e, int wait) {
-    if (!e) return 0;
+    if (!e) {
+        return 0;
+    }
     e->key = tui_key(wait ? 2 : 0);
     e->wheel = 0;
-    kos_mouse mouse = {0};
+    kos_mouse mouse = { 0 };
     syscall(KOS_SYS_MOUSE, (u32)&mouse, 0, 0, 0);
     /* Ask the kernel for the real cell geometry: it depends on resolution
      * AND the user-selected cell scale, so recomputing it here drifts. */
-    u32 fb[9] = {0};
+    u32 fb[9] = { 0 };
     int cw = 12, ch = 26, ox = 32, oy = 44;
     if (syscall(KOS_SYS_FRAMEBUFFER_INFO, (u32)fb, 0, 0, 0) == 0 && fb[5] && fb[6]) {
-        cw = (int)fb[5]; ch = (int)fb[6]; ox = (int)fb[7]; oy = (int)fb[8];
+        cw = (int)fb[5];
+        ch = (int)fb[6];
+        ox = (int)fb[7];
+        oy = (int)fb[8];
     }
     e->mouse_x = mouse.x < ox ? -1 : (mouse.x - ox) / cw;
     e->mouse_y = mouse.y < oy ? -1 : (mouse.y - oy) / ch;
@@ -50,41 +64,73 @@ int tui_event_read(tui_event* e, int wait) {
     mouse_buttons = mouse.buttons;
     e->wheel = mouse.wheel;
     /* Existing list/document widgets already understand TUI_SCROLL_*. */
-    if (mouse.wheel && !e->key) e->key = mouse.wheel > 0 ? TUI_SCROLL_UP : TUI_SCROLL_DOWN;
+    if (mouse.wheel && !e->key) {
+        e->key = mouse.wheel > 0 ? TUI_SCROLL_UP : TUI_SCROLL_DOWN;
+    }
     return e->key || e->pressed || e->released || e->buttons;
 }
+
 void tui_status(int y) {
-    kos_desktop_info info = {0};
+    kos_desktop_info info = { 0 };
     syscall(KOS_SYS_DESKTOP, (u32)&info, 0, 0, 0);
-    tui_bar(y, "KintsugiOS | RAM free");
-    tui_number(23, y, info.free_kib, TUI_HEADER);
-    tui_text(32, y, "KiB | Tasks", TUI_HEADER);
-    tui_number(44, y, info.processes, TUI_HEADER);
-    tui_text(49, y, "Up", TUI_HEADER);
-    tui_number(52, y, info.uptime, TUI_HEADER);
-    tui_text(64, y, info.russian ? "RU | ring3" : "EN | ring3", TUI_HEADER);
+    /* Fixed columns keep the value of a growing counter from colliding with
+     * the next label; the layout indicator owns the right edge. */
+    tui_bar(y, "KintsugiOS | RAM");
+    tui_number(17, y, info.free_kib, TUI_HEADER);
+    tui_text(23, y, "KiB | Tasks", TUI_HEADER);
+    tui_number(35, y, info.processes, TUI_HEADER);
+    tui_text(40, y, "Up", TUI_HEADER);
+    u32 seconds = info.uptime;
+    char clock[9];
+    clock[0] = '0' + (seconds / 3600 / 10) % 10;
+    clock[1] = '0' + (seconds / 3600) % 10;
+    clock[2] = ':';
+    clock[3] = '0' + (seconds / 60 / 10) % 10;
+    clock[4] = '0' + (seconds / 60) % 10;
+    clock[5] = ':';
+    clock[6] = '0' + (seconds / 10) % 10;
+    clock[7] = '0' + seconds % 10;
+    clock[8] = 0;
+    tui_text(43, y, clock, TUI_HEADER);
+    tui_text(70, y, info.russian ? "RU | ring3" : "EN | ring3", TUI_HEADER);
 }
+
 int tui_launch(const char* path, const char* argument) {
-    char* argv[] = {(char*)path, (char*)argument, 0};
+    char* argv[] = { (char*)path, (char*)argument, 0 };
     int pid = spawn(path, argument ? 2 : 1, argv);
-    if (pid < 0) return pid;
+    if (pid < 0) {
+        return pid;
+    }
     return wait(pid);
 }
+
 void tui_tabs(int y, const char* const* labels, unsigned count, unsigned selected) {
-    if (!count || count > 10) return;
+    if (!count || count > 10) {
+        return;
+    }
     int width = 80 / count;
-    for (unsigned i = 0; i < count; ++i) tui_button(i * width, y, width, labels[i], i == selected, 1);
+    for (unsigned i = 0; i < count; ++i) {
+        tui_button(i * width, y, width, labels[i], i == selected, 1);
+    }
 }
+
 void tui_progress(int x, int y, int width, unsigned value, unsigned total, const char* label) {
     tui_gauge(x, y, width, value, total);
-    if (label) tui_textn(x, y, label, width, TUI_STATUS);
+    if (label) {
+        tui_textn(x, y, label, width, TUI_STATUS);
+    }
 }
+
 int tui_theme_export(const char* path) {
     static const char hex[] = "0123456789ABCDEF";
     char text[1536];
     for (unsigned i = 0; i < 256; ++i) {
-        text[i*6] = hex[i>>4]; text[i*6+1] = hex[i&15]; text[i*6+2] = '=';
-        text[i*6+3] = hex[palette[i]>>4]; text[i*6+4] = hex[palette[i]&15]; text[i*6+5] = '\n';
+        text[i * 6] = hex[i >> 4];
+        text[i * 6 + 1] = hex[i & 15];
+        text[i * 6 + 2] = '=';
+        text[i * 6 + 3] = hex[palette[i] >> 4];
+        text[i * 6 + 4] = hex[palette[i] & 15];
+        text[i * 6 + 5] = '\n';
     }
     return syscall(10, (u32)path, (u32)text, sizeof(text), 0) == 0;
 }
@@ -435,11 +481,16 @@ int tui_menu(const char* title, const char* const* items, int count, int initial
         tui_scrollbar(70, y + 1, visible, top, visible, count);
         tui_present(79, 24);
         tui_event event;
-        do { tui_event_read(&event, 1); } while (!event.key && !event.pressed);
+        do {
+            tui_event_read(&event, 1);
+        } while (!event.key && !event.pressed);
         int key = event.key;
         if ((event.pressed & 1) && tui_hit(10, y + 1, 61, visible, &event)) {
             u32 at = top + event.mouse_y - y - 1;
-            if (at < (u32)count) { selected = at; key = '\n'; }
+            if (at < (u32)count) {
+                selected = at;
+                key = '\n';
+            }
         }
         if (key == 27 || key == 3) {
             tui_sound(3);
@@ -493,7 +544,7 @@ void tui_box(int x, int y, int width, int height, const char* title, unsigned ch
     }
     tui_fill(x, y, width, height, color);
     const char* h = "\xC4";
-    const char* tl = "\xDA", *tr = "\xBF", *bl = "\xC0", *br = "\xD9";
+    const char *tl = "\xDA", *tr = "\xBF", *bl = "\xC0", *br = "\xD9";
     const char* v = "\xB3";
     for (int i = 0; i < width; ++i) {
         tui_text(x + i, y, i == 0 ? tl : i == width - 1 ? tr : h, color);
@@ -626,7 +677,9 @@ void tui_present(int x, int y) {
         tui_box(2, 21, 76, 2, "Notification", TUI_BORDER);
         tui_textn(5, 21, toast_message, 70, TUI_POPUP);
         --toast_until;
-        if (!toast_until) toast_message = 0;
+        if (!toast_until) {
+            toast_message = 0;
+        }
     }
     for (int row = 0; row < 25; ++row) {
         for (int col = 0; col < 80; ++col) {
@@ -647,10 +700,16 @@ void tui_present(int x, int y) {
             }
         }
     }
-    if (!changed) return;
-    for (int row = 0; row < 25; ++row)
-        for (int col = 0; col < 80; ++col) last_presented[row][col] = themed[row][col];
-    last_presented_x = x; last_presented_y = y;
+    if (!changed) {
+        return;
+    }
+    for (int row = 0; row < 25; ++row) {
+        for (int col = 0; col < 80; ++col) {
+            last_presented[row][col] = themed[row][col];
+        }
+    }
+    last_presented_x = x;
+    last_presented_y = y;
     syscall(7, (u32)themed, x, y, 0);
 }
 
@@ -765,7 +824,9 @@ int tui_input_key(tui_input* input, int key) {
         for (u32 i = n + 1; i > *cursor; --i) {
             input->text[i + add - 1] = input->text[i - 1];
         }
-        for (u32 i = 0; i < add; ++i) input->text[(*cursor)++] = encoded[i];
+        for (u32 i = 0; i < add; ++i) {
+            input->text[(*cursor)++] = encoded[i];
+        }
         return 1;
     }
     return 0;
@@ -780,15 +841,22 @@ void tui_input_draw(tui_input* input, int x, int y, int width, int focused) {
         input->cursor = n;
     }
     u32 start = 0;
-    while (text_columns(input->text + start, input->cursor - start) >= (u32)width)
+    while (text_columns(input->text + start, input->cursor - start) >= (u32)width) {
         start = text_next(input->text, start);
+    }
     tui_fill(x, y, width, 1, TUI_INPUT);
     tui_textn(x, y, input->text + start, width, TUI_INPUT);
     if (focused) {
-        if (input->cursor < n)
-            tui_textn(x + text_columns(input->text + start, input->cursor - start), y,
-                input->text + input->cursor, 1, TUI_FOCUS);
-        else tui_text(x + text_columns(input->text + start, input->cursor - start), y, " ", TUI_FOCUS);
+        if (input->cursor < n) {
+            tui_textn(
+                x + text_columns(input->text + start, input->cursor - start),
+                y,
+                input->text + input->cursor,
+                1,
+                TUI_FOCUS);
+        } else {
+            tui_text(x + text_columns(input->text + start, input->cursor - start), y, " ", TUI_FOCUS);
+        }
     }
 }
 

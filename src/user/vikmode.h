@@ -25,7 +25,10 @@ static int vik_class(unsigned char c) {
     if (c <= ' ') {
         return 0;
     }
-    return (c >= 128 || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') ? 1 : 2;
+    return (c >= 128 || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+            || c == '_')
+        ? 1
+        : 2;
 }
 
 static u32 vik_motion(const char* t, u32 n, u32 p, int key, u32 count) {
@@ -53,13 +56,17 @@ static u32 vik_motion(const char* t, u32 n, u32 p, int key, u32 count) {
             if (end < n) {
                 p = end + 1;
                 end = vik_end(t, n, p);
-                for (u32 c = 0; c < col && p < end; ++c) p = text_next(t, p);
+                for (u32 c = 0; c < col && p < end; ++c) {
+                    p = text_next(t, p);
+                }
             }
         } else if (key == 'k' || key == TUI_UP) {
             if (start) {
                 end = start - 1;
                 p = vik_start(t, end);
-                for (u32 c = 0; c < col && p < end; ++c) p = text_next(t, p);
+                for (u32 c = 0; c < col && p < end; ++c) {
+                    p = text_next(t, p);
+                }
             }
         } else if (key == 'w') {
             int kind = p < n ? vik_class(t[p]) : 0;
@@ -207,8 +214,14 @@ static int vik_key(vik_state* v, char* t, u32* n, u32* p, int key, int readonly,
         return 1;
     } else if (key == 'x' || key == 'D' || key == 'C') {
         op = key == 'C' ? 'c' : 'd';
-        if (key == 'x') { end = *p; while (count-- && end < *n) end = text_next(t, end); }
-        else end = vik_end(t, *n, *p);
+        if (key == 'x') {
+            end = *p;
+            while (count-- && end < *n) {
+                end = text_next(t, end);
+            }
+        } else {
+            end = vik_end(t, *n, *p);
+        }
     } else if (key == 'G') {
         end = explicit_count ? 0 : vik_start(t, *n);
         if (explicit_count) {

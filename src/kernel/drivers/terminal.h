@@ -72,6 +72,9 @@ void terminal_clear_line(u32 line);
 
 /* Обновление экрана (рендеринг логического буфера на VGA) */
 void terminal_refresh(void);
+/* While a pixel GUI owns the framebuffer, terminal refreshes are suppressed
+ * so mouse IRQ dirty flags cannot paint text over GUI windows. */
+void terminal_set_gui_mode(int active);
 
 /* Обработка ввода (вызывается из keyboard.c) */
 void terminal_handle_input(char c);

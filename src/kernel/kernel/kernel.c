@@ -2,19 +2,20 @@
 
 #include "../cpu/isr.h"
 #include "../drivers/ata_pio.h"
-#include "../drivers/screen_output_switch.h"
-#include "../drivers/terminal.h"
 #include "../drivers/audio.h"
 #include "../drivers/framebuffer.h"
 #include "../drivers/mouse.h"
+#include "../drivers/screen_output_switch.h"
+#include "../drivers/terminal.h"
+#include "../fs/ext2.h"
 #include "../fs/fat12.h"
 #include "../fs/kfs2.h"
 #include "../fs/kfs3.h"
-#include "../user/auth.h"
 #include "../kklibc/kklibc.h"
 #include "../mm/memory.h"
-#include "../fs/ext2.h"
 #include "../shell/shell.h"
+#include "../user/auth.h"
+#include "../user/gfxwm.h"
 #include "../user/process.h"
 #include "../user/vfs_meta.h"
 #include "log.h"
@@ -46,7 +47,10 @@ void kmain(void) {
     process_init();
     log_event("INFO", "process", "Ring3, TSS and int80 ready; scheduler capacity=16");
     terminal_init();
-    log_event("INFO", "terminal", "%s; UTF-8 Cyrillic; scrollback 200 lines",
+    log_event(
+        "INFO",
+        "terminal",
+        "%s; UTF-8 Cyrillic; scrollback 200 lines",
         framebuffer_get_info()->available ? "Framebuffer 1280x800, 80x25 large cells" : "VGA text 80x25");
     output_set_mode(OUTPUT_MODE_TERMINAL);
     terminal_refresh();
@@ -66,14 +70,16 @@ void kmain(void) {
         log_event("WARN", "filesystem", "KFS2 unavailable; trying legacy FAT12 backend");
         fat12_init();
     }
-    log_write(ext2_is_mounted() ? "[INFO] ext2 mounted as root\n" :
-              kfs2_is_mounted() ? "[INFO] KFS2 mounted\n" :
-              fat12_is_mounted() ? "[INFO] FAT12 compatibility backend mounted\n" :
-              "[WARN] filesystem unavailable\n");
+    log_write(
+        ext2_is_mounted()        ? "[INFO] ext2 mounted as root\n"
+            : kfs2_is_mounted()  ? "[INFO] KFS2 mounted\n"
+            : fat12_is_mounted() ? "[INFO] FAT12 compatibility backend mounted\n"
+                                 : "[WARN] filesystem unavailable\n");
     if (fs_ready) {
         auth_init();
         kfs3_init();
         vfs_meta_load();
+        gfxwm_init();
     }
     printf("KintsugiOS %s\n", VERSION);
     if (fs_ready) {

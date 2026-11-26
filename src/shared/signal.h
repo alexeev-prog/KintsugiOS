@@ -4,8 +4,8 @@
 /* Signals are cooperative in KintsugiOS: a pending signal is delivered at the
  * next syscall/tick, like SIGNALED in a classic microkernel. There are no
  * userspace handlers yet. */
-#define SIGHUP  1
-#define SIGINT  2
+#define SIGHUP 1
+#define SIGINT 2
 #define SIGQUIT 3
 #define SIGKILL 9
 #define SIGUSR1 10

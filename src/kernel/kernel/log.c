@@ -1,7 +1,7 @@
 #include "log.h"
 
-#include "../drivers/lowlevel_io.h"
 #include "../drivers/framebuffer.h"
+#include "../drivers/lowlevel_io.h"
 #include "../kklibc/stdio.h"
 #include "../kklibc/stdlib.h"
 
@@ -116,8 +116,11 @@ __attribute__((noreturn)) void panic(const char* message, const registers_t* r) 
     }
     for (u32 i = 0; i < 2000; ++i) {
         u16 cell = console_cells[i];
-        if (framebuffer_get_info()->available) framebuffer_cell(i % 80, i / 80, cell, cell >> 8, 0);
-        else ((volatile u16*)0xb8000)[i] = cell;
+        if (framebuffer_get_info()->available) {
+            framebuffer_cell(i % 80, i / 80, cell, cell >> 8, 0);
+        } else {
+            ((volatile u16*)0xb8000)[i] = cell;
+        }
     }
     for (;;) {
         __asm__ volatile("hlt");
