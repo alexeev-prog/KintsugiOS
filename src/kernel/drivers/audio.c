@@ -9,7 +9,13 @@
  *  - PC speaker (PIT channel 2): 1-bit mono fallback, mute-only volume.
  */
 
-static u32 volume = 70;
+/* Mixer channels: master, music (OPL2), effects (speaker/beeps). */
+static u32 mixer_volume[3] = { 70, 70, 70 };
+
+static u32 effective_volume(u32 channel) {
+    u32 master = mixer_volume[0], channel_gain = mixer_volume[channel];
+    return master * channel_gain / 100;
+}
 static int enabled;
 static int opl2_present;
 
@@ -51,6 +57,7 @@ static const opl2_inst insts[4] = {
 static struct {
     int active;
     u32 remaining;
+    u32 channel;
 } voice[9];
 
 static void opl2_freq(u32 freq, u32* fn, u32* bl) {
@@ -74,13 +81,14 @@ static void opl2_freq(u32 freq, u32* fn, u32* bl) {
     *bl = block;
 }
 
-static u8 carrier_level(void) {
-    /* 0 = loudest, 63 = silent. Master volume maps to attenuation. */
-    u32 lvl = 63 - (63 * volume / 100);
+static u8 carrier_level(u32 channel) {
+    /* 0 = loudest, 63 = silent. Effective gain maps to attenuation. */
+    u32 gain = effective_volume(channel);
+    u32 lvl = 63 - (63 * gain / 100);
     return (u8)lvl;
 }
 
-static void opl2_setup_channel(u32 c, const opl2_inst* in) {
+static void opl2_setup_channel(u32 c, const opl2_inst* in, u32 channel) {
     u8 m = mod_off[c], k = car_off[c];
     opl2_write(0x20 + m, (in->mod_mult & 15) | 0x20); /* EG sustain */
     opl2_write(0x40 + m, in->mod_tl & 63);
@@ -88,7 +96,7 @@ static void opl2_setup_channel(u32 c, const opl2_inst* in) {
     opl2_write(0x80 + m, (in->mod_sl << 4) | in->mod_rr);
     opl2_write(0xE0 + m, in->mod_wave & 3);
     opl2_write(0x20 + k, (in->car_mult & 15) | 0x20);
-    opl2_write(0x40 + k, carrier_level());
+    opl2_write(0x40 + k, carrier_level(channel));
     opl2_write(0x60 + k, (in->car_ar << 4) | in->car_dr);
     opl2_write(0x80 + k, (in->car_sl << 4) | in->car_rr);
     opl2_write(0xE0 + k, in->car_wave & 3);
@@ -140,7 +148,7 @@ static void speaker_tone(u32 frequency, u32 milliseconds) {
         spk_remaining = 0;
         return;
     }
-    if (!volume || frequency < 20 || frequency > 20000) {
+    if (!effective_volume(2) || frequency < 20 || frequency > 20000) {
         return;
     }
     u32 divisor = 1193180 / frequency;
@@ -166,24 +174,32 @@ int audio_is_opl2(void) {
     return opl2_present;
 }
 
-void audio_volume(u32 value) {
-    volume = value > 100 ? 100 : value;
+void audio_mixer_set(u32 channel, u32 value) {
+    if (channel > 2) {
+        return;
+    }
+    mixer_volume[channel] = value > 100 ? 100 : value;
     if (opl2_present) {
-        /* Re-apply carrier attenuation to every live voice. */
         for (u32 c = 0; c < 9; ++c) {
             if (voice[c].active) {
-                opl2_write(0x40 + car_off[c], carrier_level());
+                opl2_write(0x40 + car_off[c], carrier_level(voice[c].channel));
             }
         }
-        /* Volume 0 is implemented by full carrier attenuation: live notes
-         * keep their key-on state and resume when the volume is raised. */
-    } else if (!volume) {
+    } else if (!effective_volume(2)) {
         port_byte_out(0x61, port_byte_in(0x61) & 0xfc);
     }
 }
 
+u32 audio_mixer_get(u32 channel) {
+    return channel < 3 ? mixer_volume[channel] : 0;
+}
+
+void audio_volume(u32 value) {
+    audio_mixer_set(0, value);
+}
+
 u32 audio_get_volume(void) {
-    return volume;
+    return mixer_volume[0];
 }
 
 int audio_is_enabled(void) {
@@ -202,7 +218,7 @@ void audio_tone_inst(u32 frequency, u32 milliseconds, u32 instrument) {
         }
         return;
     }
-    if (!volume) {
+    if (!mixer_volume[0]) {
         return;
     }
     if (instrument > 3) {
@@ -224,10 +240,11 @@ void audio_tone_inst(u32 frequency, u32 milliseconds, u32 instrument) {
         if (c == 9) {
             c = 0;
         }
-        opl2_setup_channel(c, &insts[instrument]);
+        opl2_setup_channel(c, &insts[instrument], 1);
         opl2_key(c, frequency, 1);
         voice[c].active = 1;
         voice[c].remaining = milliseconds / 20 + 1;
+        voice[c].channel = 1;
     } else {
         speaker_tone(frequency, milliseconds);
     }

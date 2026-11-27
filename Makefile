@@ -10,7 +10,10 @@ OBJCOPY := $(CROSS)objcopy
 PYTHON ?= python3
 QEMU ?= qemu-system-i386
 VNC ?= :0
-QEMU_FLAGS ?=
+# TCG performance: expose a modern i386 feature set to the guest so QEMU's
+# translator can use more host instructions per guest instruction.
+QEMU_CPU ?= max
+QEMU_FLAGS ?= -cpu $(QEMU_CPU) -smp 1 -no-reboot
 AUDIO_FLAGS ?= -audiodev driver=sdl,id=kos-audio -device adlib,audiodev=kos-audio -machine pcspk-audiodev=kos-audio
 MEMORY ?= 128
 VGA ?= std
@@ -321,6 +324,10 @@ run_kfs3: $(FLOPPY) $(KFS3DISK)
 	$(RUN) $(FLOPPY_DRIVE) -drive file=$(KFS3DISK),format=raw,if=ide,index=0 -boot order=a
 run_gui: $(FLOPPY) $(KFS3DISK)
 	$(QEMU) -m $(MEMORY) -vga $(VGA) -name KintsugiOS-GUI $(AUDIO_FLAGS) -vnc $(VNC) $(FLOPPY_DRIVE) -drive file=$(KFS3DISK),format=raw,if=ide,index=0 -boot order=a $(QEMU_FLAGS)
+# GUI without optional audio emulation: lowest TCG overhead, smoothest desktop.
+run_fast: $(FLOPPY) $(KFS3DISK)
+	$(QEMU) -m $(MEMORY) -vga $(VGA) -name KintsugiOS-Fast -display none -vnc $(VNC) $(FLOPPY_DRIVE) -drive file=$(KFS3DISK),format=raw,if=ide,index=0 -boot order=a $(QEMU_FLAGS)
+.PHONY: run_fast
 run_iso: $(ISO) $(FATDISK) system-install
 	$(RUN) -cdrom $(ISO) $(FAT_DRIVE) -boot order=d
 debug_fda debug_hdd debug_fat12: $(FLOPPY) $(FATDISK)
@@ -340,7 +347,7 @@ quick re:
 help info:
 	@echo 'Build: make [all|diskimg|iso]'
 	@echo 'Disk: make disk-create (only if missing); make disk-reset CONFIRM=YES (ERASES data)'
-	@echo 'Run: make run / run_kfs2 (KFS2), make run_kfs3 (KFS3 POSIX), make run_fat12 (legacy)'
+	@echo 'Run: make run / run_kfs2 (KFS2), make run_kfs3 (ext2), make run_gui (VNC), make run_fast''
 	@echo 'Test: make test (temporary disks only); clean preserves persistent disks'
 	@echo 'Debug: make debug_fat12; gdb bin/kernel.elf -ex "target remote :1234"'
 	@echo 'Headless: make run QEMU_FLAGS="-display none -monitor stdio"'

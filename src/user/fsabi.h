@@ -5,6 +5,8 @@
 typedef struct {
     unsigned int size;
     unsigned char directory, readonly;
+    unsigned char reserved;
+    unsigned int mtime; /* UNIX timestamp, 0 when the backend has no date */
 } kos_stat;
 
 typedef struct {

@@ -730,6 +730,8 @@ static int stat_op(const char* path, vfs_stat_t* stat) {
     stat->size = inode.size;
     stat->directory = (inode.mode & EXT2_S_IFDIR) ? 1 : 0;
     stat->readonly = (inode.mode & 0222) ? 0 : 1;
+    stat->reserved = 0;
+    stat->mtime = inode.mtime;
     return 0;
 }
 
@@ -1085,6 +1087,7 @@ static int readdir_long_op(const char* path, u32* cursor, vfs_long_dirent_t* ent
             entry->stat.size = child.size;
             entry->stat.directory = (child.mode & EXT2_S_IFDIR) ? 1 : 0;
             entry->stat.readonly = (child.mode & 0222) ? 0 : 1;
+            entry->stat.mtime = child.mtime;
         }
         return 1;
     }

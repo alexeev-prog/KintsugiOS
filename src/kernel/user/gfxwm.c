@@ -21,6 +21,8 @@ static gfxwm_window windows[GFXWM_MAX];
 static int window_count;
 static int focused = -1;
 static int zorder[GFXWM_MAX];
+static u32 window_generation;
+u32 gfxwm_generation(void) { return window_generation; }
 
 void gfxwm_init(void) {
     for (int i = 0; i < GFXWM_MAX; ++i) {
@@ -60,6 +62,7 @@ static void raise_slot(int slot) {
 }
 
 int gfxwm_create(u32 width, u32 height) {
+    ++window_generation;
     if (!width || !height || width > 1920 || height > 1200) {
         return -1;
     }
@@ -91,6 +94,7 @@ int gfxwm_create(u32 width, u32 height) {
 }
 
 int gfxwm_close(int id, u32 owner_pid, int privileged_uid) {
+    ++window_generation;
     if (id < 1 || id > GFXWM_MAX) {
         return VFS_EINVAL;
     }
@@ -157,6 +161,7 @@ static int clip(int id, int* x, int* y, u32* w, u32* h) {
 }
 
 int gfxwm_fill(int id, int x, int y, u32 width, u32 height, u32 color) {
+    ++window_generation;
     if (!valid_window(id)) {
         return VFS_ENOENT;
     }
@@ -173,6 +178,7 @@ int gfxwm_fill(int id, int x, int y, u32 width, u32 height, u32 color) {
 }
 
 int gfxwm_blit(int id, const u32* source, int x, int y, u32 width, u32 height) {
+    ++window_generation;
     if (!valid_window(id) || !source || !width || !height) {
         return VFS_EINVAL;
     }
@@ -191,6 +197,7 @@ int gfxwm_blit(int id, const u32* source, int x, int y, u32 width, u32 height) {
 }
 
 int gfxwm_title(int id, const char* title) {
+    ++window_generation;
     if (!valid_window(id) || !title) {
         return VFS_EINVAL;
     }
@@ -204,6 +211,7 @@ int gfxwm_title(int id, const char* title) {
 }
 
 int gfxwm_move(int id, int x, int y) {
+    ++window_generation;
     if (!valid_window(id)) {
         return VFS_ENOENT;
     }
@@ -213,6 +221,7 @@ int gfxwm_move(int id, int x, int y) {
 }
 
 int gfxwm_resize(int id, u32 width, u32 height) {
+    ++window_generation;
     if (!valid_window(id) || !width || !height || width > 1920 || height > 1200) {
         return VFS_EINVAL;
     }
@@ -238,6 +247,7 @@ int gfxwm_resize(int id, u32 width, u32 height) {
 }
 
 int gfxwm_state(int id, int state) {
+    ++window_generation;
     if (!valid_window(id)) {
         return VFS_ENOENT;
     }
@@ -253,6 +263,7 @@ int gfxwm_state(int id, int state) {
 }
 
 int gfxwm_raise(int id) {
+    ++window_generation;
     if (!valid_window(id)) {
         return VFS_ENOENT;
     }

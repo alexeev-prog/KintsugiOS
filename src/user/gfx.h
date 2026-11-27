@@ -18,11 +18,37 @@ typedef struct {
 #define GFX_RGB(r, g, b) ((u32)(((r) << 16) | ((g) << 8) | (b)))
 #define GFX_WHITE GFX_RGB(255, 255, 255)
 #define GFX_BLACK GFX_RGB(0, 0, 0)
-#define GFX_FACE GFX_RGB(192, 192, 192)
-#define GFX_SHADOW GFX_RGB(96, 96, 96)
-#define GFX_DARK GFX_RGB(0, 0, 128)
-#define GFX_LIGHT GFX_RGB(0, 0, 160)
-#define GFX_TEAL GFX_RGB(0, 128, 128)
+/* Shared look: every GUI application and every primitive reads this theme. */
+typedef struct {
+    const char* name;
+    u32 face, shadow, light, title, title_text, text, accent;
+    u32 desktop, selection, success, warning, error;
+    int flat;
+    int bright_icons;
+} gui_theme_t;
+
+extern gui_theme_t gui_theme;
+
+enum {
+    GUI_THEME_CLASSIC = 0,
+    GUI_THEME_NEXTSTEP,
+    GUI_THEME_MILLENNIUM,
+    GUI_THEME_HUMANITY,
+    GUI_THEME_FRUIT,
+    GUI_THEME_GRAPHITE,
+    GUI_THEME_OCEAN,
+    GUI_THEME_SOLAR,
+    GUI_THEME_COUNT
+};
+
+void gfx_theme_set(int id);
+int gfx_theme_id(void);
+
+#define GFX_FACE (gui_theme.face)
+#define GFX_SHADOW (gui_theme.shadow)
+#define GFX_LIGHT (gui_theme.light)
+#define GFX_DARK (gui_theme.title)
+#define GFX_TEAL (gui_theme.desktop)
 #define GFX_RED GFX_RGB(180, 40, 40)
 #define GFX_GREEN GFX_RGB(40, 180, 40)
 #define GFX_BLUE GFX_RGB(40, 40, 180)
@@ -37,6 +63,8 @@ void gfx_line(gfx_surface* surface, int x0, int y0, int x1, int y1, int size, u3
 void gfx_blit(
     gfx_surface* destination, int x, int y, const gfx_surface* source, int sx, int sy, int width, int height);
 void gfx_text(gfx_surface* surface, int x, int y, const char* text, u32 foreground, u32 background);
+void gfx_text_clipped(
+    gfx_surface* surface, int x, int y, int max_width, const char* text, u32 foreground, u32 background);
 void gfx_text_wrapped(
     gfx_surface* surface,
     int x,
@@ -50,8 +78,14 @@ void gfx_text_wrapped(
 void gfx_cell(gfx_surface* surface, int x, int y, unsigned char character, unsigned char attribute);
 int gfx_text_width(const char* text);
 void gfx_bevel(gfx_surface* surface, int x, int y, int width, int height, int raised);
+void gfx_groupbox(gfx_surface* surface, int x, int y, int width, int height, const char* label);
+void gfx_slider(gfx_surface* surface, int x, int y, int width, int height, int value, int maximum, int active);
+void gfx_tab(gfx_surface* surface, int x, int y, int width, int height, const char* label, int active);
+void gfx_progress(gfx_surface* surface, int x, int y, int width, int height, int value, int maximum, u32 color);
 void gfx_button(gfx_surface* surface, int x, int y, int width, int height, const char* label, int pressed);
 void gfx_titlebar(gfx_surface* surface, int x, int y, int width, const char* title, int active);
+/* NeXTSTEP/macOS style titlebar: sunken title plate, leading traffic lights. */
+void gfx_titlebar_next(gfx_surface* surface, int x, int y, int width, const char* title, int active);
 void gfx_scrollbar(gfx_surface* surface, int x, int y, int height, int position, int total);
 
 void gfx_dirty_add(gfx_dirty* dirty, int x, int y, int width, int height);

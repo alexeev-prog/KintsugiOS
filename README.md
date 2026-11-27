@@ -595,12 +595,20 @@ KintsugiOS распространяется под лицензией MIT. По�
 
 ## Pixel GUI
 
-`gui` (или `kgui`) запускает графический режим в стиле Windows 95: десктоп,
-панель задач, Start-меню с Programs/Search/Run/Settings/Help/Shut Down,
-перекрывающиеся окна, z-order/фокус, drag/resize, minimize/maximize/close,
-двойная буферизация и dirty-rect. Встроенные приложения: **KGFM** (файловый
-менеджер), **KGED** (графический редактор), **KGTERM** (графический терминал
-с запуском внешних ELF). Управление: Tab, WASD, R, N, M, Q, S.
+`gui` (или `kgui`) запускает графический режим в стиле **NeXTSTEP/macOS** с
+удобством Windows: глобальная menu bar сверху (K / File / Edit / View / Help),
+Dock снизу, traffic-light кнопки окна слева, перекрывающиеся окна,
+z-order/фокус, drag/resize, minimize/maximize/close, двойная буферизация и
+dirty-rect (перерисовывается только изменённая область). Подробный разбор —
+`docs/GUI_NEXTSTEP_DESIGN.md`.
+Встроенные приложения: **KGFM** (Shelf, Home, колонки Name/Size/Type/Date),
+**KGED** (холст на всё окно), **KGTERM** (ANSI и живой вывод), **Notepad**
+(Ctrl+S / Save As), **KMonitor** и **KSystem**. Settings-unit: 5 тем
+(Classic/NeXTSTEP/Millennium/Humanity/Fruit), паттерны обоев, Dock, микшер
+(master/music/effects) и конфиг `/home/user/KGUI.CFG`. Программы
+меню запускаются единым загрузчиком: TUI-приложения получают capture экрана,
+обычные команды показывают вывод в терминале, `kfetch` отображается без ANSI-мусора.
+Управление: Tab, WASD, R, N, M, Q, S.
 
 
 ## GUI Administration

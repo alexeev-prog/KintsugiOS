@@ -4,6 +4,7 @@
 #include "../kklibc/ctypes.h"
 
 void gfxwm_init(void);
+u32 gfxwm_generation(void);
 
 int gfxwm_create(u32 width, u32 height);
 int gfxwm_close(int id, u32 owner_pid, int privileged_uid);

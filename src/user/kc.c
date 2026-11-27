@@ -117,7 +117,7 @@ static int refresh(panel* p) {
     if (tui_len(p->tabs[p->active].directory) > 1) {
         tui_long_entry* parent = &p->entries[p->entries_count++];
         tui_copy(parent->name, "..", sizeof(parent->name));
-        parent->stat = (tui_stat){ 0, 1, 1 };
+        parent->stat = (tui_stat){ .size = 0, .directory = 1, .readonly = 1, .mtime = 0 };
     }
     while (p->entries_count < ENTRIES
            && (result = tui_readdir_long(

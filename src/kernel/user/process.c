@@ -1437,6 +1437,9 @@ void syscall_dispatch(syscall_regs_t* r) {
             tui_capture_dirty = 1;
             r->eax = 0;
             return;
+        case KOS_SYS_GFX_WINDOW_GEN:
+            r->eax = (int)gfxwm_generation();
+            return;
         case KOS_SYS_KEY_INJECT:
             key_inject_pid = r->ebx;
             key_injected = (int)r->ecx;
@@ -1457,12 +1460,24 @@ void syscall_dispatch(syscall_regs_t* r) {
             r->eax = 0;
             return;
         case KOS_SYS_SOUND_VOLUME:
-            if (!process_foreground() || r->ebx > 100) {
+            /* Mixer control is a local console resource, like tone generation:
+             * GUI compositors and daemons must be able to adjust it. */
+            if (r->ebx > 100) {
                 r->eax = VFS_EINVAL;
                 return;
             }
             audio_volume(r->ebx);
             r->eax = 0;
+            return;
+        case KOS_SYS_SOUND_MIXER:
+            if (r->ebx > 2) {
+                r->eax = VFS_EINVAL;
+                return;
+            }
+            if (r->ecx) {
+                audio_mixer_set(r->ebx, r->edx);
+            }
+            r->eax = audio_mixer_get(r->ebx);
             return;
         case KOS_SYS_SOUND_INFO:
             if (!user_range(r->ebx, 3 * sizeof(u32), 1)) {

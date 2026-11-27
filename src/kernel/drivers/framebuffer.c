@@ -239,10 +239,11 @@ void framebuffer_rect(u32 x, u32 y, u32 width, u32 height, u32 rgb) {
     if (height > info.height - y) {
         height = info.height - y;
     }
+    volatile u32* target = (volatile u32*)FB_WINDOW;
     for (u32 row = y; row < y + height; ++row) {
-        for (u32 col = x; col < x + width; ++col) {
-            ((volatile u32*)FB_WINDOW)[row * info.width + col] = rgb;
-        }
+        u32* line = (u32*)(target + row * info.width + x);
+        u32 count = width, color = rgb;
+        __asm__ volatile("cld; rep stosl" : "+D"(line), "+c"(count) : "a"(color) : "memory");
     }
 }
 
@@ -268,11 +269,10 @@ void framebuffer_blit(u32 x, u32 y, u32 width, u32 height, u32 stride, const u32
     }
     volatile u32* target = (volatile u32*)FB_WINDOW;
     for (u32 row = 0; row < height; ++row) {
-        volatile u32* destination = target + (y + row) * info.width + x;
+        u32* destination = (u32*)(target + (y + row) * info.width + x);
         const u32* source = pixels + row * stride;
-        for (u32 col = 0; col < width; ++col) {
-            destination[col] = source[col];
-        }
+        u32 count = width;
+        __asm__ volatile("cld; rep movsl" : "+D"(destination), "+S"(source), "+c"(count) : : "memory");
     }
 }
 

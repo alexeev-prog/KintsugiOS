@@ -248,6 +248,8 @@ static int stat_op(const char* p, vfs_stat_t* st) {
     st->size = n.size;
     st->directory = n.directory;
     st->readonly = (n.flags & 1) ? 1 : 0;
+    st->reserved = 0;
+    st->mtime = n.mtime;
     return 0;
 }
 
@@ -526,7 +528,8 @@ static int readdir_long_op(const char* p, u32* c, vfs_long_dirent_t* e) {
             memset(e, 0, sizeof(*e));
             memcpy(e->name, n.name, sizeof(e->name) - 1);
             e->name[sizeof(e->name) - 1] = 0;
-            e->stat = (vfs_stat_t){ n.size, n.directory, (n.flags & 1) ? 1 : 0 };
+            e->stat = (vfs_stat_t){ .size = n.size, .directory = n.directory,
+                                    .readonly = (n.flags & 1) ? 1 : 0, .mtime = n.mtime };
             return 1;
         }
     }

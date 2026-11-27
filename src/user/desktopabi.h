@@ -42,6 +42,8 @@
 /* Deliver a key event to a specific process (used by the GUI compositor to
  * forward console input to a window-hosted TUI child). */
 #define KOS_SYS_KEY_INJECT 89
+#define KOS_SYS_GFX_WINDOW_GEN 90
+#define KOS_SYS_SOUND_MIXER 91 /* ebx channel, ecx set?, edx value; eax = volume */
 
 typedef struct {
     unsigned width, height;

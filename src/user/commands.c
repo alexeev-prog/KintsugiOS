@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
     static kos_long_dirent entries[64];
     for (u32 clear = 0; clear < 64; ++clear) {
         entries[clear].name[0] = 0;
-        entries[clear].stat = (stat_t){ 0, 0, 0 };
+        entries[clear].stat = (stat_t){ .size = 0, .directory = 0, .readonly = 0, .mtime = 0 };
     }
     u32 count = 0, max_name = 1, max_size = 1;
     int n;
