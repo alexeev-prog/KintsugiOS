@@ -53,6 +53,7 @@ typedef struct {
     /* Notepad */
     char text[512];
     int text_length;
+    char file_path[160];
     /* Administration window */
     int admin_field;
     char admin_password[64];
@@ -83,6 +84,7 @@ static char search_results[MAX_RESULTS][160];
 static int search_count;
 static int dragging, resizing, drag_dx, drag_dy;
 static int active_menu_window = -1;
+static int dialog_window_index = -1;
 static kos_mouse gui_mouse;
 static unsigned previous_buttons;
 static int program_category = -1;
@@ -94,6 +96,10 @@ static int tui_child_pid = -1;
 static gui_window* tui_window;
 static ktui_cell tui_cells[25][80];
 static int tui_saved_x, tui_saved_y, tui_saved_w, tui_saved_h;
+static gui_window* paint_window;
+static int paint_dirty;
+static gfx_surface* drag_backup;
+static int drag_index = -1;
 
 static int external_locate(int id, kos_gui_window_info* out) {
     kos_gui_window_info list[8];
@@ -112,6 +118,7 @@ static gui_window* create_window(const char* title, int x, int y, int width, int
 static void term_prompt_string(gui_window* w, char* out, u32 cap);
 static void term_shell_banner(gui_window* w);
 static void draw_window(gui_window* w);
+static void toggle_maximize(gui_window* w);
 
 static int start_menu_height(void) {
     return menu == 2 ? 220 : menu == 6 ? 260 : 240;
@@ -334,6 +341,7 @@ static void fm_open(gui_window* w) {
             note->text[n] = 0;
             note->text_length = n;
         }
+        text_copy(note->file_path, sizeof(note->file_path), path);
     } else {
         toast("Cannot create window");
     }
@@ -1257,13 +1265,13 @@ static void draw_window(gui_window* w) {
     }
     /* Dropdown painted last so the window content cannot overwrite it. */
     if (active && active_menu_window == (w - windows)) {
-        static const char* const items[4][4] = {
-            { "New",        "Open",          "Save",        "Close"       },
-            { "Cut",        "Copy",          "Paste",       "Select All"  },
-            { "Refresh",    "Status Bar",    "Large Icons", "Small Icons" },
-            { "About KGUI", "Keyboard help", 0,             0             }
+        static const char* const items[4][5] = {
+            { "New",        "Open",          "Save",        "Save As...",  "Close"       },
+            { "Cut",        "Copy",          "Paste",       "Select All",  0             },
+            { "Refresh",    "Status Bar",    "Large Icons", "Small Icons", 0             },
+            { "About KGUI", "Keyboard help", 0,             0,             0             }
         };
-        int count = active_menu_column == 3 ? 2 : 4;
+        int count = active_menu_column == 3 ? 2 : active_menu_column == 0 ? 5 : 4;
         int width = 136, height = count * 18 + 4;
         gfx_fill(s, 8, menu_y + MENU_HEIGHT, width, height, GFX_FACE);
         gfx_bevel(s, 8, menu_y + MENU_HEIGHT, width, height, 1);
@@ -1433,6 +1441,7 @@ static void draw_dialog(gfx_surface* back) {
         : menu == 7               ? (fm_action == 1       ? "New File"
                                          : fm_action == 2 ? "New Folder"
                                                           : "Rename")
+        : menu == 8               ? "Save As"
                                   : "KintsugiOS Help";
     gfx_text(back, x + 8, y + 6, title, GFX_WHITE, 0);
     gfx_button(back, x + width - 26, y + 4, 18, 16, "x", 0);
@@ -1455,11 +1464,12 @@ static void draw_dialog(gfx_surface* back) {
         gfx_text(back, x + 18, y + 70, dialog_input, GFX_BLACK, 0);
         gfx_button(back, x + width - 170, y + height - 44, 72, 26, "OK", 0);
         gfx_button(back, x + width - 88, y + height - 44, 72, 26, "Cancel", 0);
-    } else if (menu == 7) {
-        gfx_text(back, x + 12, y + 42, "Name:", GFX_BLACK, 0);
+    } else if (menu == 7 || menu == 8) {
+        gfx_text(back, x + 12, y + 42, menu == 8 ? "File name:" : "Name:", GFX_BLACK, 0);
         gfx_fill(back, x + 12, y + 66, width - 24, 24, GFX_WHITE);
         gfx_bevel(back, x + 12, y + 66, width - 24, 24, 0);
         gfx_text(back, x + 18, y + 70, dialog_input, GFX_BLACK, 0);
+        if (menu == 8) gfx_text(back, x + 12, y + 104, "Saved in /home/user", GFX_SHADOW, 0);
         gfx_button(back, x + width - 170, y + height - 44, 72, 26, "OK", 0);
         gfx_button(back, x + width - 88, y + height - 44, 72, 26, "Cancel", 0);
     } else {
@@ -1500,22 +1510,37 @@ static void fm_apply_name(void) {
 static void open_context_menu(int x, int y, int window, int kind) {
     static const char* const desktop[] = { "Open Terminal", "New Folder", "Display Settings", "About KGUI" };
     static const char* const files[] = { "New File", "New Folder", "Open", "Rename", "Delete", "Properties" };
+    static const char* const system[] = { "Restore", "Minimize", "Maximize", "Close" };
+    static const char* const header[] = { "Refresh", "New Folder", "Up", "Properties" };
+    const char* const* source;
+    int count;
+    if (kind == 0) { source = desktop; count = 4; }
+    else if (kind == 1) { source = files; count = 6; }
+    else if (kind == 2) { source = system; count = 4; }
+    else { source = header; count = 4; }
     context_kind = kind;
     context_window = window;
-    if (kind == 0) {
-        context_count = 4;
-        for (int i = 0; i < 4; ++i) {
-            text_copy(context_items[i], sizeof(context_items[i]), desktop[i]);
-        }
-    } else {
-        context_count = 6;
-        for (int i = 0; i < 6; ++i) {
-            text_copy(context_items[i], sizeof(context_items[i]), files[i]);
-        }
-    }
+    context_count = count;
+    for (int i = 0; i < count; ++i)
+        text_copy(context_items[i], sizeof(context_items[i]), source[i]);
     context_x = x;
     context_y = y;
     context_open = 1;
+}
+
+static void notepad_save(gui_window* w, const char* name) {
+    char path[160];
+    if (name[0] == '/') text_copy(path, sizeof(path), name);
+    else {
+        text_copy(path, sizeof(path), "/home/user/");
+        int n = text_length(path), i = 0;
+        while (name[i] && n + i + 1 < (int)sizeof(path)) { path[n + i] = name[i]; ++i; }
+        path[n + i] = 0;
+    }
+    int result = syscall(10, (u32)path, (u32)w->text, (u32)w->text_length, 0);
+    if (result < 0) { toast(kos_error(result)); return; }
+    text_copy(w->file_path, sizeof(w->file_path), path);
+    toast("Saved");
 }
 
 static void window_menu_action(gui_window* w, int column, int item) {
@@ -1526,10 +1551,20 @@ static void window_menu_action(gui_window* w, int column, int item) {
             create_window("KGFM - Files", 80, 50, 520, 320, 0);
         } else if (item == 2) {
             if (w && w->kind == 4) {
-                syscall(10, (u32) "/home/user/notes.txt", (u32)w->text, w->text_length, 0);
-            }
-            toast("Saved");
+                if (w->file_path[0]) notepad_save(w, w->file_path);
+                else {
+                    dialog_window_index = (int)(w - windows);
+                    dialog_input[0] = 0; dialog_length = 0;
+                    menu = 8;
+                }
+            } else toast("No document to save");
         } else if (item == 3) {
+            if (w && w->kind == 4) {
+                dialog_window_index = (int)(w - windows);
+                dialog_input[0] = 0; dialog_length = 0;
+                menu = 8;
+            } else toast("No document to save as");
+        } else if (item == 4) {
             close_window(w);
         }
     } else if (column == 1) {
@@ -1569,6 +1604,31 @@ static void window_menu_action(gui_window* w, int column, int item) {
 }
 
 static void context_action(int item) {
+    if (context_kind == 2) {
+        gui_window* w = context_window >= 0 ? &windows[context_window] : 0;
+        if (w && w->used) {
+            if (item == 0 && w->maximized) toggle_maximize(w);
+            else if (item == 1) { w->minimized = 1; if (focused == context_window) focused = -1; }
+            else if (item == 2 && !w->maximized) toggle_maximize(w);
+            else if (item == 3) close_window(w);
+        }
+        context_open = 0;
+        return;
+    }
+    if (context_kind == 3) {
+        gui_window* w = context_window >= 0 ? &windows[context_window] : 0;
+        if (w && w->used && w->kind == 0) {
+            if (item == 0) { fm_refresh(w); toast("Refreshed"); }
+            else if (item == 1) {
+                fm_action = 2;
+                dialog_input[0] = 0; dialog_length = 0;
+                menu = 7;
+            } else if (item == 2) fm_up(w);
+            else toast(w->path);
+        }
+        context_open = 0;
+        return;
+    }
     if (context_kind == 0) {
         if (item == 0) {
             create_window("KGTERM", 80, 400, 520, 320, 2);
@@ -1729,8 +1789,13 @@ static void cursor_erase(void) {
     cursor_drawn = 0;
 }
 
-static void cursor_move(int x, int y) {
+static void cursor_move(int x, int y, gfx_dirty* extra) {
     gfx_dirty dirty = { 0, 0, 0, 0, 0 };
+    if (extra && extra->valid) {
+        dirty.left = extra->left; dirty.top = extra->top;
+        dirty.right = extra->right; dirty.bottom = extra->bottom;
+        dirty.valid = 1;
+    }
     if (cursor_drawn) {
         int left, top, width, height;
         cursor_bounds(cursor_x, cursor_y, &left, &top, &width, &height);
@@ -1799,6 +1864,10 @@ static void compose(gfx_dirty* dirty) {
     gfx_present_dirty(desktop, 0, 0, dirty);
 }
 
+static void drag_begin(gui_window* w);
+static void drag_move(gui_window* w, int old_x, int old_y);
+static void drag_end(void);
+
 static gui_window* create_window(const char* title, int x, int y, int width, int height, int kind) {
     for (int i = 0; i < MAX_WINDOWS; ++i) {
         if (windows[i].used) {
@@ -1843,6 +1912,36 @@ static gui_window* create_window(const char* title, int x, int y, int width, int
         return w;
     }
     return 0;
+}
+
+static void drag_begin(gui_window* w) {
+    drag_index = (int)(w - windows);
+    if (drag_backup) gfx_surface_destroy(drag_backup);
+    drag_backup = gfx_surface_create(w->width, w->height);
+    if (!drag_backup) { drag_index = -1; return; }
+    int saved = w->minimized;
+    w->minimized = 1;
+    gfx_dirty dirty = { 0, 0, 0, 0, 0 };
+    compose(&dirty);
+    w->minimized = saved;
+    gfx_blit(drag_backup, 0, 0, desktop, w->x, w->y, w->width, w->height);
+}
+
+static void drag_move(gui_window* w, int old_x, int old_y) {
+    if (!drag_backup || drag_index != (int)(w - windows)) return;
+    gfx_dirty dirty = { 0, 0, 0, 0, 0 };
+    gfx_blit(desktop, old_x, old_y, drag_backup, 0, 0, w->width, w->height);
+    gfx_dirty_add(&dirty, old_x, old_y, w->width, w->height);
+    gfx_blit(drag_backup, 0, 0, desktop, w->x, w->y, w->width, w->height);
+    gfx_blit(desktop, w->x, w->y, w->surface, 0, 0, w->width, w->height);
+    gfx_dirty_add(&dirty, w->x, w->y, w->width, w->height);
+    cursor_move(gui_mouse.x, gui_mouse.y, &dirty);
+}
+
+static void drag_end(void) {
+    if (drag_backup) gfx_surface_destroy(drag_backup);
+    drag_backup = 0;
+    drag_index = -1;
 }
 
 static void activate_icon(int index) {
@@ -2029,7 +2128,7 @@ int main(int argc, char** argv) {
     gfx_dirty dirty = { 0, 0, 0, 0, 0 };
     syscall(KOS_SYS_MOUSE, (u32)&gui_mouse, 0, 0, 0);
     compose(&dirty);
-    cursor_move(gui_mouse.x, gui_mouse.y);
+    cursor_move(gui_mouse.x, gui_mouse.y, 0);
 
     for (;;) {
         ++gui_frame;
@@ -2045,7 +2144,7 @@ int main(int argc, char** argv) {
             int only_motion =
                 (mouse.buttons == previous_buttons && !mouse.wheel && (mouse.x != old_x || mouse.y != old_y));
             if (only_motion) {
-                cursor_move(mouse.x, mouse.y);
+                cursor_move(mouse.x, mouse.y, 0);
             } else {
                 changed = 1;
             }
@@ -2135,11 +2234,16 @@ int main(int argc, char** argv) {
                 ny = screen_height - TASKBAR_HEIGHT - focused_window->height;
             }
             if (nx != focused_window->x || ny != focused_window->y) {
+                int old_x = focused_window->x, old_y = focused_window->y;
                 focused_window->x = nx;
                 focused_window->y = ny;
-                changed = 1;
+                if (drag_backup && drag_index == (int)(focused_window - windows)) {
+                    cursor_erase();
+                    drag_move(focused_window, old_x, old_y);
+                } else changed = 1;
             }
         } else {
+            if (dragging && drag_backup) { drag_end(); changed = 1; }
             dragging = 0;
         }
         if (resizing && (mouse.buttons & 1) && focused_window && !focused_window->maximized) {
@@ -2180,6 +2284,10 @@ int main(int argc, char** argv) {
                     } else if (menu == 7 && mouse.x >= dx + 310 && mouse.x < dx + 382) {
                         fm_apply_name();
                         menu = 0;
+                    } else if (menu == 8 && mouse.x >= dx + 310 && mouse.x < dx + 382
+                               && dialog_window_index >= 0 && dialog_input[0]) {
+                        notepad_save(&windows[dialog_window_index], dialog_input);
+                        menu = 0;
                     } else {
                         menu = 0;
                     }
@@ -2211,6 +2319,9 @@ int main(int argc, char** argv) {
                     } else if (menu == 7) {
                         fm_apply_name();
                         menu = 0;
+                    } else if (menu == 8 && dialog_window_index >= 0 && dialog_input[0]) {
+                        notepad_save(&windows[dialog_window_index], dialog_input);
+                        menu = 0;
                     }
                     changed = 1;
                 }
@@ -2218,7 +2329,7 @@ int main(int argc, char** argv) {
             if (changed) {
                 cursor_erase();
                 compose(&dirty);
-                cursor_move(mouse.x, mouse.y);
+                cursor_move(mouse.x, mouse.y, 0);
             }
             syscall(KOS_SYS_SLEEP, 10, 0, 0, 0);
             continue;
@@ -2237,14 +2348,18 @@ int main(int argc, char** argv) {
         } else if (pressed & 2) {
             if (!menu && mouse.y < screen_height - TASKBAR_HEIGHT) {
                 int target = window_at(mouse.x, mouse.y);
-                if (target >= 0 && windows[target].kind == 0) {
-                    int content_y = TITLE_HEIGHT + 6 + MENU_HEIGHT + 4;
-                    int list_y = content_y + 28;
-                    int ly = mouse.y - windows[target].y;
-                    if (ly >= list_y) {
-                        open_context_menu(mouse.x, mouse.y, target, 1);
+                if (target >= 0) {
+                    gui_window* w = &windows[target];
+                    int ly = mouse.y - w->y;
+                    if (ly < TITLE_HEIGHT) {
+                        open_context_menu(mouse.x, mouse.y, target, 2); /* system menu */
+                    } else if (w->kind == 0) {
+                        int content_y = TITLE_HEIGHT + 6 + MENU_HEIGHT + 4;
+                        int list_y = content_y + 29 + 28 + 20;
+                        if (ly >= list_y) open_context_menu(mouse.x, mouse.y, target, 1);
+                        else open_context_menu(mouse.x, mouse.y, target, 3);
                     } else {
-                        open_context_menu(mouse.x, mouse.y, -1, 0);
+                        open_context_menu(mouse.x, mouse.y, target, 2);
                     }
                 } else {
                     open_context_menu(mouse.x, mouse.y, -1, 0);
@@ -2417,7 +2532,8 @@ int main(int argc, char** argv) {
                             } else if (
                                 active_menu_window == target && lx >= 8 && lx < 144
                                 && ly >= menu_y + MENU_HEIGHT
-                                && ly < menu_y + MENU_HEIGHT + (active_menu_column == 3 ? 40 : 76)) {
+                                && ly < menu_y + MENU_HEIGHT
+                                    + (active_menu_column == 3 ? 40 : active_menu_column == 0 ? 94 : 76)) {
                                 int item = (ly - menu_y - MENU_HEIGHT - 4) / 18;
                                 window_menu_action(w, active_menu_column, item);
                                 changed = 1;
@@ -2425,10 +2541,12 @@ int main(int argc, char** argv) {
                                 raise_window(target);
                                 resizing = 1;
                             } else if (ly < TITLE_HEIGHT) {
+                                cursor_erase();
                                 raise_window(target);
                                 dragging = 1;
                                 drag_dx = lx;
                                 drag_dy = ly;
+                                drag_begin(w);
                             } else {
                                 raise_window(target);
                                 int content_y = menu_y + MENU_HEIGHT + 4;
@@ -2612,7 +2730,8 @@ int main(int argc, char** argv) {
                     color);
                 focused_window->last_paint_x = cx;
                 focused_window->last_paint_y = cy;
-                changed = 1;
+                paint_window = focused_window;
+                paint_dirty = 1;
             }
         } else if (!(mouse.buttons & 1)) {
             if (focused_window) {
@@ -2858,7 +2977,19 @@ int main(int argc, char** argv) {
                 changed = 1;
             }
         }
-        if (changed) {
+        if (paint_window && paint_dirty && !changed) {
+            /* Painting only touches one window surface: repaint that
+             * rectangle instead of the whole 1280x800 frame. */
+            gui_mouse = mouse;
+            gfx_dirty partial = { 0, 0, 0, 0, 0 };
+            gfx_dirty_add(&partial, paint_window->x, paint_window->y,
+                          paint_window->width, paint_window->height);
+            cursor_erase();
+            draw_window(paint_window);
+            gfx_blit(desktop, paint_window->x, paint_window->y, paint_window->surface,
+                     0, 0, paint_window->width, paint_window->height);
+            cursor_move(gui_mouse.x, gui_mouse.y, &partial);
+        } else if (changed) {
             gui_mouse = mouse;
             cursor_erase();
             for (int i = 0; i < MAX_WINDOWS; ++i) {
@@ -2867,8 +2998,10 @@ int main(int argc, char** argv) {
                 }
             }
             compose(&dirty);
-            cursor_move(gui_mouse.x, gui_mouse.y);
+            cursor_move(gui_mouse.x, gui_mouse.y, 0);
         }
+        paint_window = 0;
+        paint_dirty = 0;
         syscall(KOS_SYS_SLEEP, 10, 0, 0, 0);
     }
 }
