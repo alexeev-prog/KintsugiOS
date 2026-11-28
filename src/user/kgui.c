@@ -5,6 +5,9 @@
 #include "sysabi.h"
 #include "tuiabi.h"
 
+/* Foreground for surfaces filled with the theme face. A dark theme has a pale
+ * text colour, so hardcoded black would become unreadable there. */
+#define GUI_INK (gui_theme.text)
 /* KGUI - pixel window manager, Win95-like desktop and three graphic apps:
  * KGFM (files), KGED (editor), KGTERM (terminal). */
 
@@ -27,9 +30,13 @@
 #define TERM_COLS 96
 #define MAX_PROCESS_ROWS 16
 #define POLL_INTERVAL 5
+#define WALLPAPER_COUNT 8
+#define DOCK_SLOT 44
+#define DOCK_TILE 38
 /* Title-bar buttons, window-relative. Keep these in sync with gfx_titlebar(),
  * which draws at (2,2) with width (w->width - 4). */
 #define TITLE_BUTTON_W TITLE_BUTTON_SIZE
+#define GUI_CURSOR_HIT_MARGIN 2
 
 static int zvalid(int index) {
     return index >= 0 && index < MAX_WINDOWS;
@@ -39,6 +46,8 @@ typedef struct {
     int used, x, y, width, height;
     int saved_x, saved_y, saved_width, saved_height;
     int minimized, maximized;
+    int anim_open, anim_progress; /* open animation: scale 0.75 -> 1.0 */
+    int anim_close; /* closing animation: scale 1.0 -> 0.75 */
     char title[48];
     gfx_surface* surface;
     int kind; /* 0 KGFM, 1 KGED, 2 KGTERM, 3 About, 4 Notepad */
@@ -89,8 +98,10 @@ static u32 desktop_color = GFX_RGB(0, 128, 128);
 static gfx_surface* wallpaper_surface;
 static int wallpaper_kind, wallpaper_color_a, wallpaper_color_b, wallpaper_scale = 32;
 static int dock_size = 18, dock_autohide;
+static int dock_hover_key = -1, dock_mag_key = -1, dock_mag;
 static int volume_master = 70, volume_music = 70, volume_effects = 70;
-static const char* const wallpaper_names[6] = { "Solid", "Grid", "Diagonal", "Checker", "Dots", "Stripes" };
+static const char* const wallpaper_names[WALLPAPER_COUNT] = { "Solid", "Grid",    "Diagonal", "Checker",
+                                                              "Dots",  "Stripes", "Weave",    "Ripple" };
 static int gui_language; /* 0 English, 1 Russian */
 static char gui_toast[64];
 static int gui_toast_until;
@@ -98,7 +109,14 @@ static char settings_users[8][32];
 static int settings_user_count;
 static int context_open, context_x, context_y, context_window, fm_action, context_kind;
 static char context_items[10][32];
-static int context_count;
+static int context_count, context_hover = -1;
+/* Rectangle of the last composited overlay. It must be invalidated when the
+ * overlay closes or moves, otherwise its pixels survive the next partial
+ * repaint (the classic "leftover menu pieces" artifact). */
+static gfx_dirty overlay_prev = { 0, 0, 0, 0, 0 };
+/* Teardown is deferred until compose has finished walking zorder: destroying a
+ * window inside that walk corrupts the iteration and can skip a redraw. */
+static int pending_close[MAX_WINDOWS], pending_close_count;
 static int global_menu_column = -1;
 static gfx_surface* desktop;
 static int screen_width, screen_height;
@@ -110,6 +128,9 @@ static char search_results[MAX_RESULTS][160];
 static int search_count;
 static int dragging, resizing, drag_dx, drag_dy;
 static int dialog_window_index = -1;
+/* Set when the focused window moved through the keyboard: the old position
+ * must be repainted, so the frame cannot use a single-window dirty rect. */
+static int gui_keyboard_move;
 static kos_mouse gui_mouse;
 static unsigned previous_buttons;
 static int program_category = -1;
@@ -155,6 +176,9 @@ static int external_locate(int id, kos_gui_window_info* out) {
 }
 
 static void close_window(gui_window* w);
+static void window_finish(gui_window* w);
+static void open_help_document(void);
+static gui_window* activate_window_kind(int kind, const char* title);
 static gui_window* create_window(const char* title, int x, int y, int width, int height, int kind);
 static void term_prompt_string(gui_window* w, char* out, u32 cap);
 static void term_shell_banner(gui_window* w);
@@ -171,11 +195,11 @@ static void draw_system(gui_window* w, gfx_surface* s, int content_y, int status
 /* Single source of truth for the Programs submenu: drawing, hit testing and
  * keyboard shortcuts all use these tables, so no entry can be unreachable. */
 static const char* const program_names[5][9] = {
-    { "Notepad", "kfetch",   0,          0,         0,          0,        0, 0, 0 },
-    { "KPaint",  "KGED",     0,          0,         0,          0,        0, 0, 0 },
-    { "KGFM",    "KGTERM",   "KMonitor", "KSystem", "KServices", "KSersys", "KInfo", 0, 0 },
-    { "KMusa",   "KListen",  "SoundCtl", 0,         0,          0,        0, 0, 0 },
-    { "KRrawl",  "KMines",   "K2048",    "KLife",   "KTmux",    0,        0, 0, 0 }
+    { "Notepad", "kfetch",  0,          0,         0,           0,         0,       0, 0 },
+    { "KPaint",  "KGED",    0,          0,         0,           0,         0,       0, 0 },
+    { "KGFM",    "KGTERM",  "KMonitor", "KSystem", "KServices", "KSersys", "KInfo", 0, 0 },
+    { "KMusa",   "KListen", "SoundCtl", 0,         0,           0,         0,       0, 0 },
+    { "KRrawl",  "KMines",  "K2048",    "KLife",   "KTmux",     0,         0,       0, 0 }
 };
 static const int program_counts[5] = { 2, 2, 7, 3, 5 };
 
@@ -191,7 +215,7 @@ static int start_menu_height(void) {
         int height = 38 + (program_count(program_category) + 1) * 28;
         return height > screen_height - TASKBAR_HEIGHT - 8 ? screen_height - TASKBAR_HEIGHT - 8 : height;
     }
-    return 240;
+    return 272;
 }
 
 static int text_length(const char* s) {
@@ -214,6 +238,19 @@ static void toast(const char* text) {
 
 static int text_equal(const char* a, const char* b) {
     while (*a && *a == *b) {
+        ++a;
+        ++b;
+    }
+    return *a == *b;
+}
+
+static int text_equal_ci(const char* a, const char* b) {
+    while (*a && *b) {
+        char ca = *a >= 'A' && *a <= 'Z' ? (char)(*a + 32) : *a;
+        char cb = *b >= 'A' && *b <= 'Z' ? (char)(*b + 32) : *b;
+        if (ca != cb) {
+            return 0;
+        }
         ++a;
         ++b;
     }
@@ -772,7 +809,7 @@ static int cli_poll(gui_window* w) {
         return 0;
     }
     char output[2048];
-    int size = syscall(2, (u32)"/tmp/kgui-term.out", (u32)cli_offset, (u32)output, sizeof(output) - 1);
+    int size = syscall(2, (u32) "/tmp/kgui-term.out", (u32)cli_offset, (u32)output, sizeof(output) - 1);
     if (size > 0) {
         cli_offset += size;
         term_write(w, output, size);
@@ -852,11 +889,11 @@ static int name_equal(const char* a, const char* b) {
 }
 
 static int is_tui_name(const char* name) {
-    static const char* const apps[] = { "kiwi",     "kpaint",  "kuned",   "vik",     "kc",      "kterm",
-                                        "kset",     "ktte",    "k2048",   "kmines",  "klife",   "kcsv",
-                                        "krrawl",   "kmusa",   "klisten", "soundctl", "ktmux",  "kservices",
-                                        "ksersys",  "kinfo",   "kman",    "pager",   "journal", "hiero",
-                                        "kbsm",     "kmemman", "kprocm",  "kdiskman", "ktui",   "dir",
+    static const char* const apps[] = { "kiwi",    "kpaint",  "kuned",   "vik",      "kc",      "kterm",
+                                        "kset",    "ktte",    "k2048",   "kmines",   "klife",   "kcsv",
+                                        "krrawl",  "kmusa",   "klisten", "soundctl", "ktmux",   "kservices",
+                                        "ksersys", "kinfo",   "kman",    "pager",    "journal", "hiero",
+                                        "kbsm",    "kmemman", "kprocm",  "kdiskman", "ktui",    "dir",
                                         "ksdaemon" };
     for (unsigned i = 0; i < sizeof(apps) / sizeof(apps[0]); ++i) {
         const char *a = apps[i], *b = name;
@@ -1341,41 +1378,127 @@ static void note_draw(gui_window* w, gfx_surface* s, int content_y, int status_y
     }
 }
 
-static void draw_icon(gfx_surface* s, int x, int y, char letter, u32 color) {
-    gfx_fill(s, x, y, 18, 18, color);
-    gfx_bevel(s, x, y, 18, 18, 1);
-    char label[2] = { letter, 0 };
-    gfx_text(s, x + 4, y + 2, label, GFX_WHITE, 0);
+/* Perceptual luminance (Rec. 601 weights, integer only) decides whether a
+ * pictogram is drawn in white or near-black on its tile. */
+static u32 icon_ink(u32 color) {
+    unsigned r = (color >> 16) & 0xff, g = (color >> 8) & 0xff, b = color & 0xff;
+    unsigned luminance = (r * 77 + g * 150 + b * 29) / 256;
+    return luminance > 128 ? GFX_RGB(20, 24, 32) : GFX_WHITE;
+}
+
+/* Vector pictograms avoid unreadable letter soup at 14..26 px. Every shape is
+ * built from the same gfx primitives as the rest of the GUI. */
+static void draw_pictogram(gfx_surface* s, int x, int y, int size, int kind, u32 color) {
+    if (size < 12) {
+        return;
+    }
+    u32 ink = icon_ink(color);
+    int m = size / 5;
+    int w = size - 2 * m;
+    gfx_fill(s, x, y, size, size, color);
+    gfx_bevel(s, x, y, size, size, 1);
+    switch (kind) {
+        case 0: /* launcher: K monogram */
+            gfx_vline(s, x + size / 2 - m, y + m, size - 2 * m, ink);
+            gfx_line(s, x + size / 2 + 1, y + m, x + size - m - 1, y + size / 2 - 1, 1, ink);
+            gfx_line(s, x + size / 2 + 1, y + size / 2 + 1, x + size - m - 1, y + size - m - 1, 1, ink);
+            break;
+        case 1: /* file manager: folder */
+            gfx_fill(s, x + m, y + m + 1, w / 2, m, ink);
+            gfx_fill(s, x + m, y + m + 2, w, w - 1, ink);
+            gfx_fill(s, x + m + 2, y + m + 4, w - 4, w - 5, color);
+            break;
+        case 2: /* editor: page with a folded corner */
+            gfx_fill(s, x + m, y + m, w, w, ink);
+            gfx_fill(s, x + m + 2, y + m + 1, w - 4, w - 3, color);
+            gfx_hline(s, x + m + 3, y + m + 4, w - 7, ink);
+            gfx_hline(s, x + m + 3, y + m + 8, w - 7, ink);
+            gfx_hline(s, x + m + 3, y + m + 12, w / 2, ink);
+            break;
+        case 3: /* terminal: prompt */
+            gfx_fill(s, x + m, y + m, w, w, ink);
+            gfx_fill(s, x + m + 2, y + m + 2, w - 4, w - 4, color);
+            gfx_line(s, x + m + 3, y + m + 4, x + m + w / 3, y + m + 6, 1, ink);
+            gfx_line(s, x + m + w / 3, y + m + 6, x + m + 3, y + m + 8, 1, ink);
+            gfx_hline(s, x + m + w / 3 + 2, y + m + 9, w / 3, ink);
+            break;
+        case 4: /* monitor */
+            gfx_fill(s, x + m, y + m, w, w * 2 / 3, ink);
+            gfx_fill(s, x + m + 2, y + m + 2, w - 4, w * 2 / 3 - 4, color);
+            gfx_fill(s, x + size / 2 - 2, y + m + w * 2 / 3, 4, m + 1, ink);
+            gfx_hline(s, x + m + 1, y + size - m - 1, w - 2, ink);
+            break;
+        case 5: /* system: cross/gear */
+            gfx_fill(s, x + size / 2 - m, y + m, 2 * m, size - 2 * m, ink);
+            gfx_fill(s, x + m, y + size / 2 - m, size - 2 * m, 2 * m, ink);
+            gfx_fill(s, x + size / 2 - m / 2, y + size / 2 - m / 2, m, m, color);
+            break;
+        default: /* trash */
+            gfx_hline(s, x + m, y + m, w, ink);
+            gfx_fill(s, x + m + 2, y + m + 3, w - 4, w - 2, ink);
+            gfx_fill(s, x + m + 4, y + m + 5, w - 8, w - 6, color);
+            gfx_vline(s, x + size / 2, y + m + 6, w - 8, ink);
+            break;
+    }
 }
 
 typedef struct {
-    int x, y, kind;
-    char letter;
-    u32 color;
+    int x, y, kind; /* kind is a draw_pictogram() id */
     const char* label;
 } desktop_icon;
 
+/* Iconography follows the active theme so bright themes (Fruit, NeXTSTEP) and
+ * muted ones (Graphite, Solar) keep the same icon language. */
+static u32 desktop_icon_color(int kind) {
+    switch (kind) {
+        case 1:
+            return gui_theme.accent;
+        case 2:
+            return gui_theme.success;
+        case 3:
+            return gui_theme.title;
+        default:
+            return gui_theme.shadow;
+    }
+}
+
 static const desktop_icon desktop_icons[] = {
-    { 22, 40,  0, 'F', GFX_RGB(180, 150, 40),  "My Computer" },
-    { 22, 130, 1, 'T', GFX_RGB(60,  120, 180), "Terminal"    },
-    { 22, 220, 2, 'E', GFX_RGB(60,  160, 90),  "Editor"      },
-    { 22, 310, 3, 'R', GFX_RGB(128, 128, 128), "Trash"       }
+    { 22, 40,  1, "My Computer" },
+    { 22, 130, 3, "Terminal"    },
+    { 22, 220, 2, "Editor"      },
+    { 22, 310, 6, "Trash"       }
 };
 #define DESKTOP_ICON_COUNT ((int)(sizeof(desktop_icons) / sizeof(desktop_icons[0])))
 static int selected_icon = -1, last_icon_click = -1;
 static u32 last_icon_tick;
 
+/* Painter and hit-test share one rectangle: no more label clicks that miss. */
+static void desktop_icon_rect(const desktop_icon* icon, int* x, int* y, int* width, int* height) {
+    int label_width = gfx_text_width(icon->label) + 8;
+    int total = label_width > 22 ? label_width : 22;
+    *x = icon->x - 2;
+    *y = icon->y - 2;
+    *width = total;
+    *height = 42;
+}
+
 static void draw_desktop_icon(gfx_surface* back, const desktop_icon* icon, int selected) {
-    draw_icon(back, icon->x, icon->y, icon->letter, icon->color);
-    if (selected) {
-        gfx_bevel(back, icon->x - 2, icon->y - 2, 22, 42, 1);
-    }
-    int width = gfx_text_width(icon->label);
-    int label_x = icon->x + 9 - width / 2;
+    u32 color = desktop_icon_color(icon->kind);
+    draw_pictogram(back, icon->x, icon->y, 18, icon->kind, color);
+    int label_width = gfx_text_width(icon->label) + 8;
+    int label_x = icon->x + 9 - label_width / 2;
     if (label_x < 2) {
         label_x = 2;
     }
-    gfx_text(back, label_x, icon->y + 22, icon->label, GFX_WHITE, selected ? GFX_DARK : 0);
+    /* A recessed plate keeps labels legible on light and patterned wallpapers. */
+    gfx_fill(back, label_x, icon->y + 21, label_width, 16, GFX_FACE);
+    gfx_bevel(back, label_x, icon->y + 21, label_width, 16, selected ? 0 : 1);
+    gfx_text(back, label_x + 4, icon->y + 23, icon->label, selected ? GUI_INK : gui_theme.text, GFX_FACE);
+    if (selected) {
+        int x, y, width, height;
+        desktop_icon_rect(icon, &x, &y, &width, &height);
+        gfx_bevel(back, x, y, width, height, 1);
+    }
 }
 
 static void draw_meter(gfx_surface* s, int x, int y, int width, int height, u32 used, u32 total, u32 color) {
@@ -1489,7 +1612,13 @@ static void draw_monitor(gui_window* w, gfx_surface* s, int content_y, int statu
         number_text(text + n, sizeof(text) - n, list[i].ticks);
         gfx_text(s, 14, y + 134 + i * 16, text, i == 0 ? GFX_DARK : GFX_BLACK, 0);
     }
-    gfx_text(s, 10, status_y + 2, "KMonitor - F5-like automatic refresh, wheel to scroll windows", GFX_BLACK, GFX_FACE);
+    gfx_text(
+        s,
+        10,
+        status_y + 2,
+        "KMonitor - F5-like automatic refresh, wheel to scroll windows",
+        GUI_INK,
+        GFX_FACE);
 }
 
 typedef struct {
@@ -1500,14 +1629,14 @@ typedef struct {
 } sys_service_t;
 
 static const sys_service_t sys_services[] = {
-    { "login",     "/bin/INIT.ELF",     "Session supervisor",   1 },
-    { "shell",     "/bin/SHELL.ELF",    "Command interpreter",  0 },
-    { "sysmon",    "/bin/KINFO.ELF",    "System monitor",       0 },
-    { "mixer",     "/bin/SOUNDCTL.ELF", "Audio mixer",          0 },
-    { "music",     "/bin/KMUSA.ELF",    "Music generator",      0 },
-    { "terminal",  "/bin/KTERM.ELF",    "Terminal session",     0 },
-    { "clockd",    "/bin/KSDAEMON.ELF", "Clock daemon",         1 },
-    { "workspace", "/bin/KIWI.ELF",     "Window workspace",     0 }
+    { "login",     "/bin/INIT.ELF",     "Session supervisor",  1 },
+    { "shell",     "/bin/SHELL.ELF",    "Command interpreter", 0 },
+    { "sysmon",    "/bin/KINFO.ELF",    "System monitor",      0 },
+    { "mixer",     "/bin/SOUNDCTL.ELF", "Audio mixer",         0 },
+    { "music",     "/bin/KMUSA.ELF",    "Music generator",     0 },
+    { "terminal",  "/bin/KTERM.ELF",    "Terminal session",    0 },
+    { "clockd",    "/bin/KSDAEMON.ELF", "Clock daemon",        1 },
+    { "workspace", "/bin/KIWI.ELF",     "Window workspace",    0 }
 };
 #define SYS_SERVICE_COUNT ((int)(sizeof(sys_services) / sizeof(sys_services[0])))
 
@@ -1637,7 +1766,7 @@ static void draw_system(gui_window* w, gfx_surface* s, int content_y, int status
         gfx_button(s, 92, status_y - 32, 72, 24, "Stop", 0);
         gfx_text(s, 176, status_y - 26, "System services need root rights", GFX_SHADOW, 0);
     }
-    gfx_text(s, 10, status_y + 2, "KSystem - processes and services", GFX_BLACK, GFX_FACE);
+    gfx_text(s, 10, status_y + 2, "KSystem - processes and services", GUI_INK, GFX_FACE);
 }
 
 /* NeXTSTEP style: the menu bar belongs to the screen, not to each window.
@@ -1719,6 +1848,36 @@ static void fm_init_shelf(gui_window* w) {
 
 /* ---- Settings document: theme, wallpaper, Dock, mixer, persistence ---- */
 
+/* Pure pattern function: no allocations, no state, identical result for the
+ * full-size wallpaper and for the small preview tiles in Settings. */
+static int wallpaper_pattern(int kind, int x, int y, int scale) {
+    if (scale < 4) {
+        scale = 4;
+    }
+    switch (kind) {
+        case 1:
+            return (x % scale) < 2 || (y % scale) < 2;
+        case 2:
+            return ((x + y) % scale) < scale / 2;
+        case 3:
+            return ((x / scale) + (y / scale)) & 1;
+        case 4:
+            return (x % scale) < 3 && (y % scale) < 3;
+        case 5:
+            return (x / (scale / 2)) & 1;
+        case 6:
+            return (((x / scale) + (y / scale)) & 1) ^ (((x / (scale / 2)) + (y / (scale / 2))) & 1);
+        case 7: {
+            int dx = x - screen_width / 2;
+            int dy = y - screen_height / 2;
+            int ring = (dx * dx + dy * dy) / (scale * scale * 2);
+            return (ring & 1) && (((x + y) % (scale * 2)) < scale);
+        }
+        default:
+            return 0;
+    }
+}
+
 static void wallpaper_generate(void) {
     if (!wallpaper_surface || wallpaper_surface->width != screen_width
         || wallpaper_surface->height != screen_height) {
@@ -1734,16 +1893,8 @@ static void wallpaper_generate(void) {
     for (int y = 0; y < screen_height; ++y) {
         u32* row = wallpaper_surface->pixels + y * screen_width;
         for (int x = 0; x < screen_width; ++x) {
-            int pattern = 0;
-            switch (wallpaper_kind) {
-                case 1: pattern = (x % scale) < 2 || (y % scale) < 2; break;
-                case 2: pattern = ((x + y) % scale) < scale / 2; break;
-                case 3: pattern = ((x / scale) + (y / scale)) & 1; break;
-                case 4: pattern = (x % scale) < 3 && (y % scale) < 3; break;
-                case 5: pattern = ((x / (scale / 2)) & 1); break;
-                default: pattern = 0; break;
-            }
-            row[x] = pattern ? (u32)wallpaper_color_b : (u32)wallpaper_color_a;
+            row[x] = wallpaper_pattern(wallpaper_kind, x, y, scale) ? (u32)wallpaper_color_b
+                                                                    : (u32)wallpaper_color_a;
         }
     }
 }
@@ -1764,9 +1915,11 @@ static void settings_save(void) {
     while (*head && n + 1 < (int)sizeof(data)) {
         data[n++] = *head++;
     }
-    const char* keys[8] = { "theme", "wallpaper", "color_a", "color_b", "scale", "dock", "autohide", "volume" };
-    int values[8] = { gfx_theme_id(), wallpaper_kind, wallpaper_color_a, wallpaper_color_b, wallpaper_scale,
-                      dock_size, dock_autohide, volume_master };
+    const char* keys[8] = {
+        "theme", "wallpaper", "color_a", "color_b", "scale", "dock", "autohide", "volume"
+    };
+    int values[8] = { gfx_theme_id(),  wallpaper_kind, wallpaper_color_a, wallpaper_color_b,
+                      wallpaper_scale, dock_size,      dock_autohide,     volume_master };
     for (int i = 0; i < 8; ++i) {
         const char* key = keys[i];
         while (*key && n + 1 < (int)sizeof(data)) {
@@ -1777,7 +1930,7 @@ static void settings_save(void) {
         data[n++] = '\n';
         data[n] = 0;
     }
-    syscall(10, (u32)"/home/user/KGUI.CFG", (u32)data, (u32)n, 0);
+    syscall(10, (u32) "/home/user/KGUI.CFG", (u32)data, (u32)n, 0);
 }
 
 static int config_value(const char* data, const char* key) {
@@ -1807,7 +1960,7 @@ static int config_value(const char* data, const char* key) {
 
 static void settings_load(void) {
     char data[512];
-    int size = syscall(2, (u32)"/home/user/KGUI.CFG", 0, (u32)data, sizeof(data) - 1);
+    int size = syscall(2, (u32) "/home/user/KGUI.CFG", 0, (u32)data, sizeof(data) - 1);
     if (size <= 0) {
         return;
     }
@@ -1816,7 +1969,7 @@ static void settings_load(void) {
     if ((value = config_value(data, "theme")) >= 0 && value < GUI_THEME_COUNT) {
         gfx_theme_set(value);
     }
-    if ((value = config_value(data, "wallpaper")) >= 0 && value < 6) {
+    if ((value = config_value(data, "wallpaper")) >= 0 && value < WALLPAPER_COUNT) {
         wallpaper_kind = value;
     }
     if ((value = config_value(data, "color_a")) >= 0) {
@@ -1846,11 +1999,10 @@ static void settings_load(void) {
     settings_apply();
 }
 
-static const u32 settings_palette[10] = {
-    GFX_RGB(0, 128, 128), GFX_RGB(32, 38, 48), GFX_RGB(10, 36, 106), GFX_RGB(122, 59, 46),
-    GFX_RGB(120, 160, 190), GFX_RGB(64, 64, 96), GFX_RGB(96, 64, 64), GFX_RGB(48, 96, 48),
-    GFX_RGB(221, 72, 20), GFX_RGB(245, 240, 225)
-};
+static const u32 settings_palette[10] = { GFX_RGB(0, 128, 128),  GFX_RGB(32, 38, 48),    GFX_RGB(10, 36, 106),
+                                          GFX_RGB(122, 59, 46),  GFX_RGB(120, 160, 190), GFX_RGB(64, 64, 96),
+                                          GFX_RGB(96, 64, 64),   GFX_RGB(48, 96, 48),    GFX_RGB(221, 72, 20),
+                                          GFX_RGB(245, 240, 225) };
 
 static int palette_index(u32 color) {
     for (int i = 0; i < 10; ++i) {
@@ -1859,6 +2011,50 @@ static int palette_index(u32 color) {
         }
     }
     return -1;
+}
+
+/* Display mode and interface scale persist in /etc/VIDEO.CFG, which init
+ * applies at boot; changing it live would resize every retained surface. */
+static void apply_video_config(int mode, int font_scale) {
+    unsigned char settings[5] = { 1, 5, 1, 0, 1 };
+    int loaded = (int)syscall(2, (u32) "/etc/VIDEO.CFG", 0, (u32)settings, sizeof(settings));
+    if (loaded < 5) {
+        settings[0] = 1;
+        settings[1] = 5;
+        settings[2] = 1;
+        settings[3] = 0;
+        settings[4] = 1;
+    }
+    if (mode >= 0) {
+        settings[0] = (unsigned char)mode;
+    }
+    if (font_scale >= 0) {
+        settings[2] = (unsigned char)font_scale;
+        settings[4] = (unsigned char)font_scale;
+    }
+    syscall(10, (u32) "/etc/VIDEO.CFG", (u32)settings, sizeof(settings), 0);
+    toast("Display saved - applies at next start");
+}
+
+/* Shared geometry for the wallpaper chooser: the preview tile, palette
+ * swatch and scale controls have exactly one definition for paint + hit-test. */
+#define SET_PREVIEW_W 104
+#define SET_PREVIEW_H 40
+#define SET_SWATCH_W 24
+#define SET_SWATCH_H 20
+
+static void settings_preview_rect(int index, int panel_y, int* x, int* y, int* w, int* h) {
+    *x = 24 + (index % 4) * 120;
+    *y = panel_y + 112 + (index / 4) * 52;
+    *w = SET_PREVIEW_W;
+    *h = SET_PREVIEW_H;
+}
+
+static void settings_swatch_rect(int row, int index, int panel_y, int* x, int* y, int* w, int* h) {
+    *x = 40 + index * 30;
+    *y = panel_y + 222 + row * 30;
+    *w = SET_SWATCH_W;
+    *h = SET_SWATCH_H;
 }
 
 static void settings_click(gui_window* w, int lx, int ly) {
@@ -1889,40 +2085,38 @@ static void settings_click(gui_window* w, int lx, int ly) {
                 return;
             }
         }
-        for (int i = 0; i < 6; ++i) {
-            int bx = 22 + (i % 3) * 160, by = panel_y + 108 + (i / 3) * 30;
-            if (lx >= bx && lx < bx + 150 && ly >= by && ly < by + 24) {
+        for (int i = 0; i < WALLPAPER_COUNT; ++i) {
+            int px, py, pw, ph;
+            settings_preview_rect(i, panel_y, &px, &py, &pw, &ph);
+            if (lx >= px && lx < px + pw && ly >= py && ly < py + ph) {
                 wallpaper_kind = i;
                 wallpaper_generate();
                 settings_save();
                 return;
             }
         }
-        if (lx >= 22 && lx < 62 && ly >= panel_y + 180 && ly < panel_y + 200) {
-            int index = palette_index((u32)wallpaper_color_a);
-            wallpaper_color_a = (u32)settings_palette[(index + 1) % 10];
-            wallpaper_generate();
-            settings_save();
-            return;
+        for (int row = 0; row < 2; ++row) {
+            for (int i = 0; i < 10; ++i) {
+                int px, py, pw, ph;
+                settings_swatch_rect(row, i, panel_y, &px, &py, &pw, &ph);
+                if (lx >= px && lx < px + pw && ly >= py && ly < py + ph) {
+                    if (row == 0) {
+                        wallpaper_color_a = settings_palette[i];
+                    } else {
+                        wallpaper_color_b = settings_palette[i];
+                    }
+                    wallpaper_generate();
+                    settings_save();
+                    return;
+                }
+            }
         }
-        if (lx >= 82 && lx < 122 && ly >= panel_y + 180 && ly < panel_y + 200) {
-            int index = palette_index((u32)wallpaper_color_b);
-            wallpaper_color_b = (u32)settings_palette[(index + 1) % 10];
-            wallpaper_generate();
-            settings_save();
-            return;
-        }
-        if (lx >= 134 && lx < 158 && ly >= panel_y + 178 && ly < panel_y + 202) {
-            wallpaper_scale -= 4;
+        if (((lx >= 400 && lx < 424) || (lx >= 430 && lx < 454)) && ly >= panel_y + 258
+            && ly < panel_y + 278) {
+            wallpaper_scale += lx < 424 ? -4 : 4;
             if (wallpaper_scale < 4) {
                 wallpaper_scale = 4;
             }
-            wallpaper_generate();
-            settings_save();
-            return;
-        }
-        if (lx >= 162 && lx < 186 && ly >= panel_y + 178 && ly < panel_y + 202) {
-            wallpaper_scale += 4;
             if (wallpaper_scale > 128) {
                 wallpaper_scale = 128;
             }
@@ -1971,7 +2165,25 @@ static void settings_click(gui_window* w, int lx, int ly) {
             toast("Test tone");
         }
     } else {
-        if (lx >= 24 && lx < 124 && ly >= panel_y + 30 && ly < panel_y + 54) {
+        if (ly >= panel_y + 50 && ly < panel_y + 72) {
+            if (lx >= 272 && lx < 372) {
+                apply_video_config(0, -1);
+            } else if (lx >= 378 && lx < 478) {
+                apply_video_config(1, -1);
+            }
+        } else if (ly >= panel_y + 78 && ly < panel_y + 100) {
+            if (lx >= 272 && lx < 372) {
+                apply_video_config(3, -1);
+            } else if (lx >= 378 && lx < 478) {
+                apply_video_config(5, -1);
+            }
+        } else if (ly >= panel_y + 104 && ly < panel_y + 126) {
+            if (lx >= 356 && lx < 414) {
+                apply_video_config(-1, 0);
+            } else if (lx >= 420 && lx < 478) {
+                apply_video_config(-1, 2);
+            }
+        } else if (lx >= 24 && lx < 124 && ly >= panel_y + 30 && ly < panel_y + 54) {
             gui_language = 0;
             syscall(KOS_SYS_LAYOUT, 0, 0, 0, 0);
         } else if (lx >= 132 && lx < 232 && ly >= panel_y + 30 && ly < panel_y + 54) {
@@ -2047,13 +2259,24 @@ static void draw_window(gui_window* w) {
             char size[16], date[8];
             number_text(size, sizeof(size), entry->stat.size);
             fm_date(entry->stat.mtime, date, sizeof(date));
-            gfx_text_clipped(s, 38, y + 2, size_x - 42, entry->name, ink,
-                             index == w->selected ? gui_theme.selection : GFX_FACE);
+            gfx_text_clipped(
+                s,
+                38,
+                y + 2,
+                size_x - 42,
+                entry->name,
+                ink,
+                index == w->selected ? gui_theme.selection : GFX_FACE);
             gfx_text(s, size_x, y + 2, size, ink, 0);
             gfx_text(s, type_x, y + 2, entry->stat.directory ? "DIR" : "FILE", ink, 0);
             gfx_text(s, date_x, y + 2, date, ink, 0);
-            draw_icon(s, 14, y, entry->stat.directory ? 'D' : 'F',
-                      entry->stat.directory ? GFX_RGB(180, 150, 40) : GFX_RGB(60, 120, 180));
+            draw_pictogram(
+                s,
+                14,
+                y,
+                18,
+                entry->stat.directory ? 1 : 2,
+                entry->stat.directory ? GFX_RGB(180, 150, 40) : GFX_RGB(60, 120, 180));
         }
         gfx_scrollbar(s, list_right - 8, list_y, list_h, w->top, w->entry_count ? w->entry_count : 1);
         gfx_groupbox(s, shelf_x, list_y, 116, list_h, "Shelf");
@@ -2065,7 +2288,7 @@ static void draw_window(gui_window* w) {
             int selected = i == w->shelf_selected;
             gfx_fill(s, shelf_x + 6, y, 104, 25, selected ? gui_theme.selection : GFX_FACE);
             gfx_bevel(s, shelf_x + 6, y, 104, 25, selected ? 0 : 1);
-            draw_icon(s, shelf_x + 10, y + 3, 'H', gui_theme.accent);
+            draw_pictogram(s, shelf_x + 10, y + 3, 14, 1, gui_theme.accent);
             gfx_text(s, shelf_x + 34, y + 6, w->shelf_label[i], selected ? GFX_WHITE : GFX_BLACK, 0);
         }
         char status[120];
@@ -2076,16 +2299,15 @@ static void draw_window(gui_window* w) {
             status[n++] = *tail++;
         }
         status[n] = 0;
-        gfx_text(s, 10, status_y + 2, status, GFX_BLACK, GFX_FACE);
+        gfx_text(s, 10, status_y + 2, status, GUI_INK, GFX_FACE);
     } else if (w->kind == 1) {
         /* KGED: toolbar + canvas */
         int y = content_y;
         gfx_button(s, 10, y, 66, 20, "Pen", w->tool == 0);
         gfx_button(s, 82, y, 66, 20, "Erase", w->tool == 1);
         gfx_button(s, 154, y, 66, 20, "Clear", 0);
-        const u32 palette[] = {
-            GFX_BLACK, GFX_RED, GFX_RGB(0, 128, 0), gui_theme.title, GFX_RGB(255, 255, 0), GFX_WHITE
-        };
+        const u32 palette[] = { GFX_BLACK, GFX_RED, GFX_RGB(0, 128, 0), gui_theme.title, GFX_RGB(255, 255, 0),
+                                GFX_WHITE };
         for (int i = 0; i < 6; ++i) {
             gfx_fill(s, 228 + i * 22, y, 20, 20, palette[i]);
             gfx_bevel(s, 228 + i * 22, y, 20, 20, w->color == palette[i]);
@@ -2096,7 +2318,7 @@ static void draw_window(gui_window* w) {
         if (w->canvas) {
             gfx_blit(s, 10, canvas_y + 2, w->canvas, 0, 0, w->canvas->width, w->canvas->height);
         }
-        gfx_text(s, 10, status_y + 2, "KGED - Kintsugi Graphic Editor", GFX_BLACK, GFX_FACE);
+        gfx_text(s, 10, status_y + 2, "KGED - Kintsugi Graphic Editor", GUI_INK, GFX_FACE);
     } else if (w->kind == 2) {
         if (tui_window == w && tui_child_pid > 0) {
             /* TUI application presentation, drawn inside this window. */
@@ -2126,7 +2348,7 @@ static void draw_window(gui_window* w) {
                         tui_cells[row][col].color);
                 }
             }
-            gfx_text(s, 10, status_y + 2, "TUI session - q/Esc to exit", GFX_BLACK, GFX_FACE);
+            gfx_text(s, 10, status_y + 2, "TUI session - q/Esc to exit", GUI_INK, GFX_FACE);
         } else {
             /* One contiguous terminal: output and the live prompt line. */
             gfx_fill(s, 8, content_y, w->width - 16, status_y - content_y - 6, GFX_BLACK);
@@ -2146,13 +2368,7 @@ static void draw_window(gui_window* w) {
                 /* Clear the whole cell row: gfx_text with a transparent
                  * background would otherwise leave tails of longer lines. */
                 gfx_fill(s, 8, row_y - 1, w->width - 16, 16, GFX_BLACK);
-                gfx_text(
-                    s,
-                    14,
-                    row_y,
-                    w->output[i + w->out_top],
-                    w->output_color[i + w->out_top],
-                    0);
+                gfx_text(s, 14, row_y, w->output[i + w->out_top], w->output_color[i + w->out_top], 0);
             }
             if (active) {
                 char line[200], typed[129];
@@ -2168,7 +2384,7 @@ static void draw_window(gui_window* w) {
                 gfx_text(s, 14, py, line, GFX_RGB(200, 255, 200), 0);
                 gfx_fill(s, 14 + gfx_text_width(line), py, 2, 14, GFX_RGB(200, 255, 200));
             }
-            gfx_text(s, 10, status_y + 2, "KGTERM - shell", GFX_BLACK, GFX_FACE);
+            gfx_text(s, 10, status_y + 2, "KGTERM - shell", GUI_INK, GFX_FACE);
         }
     } else if (w->kind == 3) {
         gfx_text(s, 20, content_y + 12, "KintsugiOS", GFX_DARK, 0);
@@ -2176,11 +2392,10 @@ static void draw_window(gui_window* w) {
         gfx_text(s, 20, content_y + 60, "Surfaces + compositor", GFX_BLACK, 0);
         gfx_text(s, 20, content_y + 84, "KGFM KGED KGTERM KMonitor KSystem", GFX_BLACK, 0);
         gfx_text(s, 20, content_y + 108, "Drag title, resize corner", GFX_BLACK, 0);
-        gfx_text(s, 10, status_y + 2, "About KGUI", GFX_BLACK, GFX_FACE);
+        gfx_text(s, 10, status_y + 2, "About KGUI", GUI_INK, GFX_FACE);
     } else if (w->kind == 5) {
-        static const char* const short_themes[GUI_THEME_COUNT] = { "Classic", "NeXT", "Millen", "Human",
-                                                                   "Fruit",   "Graph", "Ocean",
-                                                                   "Solar" };
+        static const char* const short_themes[GUI_THEME_COUNT] = { "Classic", "NeXT",  "Millen", "Human",
+                                                                   "Fruit",   "Graph", "Ocean",  "Solar" };
         static const char* const setting_tabs[4] = { "Appearance", "Dock", "Sound", "System" };
         for (int i = 0; i < 4; ++i) {
             gfx_tab(s, 14 + i * 116, content_y + 4, 114, 22, setting_tabs[i], w->settings_tab == i);
@@ -2189,40 +2404,74 @@ static void draw_window(gui_window* w) {
         if (w->settings_tab == 0) {
             gfx_groupbox(s, 14, panel_y, w->width - 28, 78, "Theme");
             for (int i = 0; i < GUI_THEME_COUNT; ++i) {
-                gfx_button(s, 22 + (i % 4) * 120, panel_y + 18 + (i / 4) * 28, 114, 24,
-                           short_themes[i], gfx_theme_id() == i);
+                gfx_button(
+                    s,
+                    22 + (i % 4) * 120,
+                    panel_y + 18 + (i / 4) * 28,
+                    114,
+                    24,
+                    short_themes[i],
+                    gfx_theme_id() == i);
             }
-            gfx_groupbox(s, 14, panel_y + 86, w->width - 28, 124, "Wallpaper and patterns");
-            for (int i = 0; i < 6; ++i) {
-                gfx_button(s, 22 + (i % 3) * 160, panel_y + 108 + (i / 3) * 30, 150, 24,
-                           wallpaper_names[i], wallpaper_kind == i);
+            gfx_groupbox(s, 14, panel_y + 86, w->width - 28, 300, "Wallpaper chooser");
+            for (int i = 0; i < WALLPAPER_COUNT; ++i) {
+                int px, py, pw, ph;
+                settings_preview_rect(i, panel_y, &px, &py, &pw, &ph);
+                for (int ty = 0; ty < ph - 14; ++ty) {
+                    u32* row = s->pixels + (py + ty) * s->width + px;
+                    for (int tx = 0; tx < pw; ++tx) {
+                        row[tx] = wallpaper_pattern(i, tx, ty, wallpaper_scale) ? (u32)wallpaper_color_b
+                                                                                : (u32)wallpaper_color_a;
+                    }
+                }
+                gfx_fill(s, px, py + ph - 14, pw, 14, GFX_FACE);
+                gfx_text_clipped(s, px + 2, py + ph - 13, pw - 4, wallpaper_names[i], GUI_INK, GFX_FACE);
+                gfx_bevel(s, px, py, pw, ph, wallpaper_kind == i ? 0 : 1);
+                if (wallpaper_kind == i) {
+                    gfx_fill(s, px + 2, py + ph - 16, pw - 4, 2, gui_theme.selection);
+                }
             }
-            gfx_fill(s, 22, panel_y + 180, 40, 20, (u32)wallpaper_color_a);
-            gfx_bevel(s, 22, panel_y + 180, 40, 20, 1);
-            gfx_fill(s, 82, panel_y + 180, 40, 20, (u32)wallpaper_color_b);
-            gfx_bevel(s, 82, panel_y + 180, 40, 20, 1);
-            gfx_button(s, 134, panel_y + 178, 24, 24, "-", 0);
-            gfx_button(s, 162, panel_y + 178, 24, 24, "+", 0);
+            gfx_text(s, 24, panel_y + 204, "Palette", GFX_DARK, GFX_FACE);
+            for (int row = 0; row < 2; ++row) {
+                gfx_text(s, 24, panel_y + 228 + row * 30, row ? "B" : "A", GUI_INK, GFX_FACE);
+                for (int i = 0; i < 10; ++i) {
+                    int px, py, pw, ph;
+                    settings_swatch_rect(row, i, panel_y, &px, &py, &pw, &ph);
+                    gfx_fill(s, px, py, pw, ph, settings_palette[i]);
+                    gfx_bevel(
+                        s,
+                        px,
+                        py,
+                        pw,
+                        ph,
+                        palette_index((u32)(row ? wallpaper_color_b : wallpaper_color_a)) == i ? 0 : 1);
+                }
+            }
+            gfx_text(s, 400, panel_y + 236, "Scale", GUI_INK, GFX_FACE);
+            gfx_button(s, 400, panel_y + 258, 24, 20, "-", 0);
+            gfx_button(s, 430, panel_y + 258, 24, 20, "+", 0);
             char scale_text[16];
             int sl = number_text(scale_text, sizeof(scale_text), (unsigned)wallpaper_scale);
-            while (sl < 5 && sl + 1 < (int)sizeof(scale_text)) {
-                scale_text[sl++] = ' ';
-            }
             scale_text[sl] = 0;
-            gfx_text(s, 194, panel_y + 184, scale_text, GFX_BLACK, 0);
+            gfx_text(s, 462, panel_y + 262, scale_text, GUI_INK, GFX_FACE);
         } else if (w->settings_tab == 1) {
             gfx_groupbox(s, 14, panel_y, w->width - 28, 120, "Dock");
             gfx_text(s, 24, panel_y + 26, "Icon size", GFX_BLACK, 0);
             gfx_slider(s, 110, panel_y + 22, 260, 24, dock_size, 28, 1);
             gfx_button(s, 380, panel_y + 20, 24, 24, "-", 0);
             gfx_button(s, 408, panel_y + 20, 24, 24, "+", 0);
-            gfx_button(s, 24, panel_y + 58, 150, 24, dock_autohide ? "Compact: on" : "Compact: off",
-                       dock_autohide);
+            gfx_button(
+                s, 24, panel_y + 58, 150, 24, dock_autohide ? "Compact: on" : "Compact: off", dock_autohide);
             gfx_button(s, 182, panel_y + 58, 130, 24, "Reset layout", 0);
             gfx_text(s, 24, panel_y + 94, "Pinned: KGFM, KGED, KGTERM, KMonitor, KSystem", GFX_SHADOW, 0);
             gfx_groupbox(s, 14, panel_y + 130, w->width - 28, 60, "Behavior");
-            gfx_text(s, 24, panel_y + 156, "Pinned tiles launch apps; running apps stay in the Dock.",
-                     GFX_BLACK, 0);
+            gfx_text(
+                s,
+                24,
+                panel_y + 156,
+                "Pinned tiles launch apps; running apps stay in the Dock.",
+                GFX_BLACK,
+                0);
         } else if (w->settings_tab == 2) {
             gfx_groupbox(s, 14, panel_y, w->width - 28, 164, "Sound mixer");
             static const char* const channels[3] = { "Master", "Music (FM)", "Effects" };
@@ -2244,9 +2493,37 @@ static void draw_window(gui_window* w) {
             gfx_button(s, 24, panel_y + 140, 110, 24, "Test sound", 0);
             u32 audio[3] = { 0 };
             syscall(KOS_SYS_SOUND_INFO, (u32)audio, 0, 0, 0);
-            gfx_text(s, 184, panel_y + 146, audio[2] ? "OPL2 FM synthesizer" : "PC speaker fallback",
-                     GFX_SHADOW, 0);
+            gfx_text(
+                s,
+                184,
+                panel_y + 146,
+                audio[2] ? "OPL2 FM synthesizer" : "PC speaker fallback",
+                GFX_SHADOW,
+                0);
         } else {
+            gfx_groupbox(s, 260, panel_y, 226, 154, "Display and scale");
+            kos_desktop_info dinfo = { 0 };
+            syscall(KOS_SYS_DESKTOP, (u32)&dinfo, 0, 0, 0);
+            char mode_text[32];
+            int mn = 0;
+            const char* mhead = "Current: ";
+            while (*mhead && mn + 1 < (int)sizeof(mode_text)) {
+                mode_text[mn++] = *mhead++;
+            }
+            mn += number_text(mode_text + mn, sizeof(mode_text) - mn, dinfo.width);
+            if (mn + 1 < (int)sizeof(mode_text)) {
+                mode_text[mn++] = 'x';
+            }
+            mn += number_text(mode_text + mn, sizeof(mode_text) - mn, dinfo.height);
+            mode_text[mn] = 0;
+            gfx_text(s, 272, panel_y + 24, mode_text, GFX_BLACK, 0);
+            gfx_button(s, 272, panel_y + 50, 100, 22, "1024x768", 0);
+            gfx_button(s, 378, panel_y + 50, 100, 22, "1280x800", 0);
+            gfx_button(s, 272, panel_y + 78, 100, 22, "1600x900", 0);
+            gfx_button(s, 378, panel_y + 78, 100, 22, "1920x1080", 0);
+            gfx_text(s, 272, panel_y + 108, "Font size", GFX_DARK, 0);
+            gfx_button(s, 356, panel_y + 104, 58, 22, "Small", 0);
+            gfx_button(s, 420, panel_y + 104, 58, 22, "Large", 0);
             gfx_text(s, 24, panel_y + 8, "Language", GFX_DARK, 0);
             gfx_button(s, 24, panel_y + 30, 100, 24, "English", !gui_language);
             gfx_button(s, 132, panel_y + 30, 100, 24, "Russian", gui_language);
@@ -2258,7 +2535,7 @@ static void draw_window(gui_window* w) {
             gfx_button(s, 24, panel_y + 158, 140, 26, "Save settings", 0);
             gfx_text(s, 176, panel_y + 164, "KintsugiOS GUI framework v0.8", GFX_SHADOW, 0);
         }
-        gfx_text(s, 10, status_y + 2, "Settings - appearance, Dock, mixer, system", GFX_BLACK, GFX_FACE);
+        gfx_text(s, 10, status_y + 2, "Settings - appearance, Dock, mixer, system", GUI_INK, GFX_FACE);
     } else if (w->kind == 6) {
         gfx_text(s, 14, content_y + 6, "Root password:", GFX_BLACK, 0);
         gfx_fill(s, 14, content_y + 24, w->width - 28, 22, GFX_WHITE);
@@ -2277,13 +2554,13 @@ static void draw_window(gui_window* w) {
         gfx_fill(s, 14, content_y + 136, w->width - 28, status_y - content_y - 142, GFX_WHITE);
         gfx_bevel(s, 14, content_y + 136, w->width - 28, status_y - content_y - 142, 0);
         gfx_text(s, 20, content_y + 142, w->admin_output, GFX_BLACK, 0);
-        gfx_text(s, 10, status_y + 2, "kadms - Kintsugi Administration Service", GFX_BLACK, GFX_FACE);
+        gfx_text(s, 10, status_y + 2, "kadms - Kintsugi Administration Service", GUI_INK, GFX_FACE);
     } else if (w->kind == 7) {
         gfx_fill(s, 8, content_y, w->width - 16, status_y - content_y - 6, GFX_WHITE);
         gfx_bevel(s, 8, content_y, w->width - 16, status_y - content_y - 6, 0);
         gfx_text(s, 20, content_y + 24, "Recycle Bin is empty.", GFX_BLACK, 0);
         gfx_text(s, 20, content_y + 48, "Deleted files would appear here.", GFX_SHADOW, 0);
-        gfx_text(s, 10, status_y + 2, "Recycle Bin", GFX_BLACK, GFX_FACE);
+        gfx_text(s, 10, status_y + 2, "Recycle Bin", GUI_INK, GFX_FACE);
     } else if (w->kind == 8) {
         draw_monitor(w, s, content_y, status_y);
     } else if (w->kind == 9) {
@@ -2311,8 +2588,8 @@ static void draw_window(gui_window* w) {
         }
         info[n] = 0;
         int info_width = gfx_text_width(info);
-        gfx_text(s, w->width - info_width - 14, status_y + 2, info, GFX_BLACK, GFX_FACE);
-        gfx_text(s, 10, status_y + 2, "Notepad", GFX_BLACK, GFX_FACE);
+        gfx_text(s, w->width - info_width - 14, status_y + 2, info, GUI_INK, GFX_FACE);
+        gfx_text(s, 10, status_y + 2, "Notepad", GUI_INK, GFX_FACE);
     }
     gfx_hline(s, 4, status_y, w->width - 8, GFX_WHITE);
     /* resize grip */
@@ -2365,7 +2642,8 @@ static void draw_menu_bar(gfx_surface* back) {
             gfx_fill(back, x - 4, 2, 60, 20, gui_theme.selection);
             gfx_text_clipped(back, x, 5, 54, global_menu_titles[i], GFX_WHITE, gui_theme.selection);
         } else {
-            gfx_text_clipped(back, x, 5, 58, global_menu_titles[i], enabled ? GFX_BLACK : GFX_SHADOW, GFX_FACE);
+            gfx_text_clipped(
+                back, x, 5, 58, global_menu_titles[i], enabled ? GFX_BLACK : GFX_SHADOW, GFX_FACE);
         }
     }
     if (active && active->title[0]) {
@@ -2391,14 +2669,14 @@ static void draw_menu_bar(gfx_surface* back) {
         status[n++] = 's';
         status[n] = 0;
     }
-    gfx_text(back, screen_width - 8 - gfx_text_width(status), 5, status, GFX_BLACK, 0);
+    gfx_text(back, screen_width - 8 - gfx_text_width(status), 5, status, GUI_INK, GFX_FACE);
 
     if (global_menu_column >= 0) {
         static const char* const items[4][5] = {
-            { "New", "Open", "Save", "Save As...", "Close" },
-            { "Cut", "Copy", "Paste", "Select All", 0 },
-            { "Refresh", "Status Bar", "Large Icons", "Small Icons", 0 },
-            { "About KGUI", "Keyboard help", 0, 0, 0 }
+            { "New",        "Open",          "Save",        "Save As...",  "Close" },
+            { "Cut",        "Copy",          "Paste",       "Select All",  0       },
+            { "Refresh",    "Status Bar",    "Large Icons", "Small Icons", 0       },
+            { "About KGUI", "Keyboard help", 0,             0,             0       }
         };
         int count = global_menu_count(global_menu_column);
         int width = 152, height = count * 18 + 4;
@@ -2408,8 +2686,8 @@ static void draw_menu_bar(gfx_surface* back) {
         gfx_fill(back, x, y, width, height, GFX_FACE);
         gfx_bevel(back, x, y, width, height, 1);
         for (int i = 0; i < count; ++i) {
-            gfx_text_clipped(back, x + 8, y + 4 + i * 18, width - 16, items[global_menu_column][i], GFX_BLACK,
-                             GFX_FACE);
+            gfx_text_clipped(
+                back, x + 8, y + 4 + i * 18, width - 16, items[global_menu_column][i], GFX_BLACK, GFX_FACE);
         }
     }
 }
@@ -2424,16 +2702,124 @@ static void dock_layout(int* start_x, int* pinned_count, int* running_count) {
             ++running;
         }
     }
-    int icons = 5 + running;
-    int width = icons * 38 + (icons - 1) * 6 + 10;
+    /* The tray owns the right edge. Compute capacity once from the same slot
+     * constants the painter and hit-test use, so no tile can slide under it. */
     int tray_x = screen_width - TRAY_WIDTH;
+    int capacity = (tray_x - 16 - 6) / DOCK_SLOT;
+    if (capacity < 6) {
+        capacity = 6;
+    }
+    if (running > capacity - 6) {
+        running = capacity - 6;
+    }
+    int icons = 6 + running;
+    int width = icons * DOCK_TILE + (icons - 1) * 6 + 10;
     int x = (tray_x - width) / 2;
-    if (x < 54) {
-        x = 54;
+    if (x < 8) {
+        x = 8;
     }
     *start_x = x;
-    *pinned_count = 5;
+    *pinned_count = 6;
     *running_count = running;
+}
+
+/* NeXTSTEP dock behaviour: the tile under the pointer magnifies. Return a
+ * stable key: 0..5 pinned, 100+index for a running window, -1 for none. */
+static int dock_hovered_index(void) {
+    int task_y = screen_height - TASKBAR_HEIGHT;
+    int start_x, pinned_count, running_count;
+    dock_layout(&start_x, &pinned_count, &running_count);
+    if (gui_mouse.y < task_y || gui_mouse.x < start_x) {
+        return -1;
+    }
+    if (gui_mouse.x < start_x + pinned_count * DOCK_SLOT) {
+        int slot = (gui_mouse.x - start_x) / DOCK_SLOT;
+        if (slot >= 0 && slot < pinned_count) {
+            return slot;
+        }
+        return -1; /* gap between pinned and running tiles */
+    }
+    int button_x = start_x + pinned_count * DOCK_SLOT + 5;
+    int drawn = 0;
+    for (int i = 0; i < MAX_WINDOWS && drawn < running_count; ++i) {
+        int index = zorder[i];
+        if (!zvalid(index) || !windows[index].used) {
+            continue;
+        }
+        if (gui_mouse.x >= button_x && gui_mouse.x < button_x + DOCK_TILE && gui_mouse.y >= task_y
+            && gui_mouse.y < task_y + DOCK_HEIGHT) {
+            return 100 + index;
+        }
+        button_x += DOCK_SLOT;
+        ++drawn;
+    }
+    return -1;
+}
+
+/* One easing state for the magnified tile. Switching targets first retracts
+ * the old one, which prevents two tiles from growing at once. Returns 1 while
+ * the animation is still in progress. */
+static int dock_tick(void) {
+    int target = (menu || context_open) ? -1 : dock_hovered_index();
+    int animating = 0;
+    dock_hover_key = target;
+    if (dock_mag_key != target && dock_mag > 0) {
+        dock_mag -= (dock_mag + 7) / 8;
+        animating = 1;
+        if (dock_mag == 0) {
+            dock_mag_key = target;
+        }
+    } else if (dock_mag_key == target && target >= 0 && dock_mag < 100) {
+        dock_mag += (100 - dock_mag + 7) / 8;
+        animating = 1;
+    } else if (target < 0) {
+        dock_mag_key = -1;
+    }
+    return animating;
+}
+
+/* Real system time from the CMOS RTC, with an uptime-based fallback when the
+ * RTC is not available (so the tray clock is never blank). */
+static void system_clock_text(char* out, u32 cap) {
+    if (cap < 9) {
+        return;
+    }
+    u32 packed = (u32)syscall(KOS_SYS_RTC, 0, 0, 0, 0);
+    unsigned hour = packed >> 16, minute = (packed >> 8) & 0xff, second = packed & 0xff;
+    if (!packed) {
+        kos_desktop_info info = { 0 };
+        syscall(KOS_SYS_DESKTOP, (u32)&info, 0, 0, 0);
+        hour = info.uptime / 3600;
+        minute = (info.uptime / 60) % 60;
+        second = info.uptime % 60;
+    }
+    out[0] = '0' + (hour / 10) % 10;
+    out[1] = '0' + hour % 10;
+    out[2] = ':';
+    out[3] = '0' + minute / 10;
+    out[4] = '0' + minute % 10;
+    out[5] = ':';
+    out[6] = '0' + second / 10;
+    out[7] = '0' + second % 10;
+    out[8] = 0;
+}
+
+static int window_pictogram_kind(const gui_window* w) {
+    switch (w->kind) {
+        case 0:
+            return 1;
+        case 1:
+        case 4:
+            return 2;
+        case 2:
+            return 3;
+        case 8:
+            return 4;
+        case 9:
+            return 5;
+        default:
+            return 1;
+    }
 }
 
 static void draw_taskbar(gfx_surface* back) {
@@ -2441,50 +2827,51 @@ static void draw_taskbar(gfx_surface* back) {
     int tray_x = screen_width - TRAY_WIDTH;
     gfx_fill(back, 0, y, screen_width, DOCK_HEIGHT, GFX_FACE);
     gfx_hline(back, 0, y, screen_width, GFX_WHITE);
-    gfx_fill(back, 4, y + 4, 40, 32, GFX_DARK);
-    gfx_bevel(back, 4, y + 4, 40, 32, menu == 1 || menu == 2 || menu == 6 ? 0 : 1);
-    gfx_text(back, 18, y + 12, "K", GFX_WHITE, 0);
-    gfx_vline(back, 50, y + 5, 30, GFX_SHADOW);
-    gfx_vline(back, 51, y + 5, 30, GFX_WHITE);
-
-    static const char dock_letters[5] = { 'F', 'P', 'T', 'M', 'S' };
-    static const u32 dock_colors[5] = {
-        GFX_RGB(180, 150, 40), GFX_RGB(60, 160, 90), GFX_RGB(50, 110, 180),
-        GFX_RGB(120, 80, 170), GFX_RGB(190, 90, 70)
-    };
+    /* macOS-like Dock: the launcher and every app icon live in one centred
+     * strip; the system status tray stays at the right edge. */
+    static const int pinned_kind[6] = { 0, 1, 2, 3, 4, 5 };
+    u32 pinned_color[6] = { gui_theme.title,       gui_theme.accent,      gui_theme.success,
+                            GFX_RGB(50, 110, 180), GFX_RGB(120, 80, 170), gui_theme.warning };
     int start_x, pinned_count, running_count;
     dock_layout(&start_x, &pinned_count, &running_count);
     int x = start_x;
     int icon = dock_size < 14 ? 14 : dock_size > 26 ? 26 : dock_size;
+    /* Magnification is shared state: dock_mag_key is the tile that owns the
+     * current animation (possibly the one being retracted). */
     for (int i = 0; i < pinned_count; ++i) {
-        int iy = y + (DOCK_HEIGHT - icon) / 2 - 2;
-        gfx_fill(back, x, iy, icon, icon, dock_colors[i]);
-        gfx_bevel(back, x, iy, icon, icon, 1);
-        char mark[2] = { dock_letters[i], 0 };
-        gfx_text_clipped(back, x + 1, iy + 2, icon - 2, mark, GFX_WHITE, dock_colors[i]);
-        x += 44;
+        int dsize = (i == dock_mag_key) ? icon + (icon / 2 * dock_mag) / 100 : icon;
+        if (dsize > DOCK_HEIGHT - 2) {
+            dsize = DOCK_HEIGHT - 2;
+        }
+        int iy = y + (DOCK_HEIGHT - dsize) / 2 - 2;
+        int pressed = dock_hover_key == i;
+        draw_pictogram(back, x, iy, dsize, pinned_kind[i], pressed ? gui_theme.selection : pinned_color[i]);
+        x += DOCK_SLOT;
     }
-    gfx_vline(back, x - 1, y + 4, DOCK_HEIGHT - 8, GFX_SHADOW);
-    x += 5;
-    for (int i = 0; i < MAX_WINDOWS; ++i) {
+    gfx_vline(back, x - 4, y + 4, DOCK_HEIGHT - 8, GFX_SHADOW);
+    x += 1;
+    int drawn = 0;
+    for (int i = 0; i < MAX_WINDOWS && drawn < running_count; ++i) {
         int index = zorder[i];
         if (!zvalid(index) || !windows[index].used) {
             continue;
         }
         gui_window* w = &windows[index];
-        int active = index == focused && !w->minimized;
-        char letter = w->kind == 2 ? 'T' : w->kind == 1 ? 'P' : w->kind == 4 ? 'N'
-            : w->kind == 8 ? 'M' : w->kind == 9 ? 'S' : 'F';
-        int iy = y + (DOCK_HEIGHT - icon) / 2 - 2;
-        gfx_fill(back, x, iy, icon, icon, active ? gui_theme.accent : GFX_FACE);
-        gfx_bevel(back, x, iy, icon, icon, active ? 0 : 1);
-        char mark[2] = { letter, 0 };
-        gfx_text_clipped(back, x + 1, iy + 2, icon - 2, mark,
-                         active ? GFX_WHITE : GFX_DARK, active ? gui_theme.accent : GFX_FACE);
-        if (!w->minimized) {
-            gfx_fill(back, x + icon / 2 - 2, y + DOCK_HEIGHT - 5, 4, 2, gui_theme.selection);
+        int key = 100 + index;
+        int dsize = (key == dock_mag_key) ? icon + (icon / 2 * dock_mag) / 100 : icon;
+        if (dsize > DOCK_HEIGHT - 2) {
+            dsize = DOCK_HEIGHT - 2;
         }
-        x += 44;
+        int iy = y + (DOCK_HEIGHT - dsize) / 2 - 2;
+        int active = index == focused && !w->minimized;
+        u32 color = active ? gui_theme.accent : (w->minimized ? gui_theme.shadow : gui_theme.face);
+        draw_pictogram(back, x, iy, dsize, window_pictogram_kind(w), color);
+        if (!w->minimized) {
+            gfx_fill(
+                back, x + dsize / 2 - 2, y + DOCK_HEIGHT - 5, 4, 2, active ? GFX_WHITE : gui_theme.selection);
+        }
+        x += DOCK_SLOT;
+        ++drawn;
     }
 
     gfx_bevel(back, tray_x + 2, y + 4, TRAY_WIDTH - 6, 32, 0);
@@ -2501,24 +2888,20 @@ static void draw_taskbar(gfx_surface* back) {
     memory[m] = 0;
     gfx_text(back, tray_x + 100, y + 12, memory, GFX_BLACK, 0);
     gfx_vline(back, tray_x + 170, y + 7, 24, GFX_SHADOW);
-    unsigned seconds = info.uptime;
-    unsigned hours = seconds / 3600, minutes = (seconds / 60) % 60, secs = seconds % 60;
     char clock[9];
-    int cn = 0;
-    clock[cn++] = '0' + (hours / 10) % 10;
-    clock[cn++] = '0' + hours % 10;
-    clock[cn++] = ':';
-    clock[cn++] = '0' + minutes / 10;
-    clock[cn++] = '0' + minutes % 10;
-    clock[cn++] = ':';
-    clock[cn++] = '0' + secs / 10;
-    clock[cn++] = '0' + secs % 10;
-    clock[cn] = 0;
+    system_clock_text(clock, sizeof(clock));
     gfx_text(back, screen_width - 8 - gfx_text_width(clock), y + 12, clock, GFX_BLACK, 0);
 
     if (gui_toast_until > 0) {
-        gfx_fill(back, 8, y - 24, 320, 20, GFX_RGB(255, 255, 220));
-        gfx_bevel(back, 8, y - 24, 320, 20, 1);
+        int toast_width = gfx_text_width(gui_toast) + 24;
+        if (toast_width > screen_width - 16) {
+            toast_width = screen_width - 16;
+        }
+        if (toast_width < 96) {
+            toast_width = 96;
+        }
+        gfx_fill(back, 8, y - 24, toast_width, 20, GFX_RGB(255, 255, 220));
+        gfx_bevel(back, 8, y - 24, toast_width, 20, 1);
         gfx_text(back, 14, y - 20, gui_toast, GFX_BLACK, 0);
         --gui_toast_until;
     }
@@ -2526,6 +2909,7 @@ static void draw_taskbar(gfx_surface* back) {
 
 static void draw_start_menu(gfx_surface* back) {
     int y = MENUBAR_HEIGHT;
+    int height = start_menu_height();
     if (menu == 2) {
         gfx_fill(back, 62, y, 200, 220, GFX_FACE);
         gfx_bevel(back, 62, y, 200, 220, 1);
@@ -2538,7 +2922,7 @@ static void draw_start_menu(gfx_surface* back) {
         return;
     }
     if (menu == 6) {
-        int height = start_menu_height();
+        height = start_menu_height();
         gfx_fill(back, 62, y, 230, height, GFX_FACE);
         gfx_bevel(back, 62, y, 230, height, 1);
         gfx_fill(back, 66, y + 4, 222, 22, GFX_DARK);
@@ -2550,13 +2934,14 @@ static void draw_start_menu(gfx_surface* back) {
         gfx_button(back, 68, y + 34 + count * 28, 218, 24, "Back", 0);
         return;
     }
-    gfx_fill(back, 0, y, 220, 240, GFX_FACE);
-    gfx_bevel(back, 0, y, 220, 240, 1);
+    /* Base Start menu: height comes from the same helper as the hit-test. */
+    gfx_fill(back, 0, y, 220, height, GFX_FACE);
+    gfx_bevel(back, 0, y, 220, height, 1);
     gfx_fill(back, 4, y + 4, 212, 24, GFX_DARK);
     gfx_text(back, 10, y + 9, "KintsugiOS OS", GFX_WHITE, 0);
-    const char* items[] = { "Programs  >", "Search...", "Run...", "Settings",
-                            "Find...",     "Help",      "",       "Shut Down..." };
-    for (int i = 0; i < 8; ++i) {
+    const char* items[] = { "Programs  >", "Search...", "Run...",       "Settings",     "Find...",
+                            "Help",        "",          "Shut Down...", "Exit to Shell" };
+    for (int i = 0; i < 9; ++i) {
         if (!items[i][0]) {
             gfx_hline(back, 8, y + 36 + i * 24, 204, GFX_SHADOW);
             continue;
@@ -2565,8 +2950,22 @@ static void draw_start_menu(gfx_surface* back) {
     }
 }
 
+/* While the pointer holds inside a dialog button rectangle the control renders
+ * in its pressed (sunken) state; release returns it to raised. */
+static int dialog_button_pressed(int x, int y, int width, int height) {
+    return (gui_mouse.buttons & 1) && gui_mouse.x >= x && gui_mouse.x < x + width && gui_mouse.y >= y
+        && gui_mouse.y < y + height;
+}
+
 static void draw_dialog(gfx_surface* back) {
     int width = 480, height = menu == 3 ? 280 : 180;
+    /* Keep the modal inside the work area on small screens. */
+    if (width > screen_width) {
+        width = screen_width;
+    }
+    if (height > screen_height - TASKBAR_HEIGHT - MENUBAR_HEIGHT - 8) {
+        height = screen_height - TASKBAR_HEIGHT - MENUBAR_HEIGHT - 8;
+    }
     int x = (screen_width - width) / 2, y = (screen_height - height) / 2;
     gfx_fill(back, x, y, width, height, GFX_FACE);
     gfx_bevel(back, x, y, width, height, 1);
@@ -2590,15 +2989,43 @@ static void draw_dialog(gfx_surface* back) {
         for (int i = 0; i < search_count && i < 8; ++i) {
             gfx_text(back, x + 18, y + 72 + i * 16, search_results[i], GFX_BLACK, 0);
         }
-        gfx_button(back, x + width - 170, y + height - 42, 72, 26, "Search", 0);
-        gfx_button(back, x + width - 88, y + height - 42, 72, 26, "Cancel", 0);
+        gfx_button(
+            back,
+            x + 164,
+            y + height - 42,
+            72,
+            26,
+            "Cancel",
+            dialog_button_pressed(x + 164, y + height - 42, 72, 26));
+        gfx_button(
+            back,
+            x + 244,
+            y + height - 42,
+            72,
+            26,
+            "Search",
+            dialog_button_pressed(x + 244, y + height - 42, 72, 26));
     } else if (menu == 4) {
         gfx_text(back, x + 12, y + 42, "Type the name of a program:", GFX_BLACK, 0);
         gfx_fill(back, x + 12, y + 66, width - 24, 24, GFX_WHITE);
         gfx_bevel(back, x + 12, y + 66, width - 24, 24, 0);
         gfx_text(back, x + 18, y + 70, dialog_input, GFX_BLACK, 0);
-        gfx_button(back, x + width - 170, y + height - 44, 72, 26, "OK", 0);
-        gfx_button(back, x + width - 88, y + height - 44, 72, 26, "Cancel", 0);
+        gfx_button(
+            back,
+            x + 164,
+            y + height - 42,
+            72,
+            26,
+            "Cancel",
+            dialog_button_pressed(x + 164, y + height - 42, 72, 26));
+        gfx_button(
+            back,
+            x + 244,
+            y + height - 42,
+            72,
+            26,
+            "OK",
+            dialog_button_pressed(x + 244, y + height - 42, 72, 26));
     } else if (menu == 7 || menu == 8) {
         gfx_text(back, x + 12, y + 42, menu == 8 ? "File name:" : "Name:", GFX_BLACK, 0);
         gfx_fill(back, x + 12, y + 66, width - 24, 24, GFX_WHITE);
@@ -2608,15 +3035,38 @@ static void draw_dialog(gfx_surface* back) {
         } else {
             gfx_text(back, x + 18, y + 70, dialog_input, GFX_BLACK, 0);
         }
-        if (menu == 8) gfx_text(back, x + 12, y + 104, "Saved in /home/user", GFX_SHADOW, 0);
-        gfx_button(back, x + width - 170, y + height - 44, 72, 26, "OK", 0);
-        gfx_button(back, x + width - 88, y + height - 44, 72, 26, "Cancel", 0);
+        if (menu == 8) {
+            gfx_text(back, x + 12, y + 104, "Saved in /home/user", GFX_SHADOW, 0);
+        }
+        gfx_button(
+            back,
+            x + 164,
+            y + height - 42,
+            72,
+            26,
+            "Cancel",
+            dialog_button_pressed(x + 164, y + height - 42, 72, 26));
+        gfx_button(
+            back,
+            x + 244,
+            y + height - 42,
+            72,
+            26,
+            "OK",
+            dialog_button_pressed(x + 244, y + height - 42, 72, 26));
     } else {
         gfx_text(back, x + 16, y + 40, "KintsugiOS Pixel GUI", GFX_DARK, 0);
         gfx_text(back, x + 16, y + 66, "KGFM, KGED, KGTERM, KMonitor, KSystem, KServices", GFX_BLACK, 0);
         gfx_text(back, x + 16, y + 90, "Tab focus, arrows move, R resize, N minimize", GFX_BLACK, 0);
         gfx_text(back, x + 16, y + 114, "M maximize, Q exit, S Start, Ctrl+S save", GFX_BLACK, 0);
-        gfx_button(back, x + width / 2 - 36, y + height - 44, 72, 26, "OK", 0);
+        gfx_button(
+            back,
+            x + (width - 72) / 2,
+            y + height - 42,
+            72,
+            26,
+            "OK",
+            dialog_button_pressed(x + (width - 72) / 2, y + height - 42, 72, 26));
     }
 }
 
@@ -2653,17 +3103,28 @@ static void open_context_menu(int x, int y, int window, int kind) {
     static const char* const header[] = { "Refresh", "New Folder", "Up", "Properties" };
     const char* const* source;
     int count;
-    if (kind == 0) { source = desktop; count = 4; }
-    else if (kind == 1) { source = files; count = 6; }
-    else if (kind == 2) { source = system; count = 4; }
-    else { source = header; count = 4; }
+    if (kind == 0) {
+        source = desktop;
+        count = 4;
+    } else if (kind == 1) {
+        source = files;
+        count = 6;
+    } else if (kind == 2) {
+        source = system;
+        count = 4;
+    } else {
+        source = header;
+        count = 4;
+    }
     context_kind = kind;
     context_window = window;
     context_count = count;
-    for (int i = 0; i < count; ++i)
+    for (int i = 0; i < count; ++i) {
         text_copy(context_items[i], sizeof(context_items[i]), source[i]);
+    }
     context_x = x;
     context_y = y;
+    context_hover = -1;
     context_open = 1;
 }
 
@@ -2759,15 +3220,22 @@ static void system_action(gui_window* w, int action) {
 
 static void notepad_save(gui_window* w, const char* name) {
     char path[160];
-    if (name[0] == '/') text_copy(path, sizeof(path), name);
-    else {
+    if (name[0] == '/') {
+        text_copy(path, sizeof(path), name);
+    } else {
         text_copy(path, sizeof(path), "/home/user/");
         int n = text_length(path), i = 0;
-        while (name[i] && n + i + 1 < (int)sizeof(path)) { path[n + i] = name[i]; ++i; }
+        while (name[i] && n + i + 1 < (int)sizeof(path)) {
+            path[n + i] = name[i];
+            ++i;
+        }
         path[n + i] = 0;
     }
     int result = syscall(10, (u32)path, (u32)w->text, (u32)w->text_length, 0);
-    if (result < 0) { toast(kos_error(result)); return; }
+    if (result < 0) {
+        toast(kos_error(result));
+        return;
+    }
     text_copy(w->file_path, sizeof(w->file_path), path);
     toast("Saved");
 }
@@ -2823,7 +3291,7 @@ static void window_menu_action(gui_window* w, int column, int item) {
         if (item == 0) {
             create_window("Welcome", 680, 400, 520, 320, 3);
         } else {
-            menu = 5;
+            open_help_document();
         }
     }
     global_menu_column = -1;
@@ -2833,10 +3301,18 @@ static void context_action(int item) {
     if (context_kind == 2) {
         gui_window* w = context_window >= 0 ? &windows[context_window] : 0;
         if (w && w->used) {
-            if (item == 0 && w->maximized) toggle_maximize(w);
-            else if (item == 1) { w->minimized = 1; if (focused == context_window) focused = -1; }
-            else if (item == 2 && !w->maximized) toggle_maximize(w);
-            else if (item == 3) close_window(w);
+            if (item == 0 && w->maximized) {
+                toggle_maximize(w);
+            } else if (item == 1) {
+                w->minimized = 1;
+                if (focused == context_window) {
+                    focused = -1;
+                }
+            } else if (item == 2 && !w->maximized) {
+                toggle_maximize(w);
+            } else if (item == 3) {
+                close_window(w);
+            }
         }
         context_open = 0;
         return;
@@ -2844,13 +3320,19 @@ static void context_action(int item) {
     if (context_kind == 3) {
         gui_window* w = context_window >= 0 ? &windows[context_window] : 0;
         if (w && w->used && w->kind == 0) {
-            if (item == 0) { fm_refresh(w); toast("Refreshed"); }
-            else if (item == 1) {
+            if (item == 0) {
+                fm_refresh(w);
+                toast("Refreshed");
+            } else if (item == 1) {
                 fm_action = 2;
-                dialog_input[0] = 0; dialog_length = 0;
+                dialog_input[0] = 0;
+                dialog_length = 0;
                 menu = 7;
-            } else if (item == 2) fm_up(w);
-            else toast(w->path);
+            } else if (item == 2) {
+                fm_up(w);
+            } else {
+                toast(w->path);
+            }
         }
         context_open = 0;
         return;
@@ -2862,7 +3344,9 @@ static void context_action(int item) {
             int result = syscall(11, (u32) "/home/user/New Folder", 0, 0, 0);
             toast(result < 0 ? kos_error(result) : "Folder created");
         } else if (item == 2) {
-            create_window("Settings", 380, 180, 520, 320, 5);
+            if (!activate_window_kind(5, "Settings")) {
+                create_window("Settings", 190, 40, 640, 500, 5);
+            }
         } else {
             create_window("Welcome", 680, 400, 520, 320, 3);
         }
@@ -2905,36 +3389,90 @@ static void context_action(int item) {
     context_open = 0;
 }
 
-static void draw_context_menu(gfx_surface* back) {
-    if (!context_open) {
-        return;
-    }
+/* The menu is clamped/flipped for drawing; hit testing must use the very same
+ * rectangle, never the raw click position. */
+static void context_menu_rect(int* out_x, int* out_y, int* out_width, int* out_height) {
     int width = 156, height = context_count * 22 + 4;
     int x = context_x, y = context_y;
     if (x + width > screen_width) {
         x = screen_width - width;
     }
-    /* Flip above the pointer when the menu would cross the taskbar. Clamping
-     * it to the bottom instead made header menus appear below the file list. */
+    if (x < 0) {
+        x = 0;
+    }
+    /* Flip above the pointer when the menu would cross the taskbar. */
     if (y + height > screen_height - TASKBAR_HEIGHT && y - height >= 0) {
         y -= height;
     } else if (y + height > screen_height - TASKBAR_HEIGHT) {
         y = screen_height - TASKBAR_HEIGHT - height;
     }
-    if (x < 0) {
-        x = 0;
-    }
     if (y < 0) {
         y = 0;
     }
-    context_x = x;
-    context_y = y;
+    *out_x = x;
+    *out_y = y;
+    *out_width = width;
+    *out_height = height;
+}
+
+/* Bounding box of every currently visible overlay (Start, dialog, menu bar
+ * dropdown, context menu), including its 2 px drop shadow. */
+static void overlay_bounds(gfx_dirty* out) {
+    out->valid = 0;
+    if (menu == 1) {
+        gfx_dirty_add(out, 0, MENUBAR_HEIGHT, 222, start_menu_height() + 4);
+    } else if (menu == 2) {
+        gfx_dirty_add(out, 62, MENUBAR_HEIGHT, 202, 224);
+    } else if (menu == 6) {
+        gfx_dirty_add(out, 62, MENUBAR_HEIGHT, 232, start_menu_height() + 4);
+    }
+    if (menu >= 3 && menu != 6) {
+        int width = 480, height = menu == 3 ? 280 : 180;
+        if (width > screen_width) {
+            width = screen_width;
+        }
+        int limit = screen_height - TASKBAR_HEIGHT - MENUBAR_HEIGHT - 8;
+        if (height > limit) {
+            height = limit;
+        }
+        gfx_dirty_add(out, (screen_width - width) / 2, (screen_height - height) / 2, width + 4, height + 4);
+    }
+    if (global_menu_column >= 0) {
+        int count = global_menu_count(global_menu_column);
+        gfx_dirty_add(out, 42 + global_menu_column * 64, MENUBAR_HEIGHT, 160, count * 18 + 10);
+    }
+    if (context_open) {
+        int x, y, width, height;
+        context_menu_rect(&x, &y, &width, &height);
+        gfx_dirty_add(out, x, y, width + 4, height + 4);
+    }
+}
+
+static void draw_context_menu(gfx_surface* back) {
+    if (!context_open) {
+        return;
+    }
+    int x, y, width, height;
+    context_menu_rect(&x, &y, &width, &height);
     gfx_fill(back, x + 2, y + 2, width, height, GFX_SHADOW);
     gfx_fill(back, x, y, width, height, GFX_FACE);
     gfx_bevel(back, x, y, width, height, 1);
     for (int i = 0; i < context_count; ++i) {
-        gfx_fill(back, x + 3, y + 3 + i * 22, width - 6, 20, GFX_FACE);
-        gfx_text_clipped(back, x + 10, y + 7 + i * 22, width - 20, context_items[i], GFX_BLACK, GFX_FACE);
+        int hovered = i == context_hover;
+        u32 ink = hovered ? GFX_WHITE : GFX_BLACK;
+        if (hovered) {
+            gfx_fill(back, x + 3, y + 3 + i * 22, width - 6, 20, gui_theme.selection);
+        } else {
+            gfx_fill(back, x + 3, y + 3 + i * 22, width - 6, 20, GFX_FACE);
+        }
+        gfx_text_clipped(
+            back,
+            x + 10,
+            y + 7 + i * 22,
+            width - 20,
+            context_items[i],
+            ink,
+            hovered ? gui_theme.selection : GFX_FACE);
     }
 }
 
@@ -2976,8 +3514,8 @@ static void cursor_capture(int x, int y) {
     for (int row = 0; row < CURSOR_HEIGHT; ++row) {
         for (int col = 0; col < CURSOR_WIDTH; ++col) {
             int px = x + col, py = y + row;
-            cursor_save[row * CURSOR_WIDTH + col] =
-                (px >= 0 && py >= 0 && px < screen_width && py < screen_height)
+            int index = row * CURSOR_WIDTH + col;
+            cursor_save[index] = (px >= 0 && py >= 0 && px < screen_width && py < screen_height)
                 ? desktop->pixels[py * screen_width + px]
                 : desktop_color;
         }
@@ -2995,8 +3533,8 @@ static void cursor_paint(int x, int y) {
             if (px < 0 || py < 0 || px >= screen_width || py >= screen_height) {
                 continue;
             }
-            desktop->pixels[py * screen_width + px] =
-                pixel == 'X' ? GFX_BLACK : pixel == 'S' ? GFX_SHADOW : GFX_WHITE;
+            u32 value = pixel == 'X' ? GFX_BLACK : pixel == 'S' ? GFX_SHADOW : GFX_WHITE;
+            desktop->pixels[py * screen_width + px] = value;
         }
     }
 }
@@ -3028,8 +3566,10 @@ static void cursor_move(int x, int y, gfx_dirty* extra) {
     }
     gfx_dirty dirty = { 0, 0, 0, 0, 0 };
     if (extra && extra->valid) {
-        dirty.left = extra->left; dirty.top = extra->top;
-        dirty.right = extra->right; dirty.bottom = extra->bottom;
+        dirty.left = extra->left;
+        dirty.top = extra->top;
+        dirty.right = extra->right;
+        dirty.bottom = extra->bottom;
         dirty.valid = 1;
     }
     if (cursor_drawn) {
@@ -3085,7 +3625,9 @@ static void compose(gfx_dirty* dirty) {
      * aperture just to redraw pixels the user cannot see changing. */
     for (int i = 0; i < DESKTOP_ICON_COUNT; ++i) {
         const desktop_icon* icon = &desktop_icons[i];
-        if (dirty_rect_hit(dirty, icon->x - 2, icon->y - 2, 24, 42)) {
+        int ix, iy, iw, ih;
+        desktop_icon_rect(icon, &ix, &iy, &iw, &ih);
+        if (dirty_rect_hit(dirty, ix, iy, iw, ih)) {
             draw_desktop_icon(desktop, icon, selected_icon == i);
         }
     }
@@ -3096,6 +3638,51 @@ static void compose(gfx_dirty* dirty) {
         }
         gui_window* w = &windows[index];
         if (!w->used || w->minimized || !dirty_rect_hit(dirty, w->x, w->y, w->width, w->height)) {
+            continue;
+        }
+        if (w->anim_open) {
+            /* Ease-out scale: fast at first, settling gently at 1.0. */
+            static const int num[11] = { 30, 32, 34, 36, 37, 38, 39, 39, 40, 40, 40 };
+            gfx_blit_scale(
+                desktop,
+                w->x,
+                w->y,
+                w->surface,
+                0,
+                0,
+                w->width,
+                w->height,
+                num[w->anim_progress < 10 ? w->anim_progress : 10],
+                40);
+            ++w->anim_progress;
+            if (w->anim_progress > 10) {
+                w->anim_open = 0;
+            }
+            continue;
+        }
+        if (w->anim_close) {
+            /* Ease-in scale: the window accelerates into its disappearance. */
+            static const int num[11] = { 40, 40, 40, 39, 39, 38, 37, 36, 34, 32, 30 };
+            gfx_blit_scale(
+                desktop,
+                w->x,
+                w->y,
+                w->surface,
+                0,
+                0,
+                w->width,
+                w->height,
+                num[w->anim_progress < 10 ? w->anim_progress : 10],
+                40);
+            ++w->anim_progress;
+            if (w->anim_progress > 10) {
+                /* Retire the slot now; the real teardown runs after the loop. */
+                w->anim_close = 0;
+                w->used = 0;
+                if (pending_close_count < MAX_WINDOWS) {
+                    pending_close[pending_close_count++] = (int)(w - windows);
+                }
+            }
             continue;
         }
         gfx_blit(desktop, w->x, w->y, w->surface, 0, 0, w->width, w->height);
@@ -3112,7 +3699,9 @@ static void compose(gfx_dirty* dirty) {
         gfx_surface* surface = external_surface[i];
         if (!surface || surface->width != (int)external[i].width
             || surface->height != (int)external[i].height) {
-            if (surface) gfx_surface_destroy(surface);
+            if (surface) {
+                gfx_surface_destroy(surface);
+            }
             surface = gfx_surface_create((int)external[i].width, (int)external[i].height);
             external_surface[i] = surface;
         }
@@ -3133,7 +3722,14 @@ static void compose(gfx_dirty* dirty) {
         draw_dialog(desktop);
     }
     draw_context_menu(desktop);
+    /* Remember what was painted on top so the next partial frame can clean it
+     * up even after the overlay itself has closed. */
+    overlay_bounds(&overlay_prev);
     gfx_present_dirty(desktop, 0, 0, dirty);
+    for (int i = 0; i < pending_close_count; ++i) {
+        window_finish(&windows[pending_close[i]]);
+    }
+    pending_close_count = 0;
 }
 
 static void drag_begin(gui_window* w);
@@ -3150,11 +3746,27 @@ static gui_window* create_window(const char* title, int x, int y, int width, int
         for (unsigned n = 0; n < sizeof(*w); ++n) {
             bytes[n] = 0;
         }
+        /* Keep every window inside the work area: menu bar on top, task bar
+         * on bottom. Nothing may be placed out of bounds. */
+        if (x < 0) {
+            x = 0;
+        }
+        if (y < MENUBAR_HEIGHT + 2) {
+            y = MENUBAR_HEIGHT + 2;
+        }
+        if (width > screen_width - x) {
+            x = screen_width - width;
+        }
+        if (y + height > screen_height - TASKBAR_HEIGHT) {
+            y = screen_height - TASKBAR_HEIGHT - height;
+        }
         w->used = 1;
         w->x = x;
         w->y = y;
         w->width = width;
         w->height = height;
+        w->anim_open = 1;
+        w->anim_progress = 0;
         w->saved_x = x;
         w->saved_y = y;
         w->saved_width = width;
@@ -3189,11 +3801,78 @@ static gui_window* create_window(const char* title, int x, int y, int width, int
     return 0;
 }
 
+/* Bring an already running application forward instead of stacking duplicate
+ * windows — the launchers for TUI, terminal and GUI apps share this path. */
+static gui_window* activate_window_kind(int kind, const char* title) {
+    for (int i = MAX_WINDOWS - 1; i >= 0; --i) {
+        int index = zorder[i];
+        if (!zvalid(index) || !windows[index].used || windows[index].kind != kind) {
+            continue;
+        }
+        if (title && !text_equal(windows[index].title, title)) {
+            continue;
+        }
+        windows[index].minimized = 0;
+        raise_window(index);
+        return &windows[index];
+    }
+    return 0;
+}
+
+/* Documentation opens as a real document window (title bar, text canvas,
+ * status bar, scroll), not as a flat modal panel. */
+static void open_help_document(void) {
+    gui_window* existing = activate_window_kind(4, "KintsugiOS Documentation");
+    if (existing) {
+        menu = 0;
+        return;
+    }
+    gui_window* w = create_window("KintsugiOS Documentation", 220, 90, 600, 420, 4);
+    if (!w) {
+        toast("Cannot open documentation");
+        menu = 0;
+        return;
+    }
+    text_copy(w->text, sizeof(w->text),
+        "KintsugiOS Documentation\n"
+        "\n"
+        "WORKSPACE\n"
+        "Menu bar: File, Edit, View, Help. K opens Start.\n"
+        "Drag a title bar to move a window; drag its lower-right corner to resize.\n"
+        "Arrows / W A S D move the focused window; M maximizes, N minimizes.\n"
+        "Ctrl+S saves a document, Esc closes a menu or dialog.\n"
+        "\n"
+        "APPLICATIONS\n"
+        "KGFM  - file manager: Home, Bin, Etc, Logs, Root.\n"
+        "KGED  - graphic editor: Pen, Erase, Clear.\n"
+        "KGTERM - shell with history, ANSI colors and live output.\n"
+        "KMonitor / KSystem - processes, services and resources.\n"
+        "Settings - theme, wallpaper, Dock, mixer and system.\n"
+        "\n"
+        "TUI APPLICATIONS\n"
+        "Launch from Programs or KGTERM. TUI programs share the 12x15\n"
+        "console grid, CP866 box drawing and keyboard shortcuts.\n"
+        "\n"
+        "TIME AND SETTINGS\n"
+        "The tray clock shows real system time from the CMOS RTC.\n"
+        "Appearance and Dock layout persist in /home/user/KGUI.CFG.\n"
+        "Reopen this document from Help or the Start menu.\n");
+    w->text_length = text_length(w->text);
+    w->text_top = 0;
+    draw_window(w);
+    menu = 0;
+}
+
 static void drag_begin(gui_window* w) {
     drag_index = (int)(w - windows);
-    if (drag_backup) gfx_surface_destroy(drag_backup);
+    if (drag_backup) {
+        gfx_surface_destroy(drag_backup);
+    }
     drag_backup = gfx_surface_create(w->width, w->height);
-    if (!drag_backup) { drag_index = -1; return; }
+    if (!drag_backup) {
+        drag_index = -1;
+        return;
+    }
     int saved = w->minimized;
     w->minimized = 1;
     gfx_dirty dirty = { 0, 0, 0, 0, 0 };
@@ -3203,8 +3882,12 @@ static void drag_begin(gui_window* w) {
 }
 
 static void drag_move(gui_window* w, int old_x, int old_y) {
-    if (!drag_backup || drag_index != (int)(w - windows)) return;
+    if (!drag_backup || drag_index != (int)(w - windows)) {
+        return;
+    }
     gfx_dirty dirty = { 0, 0, 0, 0, 0 };
+    /* Never restore stale cursor pixels over freshly dragged window content. */
+    cursor_erase();
     gfx_blit(desktop, old_x, old_y, drag_backup, 0, 0, w->width, w->height);
     gfx_dirty_add(&dirty, old_x, old_y, w->width, w->height);
     gfx_blit(drag_backup, 0, 0, desktop, w->x, w->y, w->width, w->height);
@@ -3214,13 +3897,17 @@ static void drag_move(gui_window* w, int old_x, int old_y) {
 }
 
 static void drag_end(void) {
-    if (drag_backup) gfx_surface_destroy(drag_backup);
+    if (drag_backup) {
+        gfx_surface_destroy(drag_backup);
+    }
     drag_backup = 0;
     drag_index = -1;
 }
 
 static void gui_shutdown(void) {
-    if (cli_child_pid > 0) cli_finish(1);
+    if (cli_child_pid > 0) {
+        cli_finish(1);
+    }
     if (tui_child_pid > 0) {
         kill(tui_child_pid);
         tui_finish();
@@ -3278,10 +3965,7 @@ static void toggle_maximize(gui_window* w) {
     draw_window(w);
 }
 
-static void close_window(gui_window* w) {
-    if (!w) {
-        return;
-    }
+static void window_finish(gui_window* w) {
     int index = (int)(w - windows);
     gfx_surface_destroy(w->surface);
     if (w->canvas) {
@@ -3312,11 +3996,47 @@ static void close_window(gui_window* w) {
     }
 }
 
+static void close_window(gui_window* w) {
+    if (!w) {
+        return;
+    }
+    /* Closing animates out: the slot stays in the z-order until the fade
+     * completes, then the real teardown runs through window_finish(). */
+    w->anim_close = 1;
+    w->anim_progress = 0;
+    w->used = 1;
+    int index = (int)(w - windows);
+    int position = 0;
+    while (position < MAX_WINDOWS && zorder[position] != index) {
+        ++position;
+    }
+    if (position < MAX_WINDOWS) {
+        for (int i = position; i < MAX_WINDOWS - 1; ++i) {
+            zorder[i] = zorder[i + 1];
+        }
+        zorder[MAX_WINDOWS - 1] = index;
+    }
+    focused = -1;
+    for (int i = MAX_WINDOWS - 1; i >= 0; --i) {
+        int idx = zorder[i];
+        if (zvalid(idx) && windows[idx].used && !windows[idx].minimized) {
+            focused = idx;
+            break;
+        }
+    }
+}
+
 static void run_program(const char* name);
 static void gui_shutdown(void);
 
 static void dock_launch_index(int index) {
-    static const int map[5][2] = { { 2, 0 }, { 1, 1 }, { 2, 1 }, { 2, 2 }, { 2, 3 } };
+    static const int map[5][2] = {
+        { 2, 0 },
+        { 1, 1 },
+        { 2, 1 },
+        { 2, 2 },
+        { 2, 3 }
+    };
     if (index >= 0 && index < 5) {
         launch_category_item(map[index][0], map[index][1]);
     }
@@ -3328,23 +4048,48 @@ static void launch_category_item(int category, int item) {
     }
     const char* name = program_names[category][item];
     if (text_equal(name, "KGFM")) {
-        create_window("KGFM - Files", 80, 50, 560, 340, 0);
+        if (!activate_window_kind(0, "KGFM - Files")) {
+            create_window("KGFM - Files", 80, 50, 560, 340, 0);
+        }
     } else if (text_equal(name, "KGED")) {
-        create_window("KGED - Editor", 700, 50, 520, 320, 1);
+        if (!activate_window_kind(1, "KGED - Editor")) {
+            create_window("KGED - Editor", 700, 50, 520, 320, 1);
+        }
     } else if (text_equal(name, "KGTERM")) {
-        create_window("KGTERM", 80, 400, 680, 320, 2);
+        if (!activate_window_kind(2, "KGTERM")) {
+            create_window("KGTERM", 80, 400, 680, 320, 2);
+        }
     } else if (text_equal(name, "Notepad")) {
-        create_window("Notepad", 700, 400, 520, 320, 4);
+        if (!activate_window_kind(4, "Notepad")) {
+            create_window("Notepad", 700, 400, 520, 320, 4);
+        }
     } else if (text_equal(name, "KMonitor")) {
-        create_window("KMonitor", 380, 120, 560, 400, 8);
+        if (!activate_window_kind(8, "KMonitor")) {
+            create_window("KMonitor", 380, 120, 560, 400, 8);
+        }
     } else if (text_equal(name, "KSystem")) {
-        create_window("KSystem", 400, 180, 600, 400, 9);
+        if (!activate_window_kind(9, "KSystem")) {
+            create_window("KSystem", 400, 180, 600, 400, 9);
+        }
     } else {
         run_program(name);
     }
 }
 
 static void run_program(const char* name) {
+    /* An external GUI client with the same name is already running: raise it
+     * instead of spawning a second copy in the terminal. */
+    kos_gui_window_info external[8];
+    int external_count = gfx_window_list(external, 8);
+    for (int i = 0; i < external_count; ++i) {
+        if (text_equal_ci(external[i].title, name)) {
+            gfx_window_raise(external[i].id);
+            external_focus = external[i].id;
+            focused = -1;
+            toast("Activated");
+            return;
+        }
+    }
     gui_window* term = 0;
     for (int i = 0; i < MAX_WINDOWS; ++i) {
         if (windows[i].used && windows[i].kind == 2 && !windows[i].minimized) {
@@ -3387,6 +4132,8 @@ int main(int argc, char** argv) {
     wallpaper_color_a = gui_theme.desktop;
     wallpaper_color_b = gui_theme.accent;
     settings_load();
+    /* Ordinary 5x7 bitmap face: NeXTSTEP-style clarity without synthesized bold. */
+    gfx_font_set_bold(0);
     settings_user_count = 0;
     /* Read /etc/passwd into a small table for the Settings window. */
     {
@@ -3439,11 +4186,30 @@ int main(int argc, char** argv) {
             || mouse.buttons != gui_mouse.buttons || mouse.wheel != gui_mouse.wheel
             || mouse.sequence != gui_mouse.sequence;
         gui_mouse = mouse;
+        /* The pointer hit area extends a couple of pixels past the visible
+         * sprite so thin NeXTSTEP-style controls stay easy to grab. */
+        mouse.x += GUI_CURSOR_HIT_MARGIN;
+        mouse.y += GUI_CURSOR_HIT_MARGIN;
         if (mouse_changed) {
             int only_motion =
                 (mouse.buttons == previous_buttons && !mouse.wheel && (mouse.x != old_x || mouse.y != old_y));
             if (only_motion) {
                 cursor_move(mouse.x, mouse.y, 0);
+                if (context_open) {
+                    int mx, my, mw, mh;
+                    context_menu_rect(&mx, &my, &mw, &mh);
+                    int item = -1;
+                    if (mouse.x >= mx && mouse.x < mx + mw && mouse.y >= my && mouse.y < my + mh) {
+                        item = (mouse.y - my - 3) / 22;
+                        if (item < 0 || item >= context_count) {
+                            item = -1;
+                        }
+                    }
+                    if (item != context_hover) {
+                        context_hover = item;
+                        changed = 1;
+                    }
+                }
             } else {
                 changed = 1;
             }
@@ -3586,10 +4352,15 @@ int main(int argc, char** argv) {
                 if (drag_backup && drag_index == (int)(focused_window - windows)) {
                     cursor_erase();
                     drag_move(focused_window, old_x, old_y);
-                } else changed = 1;
+                } else {
+                    changed = 1;
+                }
             }
         } else {
-            if (dragging && drag_backup) { drag_end(); changed = 1; }
+            if (dragging && drag_backup) {
+                drag_end();
+                changed = 1;
+            }
             dragging = 0;
         }
         if (resizing && (mouse.buttons & 1) && focused_window && !focused_window->maximized) {
@@ -3614,30 +4385,37 @@ int main(int argc, char** argv) {
 
         if (menu >= 3 && menu != 6) {
             int dx = (screen_width - 480) / 2, dy = (screen_height - (menu == 3 ? 280 : 180)) / 2;
+            int button_y = dy + (menu == 3 ? 238 : 138);
             if (pressed & 1) {
                 if (mouse.x >= dx + 454 && mouse.x < dx + 472 && mouse.y >= dy + 4 && mouse.y < dy + 20) {
                     menu = 0;
                     changed = 1;
-                } else if (mouse.y >= dy + (menu == 3 ? 238 : 136)) {
-                    if (menu == 3 && mouse.x >= dx + 310 && mouse.x < dx + 382) {
-                        search_count = 0;
-                        search_directory("/bin", dialog_input, 0);
-                        search_directory("/etc", dialog_input, 0);
-                    } else if (menu == 4 && mouse.x >= dx + 310 && mouse.x < dx + 382) {
-                        run_program(dialog_input);
+                } else if (mouse.y >= button_y) {
+                    /* Cancel occupies the left slot, the action (OK / Search /
+                     * Run / Save) the right one: identical size and top edge, so
+                     * the pair is symmetric and both ends are clickable. */
+                    if (mouse.x >= dx + 164 && mouse.x < dx + 236) {
+                        menu = 0; /* Cancel */
+                        changed = 1;
+                    } else if (mouse.x >= dx + 244 && mouse.x < dx + 316) {
+                        if (menu == 3) {
+                            search_count = 0;
+                            search_directory("/bin", dialog_input, 0);
+                            search_directory("/etc", dialog_input, 0);
+                        } else if (menu == 4) {
+                            run_program(dialog_input);
+                        } else if (menu == 7) {
+                            fm_apply_name();
+                        } else if (menu == 8 && dialog_window_index >= 0) {
+                            notepad_save(
+                                &windows[dialog_window_index], dialog_input[0] ? dialog_input : "note.txt");
+                        }
                         menu = 0;
-                    } else if (menu == 7 && mouse.x >= dx + 310 && mouse.x < dx + 382) {
-                        fm_apply_name();
-                        menu = 0;
-                    } else if (menu == 8 && mouse.x >= dx + 310 && mouse.x < dx + 382
-                               && dialog_window_index >= 0) {
-                        notepad_save(
-                            &windows[dialog_window_index], dialog_input[0] ? dialog_input : "note.txt");
-                        menu = 0;
+                        changed = 1;
                     } else {
                         menu = 0;
+                        changed = 1;
                     }
-                    changed = 1;
                 }
             }
             if (key == 27) {
@@ -3684,8 +4462,10 @@ int main(int argc, char** argv) {
 
         int context_handled = 0;
         if (context_open && (pressed & 1)) {
-            int item = (mouse.y - context_y - 3) / 22;
-            if (mouse.x >= context_x && mouse.x < context_x + 156 && item >= 0 && item < context_count) {
+            int mx, my, mw, mh;
+            context_menu_rect(&mx, &my, &mw, &mh);
+            int item = (mouse.y - my - 3) / 22;
+            if (mouse.x >= mx && mouse.x < mx + mw && item >= 0 && item < context_count) {
                 context_action(item);
             } else {
                 context_open = 0;
@@ -3703,8 +4483,11 @@ int main(int argc, char** argv) {
                     } else if (w->kind == 0) {
                         int content_y = window_content_y();
                         int list_y = content_y + 29 + 28 + 20;
-                        if (ly >= list_y) open_context_menu(mouse.x, mouse.y, target, 1);
-                        else open_context_menu(mouse.x, mouse.y, target, 3);
+                        if (ly >= list_y) {
+                            open_context_menu(mouse.x, mouse.y, target, 1);
+                        } else {
+                            open_context_menu(mouse.x, mouse.y, target, 3);
+                        }
                     } else {
                         open_context_menu(mouse.x, mouse.y, target, 2);
                     }
@@ -3720,15 +4503,9 @@ int main(int argc, char** argv) {
             if (!menu && mouse.y < screen_height - TASKBAR_HEIGHT) {
                 for (int i = 0; i < DESKTOP_ICON_COUNT; ++i) {
                     const desktop_icon* icon = &desktop_icons[i];
-                    int lw = gfx_text_width(icon->label);
-                    int lx = icon->x + 9 - lw / 2;
-                    if (lx < 2) {
-                        lx = 2;
-                    }
-                    if ((mouse.x >= icon->x - 2 && mouse.x < icon->x + 20 && mouse.y >= icon->y - 2
-                         && mouse.y < icon->y + 20)
-                        || (mouse.x >= lx && mouse.x < lx + lw && mouse.y >= icon->y + 22
-                            && mouse.y < icon->y + 38)) {
+                    int lx, ly, lw, lh;
+                    desktop_icon_rect(icon, &lx, &ly, &lw, &lh);
+                    if (mouse.x >= lx && mouse.x < lx + lw && mouse.y >= ly && mouse.y < ly + lh) {
                         icon_hit = i;
                         break;
                     }
@@ -3737,8 +4514,8 @@ int main(int argc, char** argv) {
             if (global_menu_column >= 0) {
                 int count = global_menu_count(global_menu_column);
                 int mx = 42 + global_menu_column * 64;
-                if (mouse.y >= MENUBAR_HEIGHT && mouse.y < MENUBAR_HEIGHT + count * 18 + 4
-                    && mouse.x >= mx && mouse.x < mx + 152) {
+                if (mouse.y >= MENUBAR_HEIGHT && mouse.y < MENUBAR_HEIGHT + count * 18 + 4 && mouse.x >= mx
+                    && mouse.x < mx + 152) {
                     int item = (mouse.y - MENUBAR_HEIGHT - 4) / 18;
                     gui_window* active = focused >= 0 && zvalid(focused) ? &windows[focused] : 0;
                     window_menu_action(active, global_menu_column, item);
@@ -3769,12 +4546,14 @@ int main(int argc, char** argv) {
             } else {
                 int task_y = screen_height - TASKBAR_HEIGHT;
                 int start_y = MENUBAR_HEIGHT;
-                if (mouse.y >= task_y && mouse.x < 50) {
-                    menu = menu == 1 ? 0 : 1;
+                int dock_x, dock_pinned, dock_running;
+                dock_layout(&dock_x, &dock_pinned, &dock_running);
+                if (mouse.y >= task_y && mouse.x >= dock_x && mouse.x < dock_x + DOCK_TILE) {
+                    menu = menu == 1 ? 0 : 1; /* K launcher is the first Dock tile */
                     changed = 1;
                 } else if (
                     menu == 1 && mouse.x >= 6 && mouse.x < 214 && mouse.y >= start_y + 34
-                    && mouse.y < start_y + 226) {
+                    && mouse.y < start_y + 250) {
                     int item = (mouse.y - start_y - 34) / 24;
                     if (item == 0) {
                         menu = 2;
@@ -3788,11 +4567,16 @@ int main(int argc, char** argv) {
                         dialog_input[0] = 0;
                         dialog_length = 0;
                     } else if (item == 3) {
-                        create_window("Settings", 380, 180, 520, 320, 5);
+                        if (!activate_window_kind(5, "Settings")) {
+                            create_window("Settings", 190, 40, 640, 500, 5);
+                        }
                         menu = 0;
                     } else if (item == 5) {
-                        menu = 5;
+                        open_help_document();
                     } else if (item == 7) {
+                        syscall(KOS_SYS_SHUTDOWN, 0, 0, 0, 0);
+                        return 0;
+                    } else if (item == 8) {
                         gui_shutdown();
                         return 0;
                     } else if (item >= 0 && item <= 5) {
@@ -3826,24 +4610,19 @@ int main(int argc, char** argv) {
                 } else if (mouse.y >= task_y) {
                     int start_x, pinned_count, running_count;
                     dock_layout(&start_x, &pinned_count, &running_count);
-                    if (mouse.x >= start_x && mouse.x < start_x + pinned_count * 44) {
-                        dock_launch_index((mouse.x - start_x) / 44);
+                    if (mouse.x >= start_x + DOCK_SLOT && mouse.x < start_x + pinned_count * DOCK_SLOT) {
+                        dock_launch_index((mouse.x - start_x) / DOCK_SLOT - 1);
                         changed = 1;
                     }
-                    int button_x = start_x + pinned_count * 44 + 5;
-                    for (int i = 0; i < MAX_WINDOWS; ++i) {
+                    int button_x = start_x + pinned_count * DOCK_SLOT + 5;
+                    int drawn = 0;
+                    for (int i = 0; i < MAX_WINDOWS && drawn < running_count; ++i) {
                         int index = zorder[i];
-                        if (!zvalid(index)) {
+                        if (!zvalid(index) || !windows[index].used) {
                             continue;
                         }
                         gui_window* w = &windows[index];
-                        if (!w->used) {
-                            continue;
-                        }
-                        if (button_x + 38 > screen_width - TRAY_WIDTH - 4) {
-                            break;
-                        }
-                        if (mouse.x >= button_x && mouse.x < button_x + 38) {
+                        if (mouse.x >= button_x && mouse.x < button_x + DOCK_TILE) {
                             w->minimized = !w->minimized;
                             if (!w->minimized) {
                                 raise_window(index);
@@ -3852,7 +4631,8 @@ int main(int argc, char** argv) {
                             }
                             break;
                         }
-                        button_x += 44;
+                        button_x += DOCK_SLOT;
+                        ++drawn;
                     }
                     changed = 1;
                 } else {
@@ -3904,8 +4684,7 @@ int main(int argc, char** argv) {
                                 resizing = 1;
                             } else if (ly < TITLE_HEIGHT) {
                                 int wi = (int)(w - windows);
-                                int double_click = wi == last_title_click
-                                    && gui_frame - last_title_tick < 40;
+                                int double_click = wi == last_title_click && gui_frame - last_title_tick < 40;
                                 last_title_click = wi;
                                 last_title_tick = gui_frame;
                                 raise_window(target);
@@ -4128,9 +4907,8 @@ int main(int argc, char** argv) {
             if (!menu
                 && !(
                     focused_window && focused_window->used
-                    && (focused_window->kind == 2 || focused_window->kind == 4
-                        || focused_window->kind == 6 || focused_window->kind == 8
-                        || focused_window->kind == 9))) {
+                    && (focused_window->kind == 2 || focused_window->kind == 4 || focused_window->kind == 6
+                        || focused_window->kind == 8 || focused_window->kind == 9))) {
                 for (int i = 0; i < MAX_WINDOWS; ++i) {
                     if (windows[i].used && windows[i].kind == 2 && !windows[i].minimized) {
                         raise_window(i);
@@ -4145,7 +4923,6 @@ int main(int argc, char** argv) {
             if (key == 27) {
                 menu = 0;
                 global_menu_column = -1;
-                global_menu_column = -1;
                 context_open = 0;
             } else if (key == 9 && !(focused_window && focused_window->kind == 6)) {
                 for (int step = 1; step <= MAX_WINDOWS; ++step) {
@@ -4159,7 +4936,7 @@ int main(int argc, char** argv) {
             } else if ((key == 's' || key == 'S') && !typing) {
                 menu = menu == 1 ? 0 : 1;
                 changed = 1;
-            } else if (menu == 1 && key >= '1' && key <= '7') {
+            } else if (menu == 1 && key >= '1' && key <= '9') {
                 int item = key - '1';
                 if (item == 0) {
                     menu = 2;
@@ -4173,11 +4950,16 @@ int main(int argc, char** argv) {
                     dialog_input[0] = 0;
                     dialog_length = 0;
                 } else if (item == 3) {
-                    create_window("Settings", 380, 180, 520, 320, 5);
+                    if (!activate_window_kind(5, "Settings")) {
+                        create_window("Settings", 190, 40, 640, 500, 5);
+                    }
                     menu = 0;
                 } else if (item == 5) {
-                    menu = 5;
-                } else if (item == 6) {
+                    open_help_document();
+                } else if (item == 7) {
+                    syscall(KOS_SYS_SHUTDOWN, 0, 0, 0, 0);
+                    return 0;
+                } else if (item == 8) {
                     gui_shutdown();
                     return 0;
                 } else {
@@ -4217,46 +4999,101 @@ int main(int argc, char** argv) {
             if (key && !typing && menu == 0 && focused_window && focused_window->used) {
                 gui_window* fw = focused_window;
                 if (keyboard_resize && !fw->maximized) {
-                    if (key == 256) { fw->height -= 16; key = 0; }
-                    else if (key == 257) { fw->height += 16; key = 0; }
-                    else if (key == 258) { fw->width -= 16; key = 0; }
-                    else if (key == 259) { fw->width += 16; key = 0; }
-                    else if (key == 'r') { keyboard_resize = 0; key = 0; }
-                    if (fw->width < 200) fw->width = 200;
-                    if (fw->height < 160) fw->height = 160;
-                    if (fw->x + fw->width > screen_width) fw->width = screen_width - fw->x;
-                    if (fw->y + fw->height > screen_height - TASKBAR_HEIGHT)
+                    if (key == 256) {
+                        fw->height -= 16;
+                        key = 0;
+                    } else if (key == 257) {
+                        fw->height += 16;
+                        key = 0;
+                    } else if (key == 258) {
+                        fw->width -= 16;
+                        key = 0;
+                    } else if (key == 259) {
+                        fw->width += 16;
+                        key = 0;
+                    } else if (key == 'r') {
+                        keyboard_resize = 0;
+                        key = 0;
+                    }
+                    if (fw->width < 200) {
+                        fw->width = 200;
+                    }
+                    if (fw->height < 160) {
+                        fw->height = 160;
+                    }
+                    if (fw->x + fw->width > screen_width) {
+                        fw->width = screen_width - fw->x;
+                    }
+                    if (fw->y + fw->height > screen_height - TASKBAR_HEIGHT) {
                         fw->height = screen_height - TASKBAR_HEIGHT - fw->y;
+                    }
                     window_surface_rebuilt(fw);
                     changed = 1;
                 } else if (!fw->maximized) {
-                    if (key == 'w') { fw->y -= 8; changed = 1; key = 0; }
-                    else if (key == 'x') { fw->y += 8; changed = 1; key = 0; }
-                    else if (key == 'a') { fw->x -= 8; changed = 1; key = 0; }
-                    else if (key == 'd') { fw->x += 8; changed = 1; key = 0; }
-                    else if (key == 'n') {
+                    if (key == 'w') {
+                        fw->y -= 8;
+                        gui_keyboard_move = 1;
+                        changed = 1;
+                        key = 0;
+                    } else if (key == 'x') {
+                        fw->y += 8;
+                        gui_keyboard_move = 1;
+                        changed = 1;
+                        key = 0;
+                    } else if (key == 'a') {
+                        fw->x -= 8;
+                        gui_keyboard_move = 1;
+                        changed = 1;
+                        key = 0;
+                    } else if (key == 'd') {
+                        fw->x += 8;
+                        gui_keyboard_move = 1;
+                        changed = 1;
+                        key = 0;
+                    } else if (key == 'n') {
                         fw->minimized = 1;
                         focused = -1;
                         changed = 1;
                         key = 0;
-                    } else if (key == 'm') { toggle_maximize(fw); changed = 1; key = 0; }
-                    else if (key == 'r') { keyboard_resize = 1; toast("Resize: arrows, R to finish"); key = 0; }
-                    if (fw->x < 0) fw->x = 0;
-                    if (fw->y < MENUBAR_HEIGHT + 2) fw->y = MENUBAR_HEIGHT + 2;
-                    if (fw->x + fw->width > screen_width)
+                    } else if (key == 'm') {
+                        toggle_maximize(fw);
+                        changed = 1;
+                        key = 0;
+                    } else if (key == 'r') {
+                        keyboard_resize = 1;
+                        toast("Resize: arrows, R to finish");
+                        key = 0;
+                    }
+                    if (fw->x < 0) {
+                        fw->x = 0;
+                    }
+                    if (fw->y < MENUBAR_HEIGHT + 2) {
+                        fw->y = MENUBAR_HEIGHT + 2;
+                    }
+                    if (fw->x + fw->width > screen_width) {
                         fw->x = screen_width - fw->width;
-                    if (fw->y + fw->height > screen_height - TASKBAR_HEIGHT)
+                    }
+                    if (fw->y + fw->height > screen_height - TASKBAR_HEIGHT) {
                         fw->y = screen_height - TASKBAR_HEIGHT - fw->height;
-                } else if (key == 'm') { toggle_maximize(fw); changed = 1; key = 0; }
+                    }
+                } else if (key == 'm') {
+                    toggle_maximize(fw);
+                    changed = 1;
+                    key = 0;
+                }
             }
             focused_window = focused >= 0 ? &windows[focused] : 0;
             if (focused_window && focused_window->used && focused_window->kind == 9) {
                 int limit = focused_window->sys_tab == 0 ? sys_process_count : SYS_SERVICE_COUNT;
                 if (key == 256) {
-                    if (focused_window->sys_selected > 0) --focused_window->sys_selected;
+                    if (focused_window->sys_selected > 0) {
+                        --focused_window->sys_selected;
+                    }
                     changed = 1;
                 } else if (key == 257) {
-                    if (focused_window->sys_selected + 1 < limit) ++focused_window->sys_selected;
+                    if (focused_window->sys_selected + 1 < limit) {
+                        ++focused_window->sys_selected;
+                    }
                     changed = 1;
                 } else if (key == '\n' || key == 'k') {
                     system_action(focused_window, focused_window->sys_tab == 0 ? 0 : 1);
@@ -4441,7 +5278,24 @@ int main(int argc, char** argv) {
             }
         }
 
+        /* Dock magnification is an animation: keep the pump alive while it
+         * grows or retracts, and cleanly retract it under modal overlays. */
+        if (dock_tick()) {
+            changed = 1;
+        }
+
         int external_only = 0;
+        int animating = 0;
+        for (int i = 0; i < MAX_WINDOWS; ++i) {
+            if (windows[i].used && (windows[i].anim_open || windows[i].anim_close)) {
+                animating = 1;
+                break;
+            }
+        }
+        if (animating) {
+            /* Keep open/close animations alive frame by frame. */
+            changed = 1;
+        }
         gui_window* live_window = 0;
         {
             /* External clients change their windows through the kernel WM;
@@ -4469,38 +5323,37 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        if (paint_window && paint_dirty && !changed) {
+        if (paint_window && paint_dirty && !changed && !overlay_prev.valid && menu == 0 && !context_open
+            && global_menu_column < 0) {
             /* Painting only touches one window surface: repaint that
              * rectangle instead of the whole 1280x800 frame. */
             gui_mouse = mouse;
             gfx_dirty partial = { 0, 0, 0, 0, 0 };
-            gfx_dirty_add(&partial, paint_window->x, paint_window->y,
-                          paint_window->width, paint_window->height);
+            gfx_dirty_add(
+                &partial, paint_window->x, paint_window->y, paint_window->width, paint_window->height);
             cursor_erase();
             draw_window(paint_window);
-            gfx_blit(desktop, paint_window->x, paint_window->y, paint_window->surface,
-                     0, 0, paint_window->width, paint_window->height);
+            gfx_blit(
+                desktop,
+                paint_window->x,
+                paint_window->y,
+                paint_window->surface,
+                0,
+                0,
+                paint_window->width,
+                paint_window->height);
             cursor_move(gui_mouse.x, gui_mouse.y, &partial);
         } else if (changed) {
             gui_mouse = mouse;
             cursor_erase();
-            for (int i = 0; i < MAX_WINDOWS; ++i) {
-                if (windows[i].used) {
-                    draw_window(&windows[i]);
-                }
-            }
-            /* Typing in a topmost window only changes that rectangle; pushing
-             * the entire framebuffer for each keystroke was the main source
-             * of visible stutter. Menus, dialogs and window moves still use
-             * a full recomposition because their effects are global. */
             gfx_dirty frame = { 0, 0, 0, 0, 0 };
             if (external_only) {
                 kos_gui_window_info external[8];
                 int count = gfx_window_list(external, 8);
                 for (int i = 0; i < count; ++i) {
                     if (!external[i].minimized) {
-                        gfx_dirty_add(&frame, external[i].x, external[i].y, external[i].width,
-                                      external[i].height);
+                        gfx_dirty_add(
+                            &frame, external[i].x, external[i].y, external[i].width, external[i].height);
                     }
                 }
                 if (!frame.valid) {
@@ -4509,14 +5362,59 @@ int main(int argc, char** argv) {
             } else if (live_window) {
                 dirty_window(&frame, live_window);
                 gfx_dirty_add(&frame, 0, screen_height - TASKBAR_HEIGHT, screen_width, TASKBAR_HEIGHT);
-            } else if (key && !menu && !context_open && focused_window && focused_window->used
+            } else if (
+                key && !menu && !context_open && focused_window && focused_window->used && !gui_keyboard_move
                 && zorder[MAX_WINDOWS - 1] == (int)(focused_window - windows)
                 && (focused_window->kind == 2 || focused_window->kind == 4 || focused_window->kind == 6
                     || focused_window->kind == 8 || focused_window->kind == 9)) {
                 dirty_window(&frame, focused_window);
                 gfx_dirty_add(&frame, 0, screen_height - TASKBAR_HEIGHT, screen_width, TASKBAR_HEIGHT);
+            } else if (
+                focused_window && focused_window->used && !focused_window->minimized && !dragging && !resizing
+                && !keyboard_resize && !gui_keyboard_move && !menu && !context_open
+                && zorder[MAX_WINDOWS - 1] == (int)(focused_window - windows)
+                && (focused_window->kind == 2 || focused_window->kind == 4 || focused_window->kind == 6
+                    || focused_window->kind == 8 || focused_window->kind == 9)) {
+                /* Mouse-driven content changes (scroll, list moves) repaint the
+                 * focused document window instead of the whole frame. */
+                dirty_window(&frame, focused_window);
+                gfx_dirty_add(&frame, 0, screen_height - TASKBAR_HEIGHT, screen_width, TASKBAR_HEIGHT);
             } else {
                 dirty_full(&frame);
+            }
+            /* An overlay (Start, dialog, menu dropdown, context menu) paints
+             * above every window. Both its last rectangle and its new one must
+             * be repainted: otherwise closing or moving it leaves fragments. */
+            if (overlay_prev.valid) {
+                gfx_dirty_add(
+                    &frame,
+                    overlay_prev.left,
+                    overlay_prev.top,
+                    overlay_prev.right - overlay_prev.left,
+                    overlay_prev.bottom - overlay_prev.top);
+            }
+            gfx_dirty overlay_now = { 0, 0, 0, 0, 0 };
+            overlay_bounds(&overlay_now);
+            if (overlay_now.valid) {
+                gfx_dirty_add(
+                    &frame,
+                    overlay_now.left,
+                    overlay_now.top,
+                    overlay_now.right - overlay_now.left,
+                    overlay_now.bottom - overlay_now.top);
+            }
+            if (dock_mag > 0) {
+                /* A magnified tile grows a few pixels above the dock strip. */
+                gfx_dirty_add(
+                    &frame, 0, screen_height - TASKBAR_HEIGHT - 8, screen_width, TASKBAR_HEIGHT + 8);
+            }
+            gui_keyboard_move = 0;
+            for (int i = 0; i < MAX_WINDOWS; ++i) {
+                if (windows[i].used && !windows[i].minimized
+                    && dirty_rect_hit(
+                        &frame, windows[i].x, windows[i].y, windows[i].width, windows[i].height)) {
+                    draw_window(&windows[i]);
+                }
             }
             compose(&frame);
             cursor_move(gui_mouse.x, gui_mouse.y, 0);

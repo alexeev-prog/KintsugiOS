@@ -16,6 +16,7 @@ static u32 effective_volume(u32 channel) {
     u32 master = mixer_volume[0], channel_gain = mixer_volume[channel];
     return master * channel_gain / 100;
 }
+
 static int enabled;
 static int opl2_present;
 

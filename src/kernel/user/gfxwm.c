@@ -22,7 +22,10 @@ static int window_count;
 static int focused = -1;
 static int zorder[GFXWM_MAX];
 static u32 window_generation;
-u32 gfxwm_generation(void) { return window_generation; }
+
+u32 gfxwm_generation(void) {
+    return window_generation;
+}
 
 void gfxwm_init(void) {
     for (int i = 0; i < GFXWM_MAX; ++i) {

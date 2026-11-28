@@ -44,6 +44,8 @@
 #define KOS_SYS_KEY_INJECT 89
 #define KOS_SYS_GFX_WINDOW_GEN 90
 #define KOS_SYS_SOUND_MIXER 91 /* ebx channel, ecx set?, edx value; eax = volume */
+#define KOS_SYS_SHUTDOWN 92 /* Power off the machine (root only). */
+#define KOS_SYS_RTC 93 /* eax = (hour << 16) | (minute << 8) | second */
 
 typedef struct {
     unsigned width, height;

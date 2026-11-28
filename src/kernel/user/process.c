@@ -83,7 +83,8 @@ static u32 shell_pid;
 void process_shutdown(void) {
     /* Single CPU, interrupts disabled by the power path: no new userspace work. */
     for (int i = 0; i < PROCESS_MAX; ++i) {
-        if (&processes[i] != current) {
+        /* Slots with state == 0 are unused and must never be torn down. */
+        if (&processes[i] != current && processes[i].state) {
             reap(&processes[i]);
         }
     }
@@ -860,6 +861,30 @@ int process_boot_init(void) {
     char* argv[] = { "init", NULL };
     init_pid = next_pid;
     return process_run("/bin/INIT.ELF", 1, argv);
+}
+
+/* MC146818 CMOS RTC: real wall-clock time. QEMU seeds the RTC with the host
+ * clock, so the GUI can show actual time instead of seconds since boot. */
+static u8 cmos_read(u8 reg) {
+    u8 value;
+    __asm__ volatile("outb %%al, $0x70\n\tinb $0x71, %%al" : "=a"(value) : "a"((u8)(reg | 0x80)) : "memory");
+    __asm__ volatile("outb %%al, $0x70" : : "a"((u8)(reg & 0x7f)) : "memory");
+    return value;
+}
+
+static u32 system_clock_bcd(void) {
+    /* Read outside an RTC update so seconds/minutes/hours belong together. */
+    for (int guard = 0; guard < 100 && (cmos_read(0x0a) & 0x80); ++guard) {}
+    u8 mode = cmos_read(0x0b);
+    u8 second = cmos_read(0x00);
+    u8 minute = cmos_read(0x02);
+    u8 hour = (u8)(cmos_read(0x04) & 0x7f);
+    if (!(mode & 0x04)) { /* BCD -> binary */
+        second = (u8)((second >> 4) * 10 + (second & 15));
+        minute = (u8)((minute >> 4) * 10 + (minute & 15));
+        hour = (u8)((hour >> 4) * 10 + (hour & 15));
+    }
+    return ((u32)hour << 16) | ((u32)minute << 8) | second;
 }
 
 /* ABI: eax=number, ebx/ecx/edx/esi=arguments, eax=result. */
@@ -1692,6 +1717,12 @@ void syscall_dispatch(syscall_regs_t* r) {
             for (;;) {
                 __asm__ volatile("cli; hlt");
             }
+        case KOS_SYS_SHUTDOWN:
+            log_write("[INFO] shutdown requested\n");
+            system_shutdown();
+            for (;;) {
+                __asm__ volatile("cli; hlt");
+            }
         case KOS_SYS_SLEEP: {
             extern u32 tick;
             u32 ms = r->ebx > 10000 ? 10000 : r->ebx;
@@ -1738,6 +1769,10 @@ void syscall_dispatch(syscall_regs_t* r) {
             }
             memcpy((void*)r->ebx, &out, sizeof(out));
             r->eax = 0;
+            return;
+        }
+        case KOS_SYS_RTC: {
+            r->eax = system_clock_bcd();
             return;
         }
         case 16: { /* Bounded process table snapshot. */
